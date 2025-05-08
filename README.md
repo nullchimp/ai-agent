@@ -38,8 +38,8 @@ src/
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/octodemo/nullchimp-mcp.git
-   cd nullchimp-mcp
+   git clone https://github.com/nullchimp/ai-agent.git
+   cd ai-agent
    ```
 2. Create and activate a Python 3.9+ virtual environment:
    ```bash

@@ -1,6 +1,6 @@
 # Custom Project Instructions
 
-* The repository can be found under: `https://github.com/octodemo/nullchimp-mcp`
+* The repository can be found under: `https://github.com/nullchimp/ai-agent`
 * Context7 should be used to get coding best practices for Python
 * Every change that you make needs to be validated with tests.
 * You have to execute all tests and they need to pass before finishing the implementation.
