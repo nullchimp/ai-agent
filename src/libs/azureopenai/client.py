@@ -5,12 +5,13 @@ from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Union
 import json
 import httpx
+import os
 
 
 # Constants for API configuration
 DEFAULT_TIMEOUT = 30.0  # seconds
-DEFAULT_ENDPOINT = "https://timo-m6qhelh2-eastus2.cognitiveservices.azure.com/openai/deployments/custom-gpt-4.1/chat/completions?api-version=2025-01-01-preview"
-DEFAULT_MODEL = "custom-gpt-4.1"
+DEFAULT_ENDPOINT = os.environ.get("AZURE_OPENAI_ENDPOINT", "https://api.azure.com/openai/v1")
+DEFAULT_MODEL = os.environ.get("AZURE_OPENAI_MODEL", "GPT-4o")
 
 
 @dataclass
@@ -78,6 +79,8 @@ class Client:
         endpoint: Optional[str] = None, 
         timeout: Optional[float] = None
     ):
+        print("Loading Azure OpenAI client with model:", DEFAULT_MODEL)
+
         self.api_key = api_key
         self.endpoint = endpoint or DEFAULT_ENDPOINT
         self.timeout = timeout or DEFAULT_TIMEOUT
