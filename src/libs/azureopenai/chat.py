@@ -13,7 +13,6 @@ DEFAULT_MAX_TOKENS = 500
 DEFAULT_API_KEY_ENV = "AZURE_OPENAI_API_KEY"
 DEFAULT_TIMEOUT = 30.0  # seconds
 
-
 class ChatClient(Protocol):
     """Protocol defining the methods required for chat functionality."""
     
@@ -82,12 +81,18 @@ class Chat:
         self,
         system_role: str,
         user_prompt: str,
-        opts: ResponseOptions
+        tools: Optional[Any] = None,
     ) -> str:
         messages = [
             Message(role="system", content=system_role),
             Message(role="user", content=user_prompt)
         ]
+
+        opts = ResponseOptions(
+            temperature=0.7,
+            max_tokens=32000,
+            tools=tools
+        )
         
         # Make the request to get full response
         resp = self.client.make_request(

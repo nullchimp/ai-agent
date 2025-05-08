@@ -5,22 +5,38 @@ from libs.azureopenai.chat import Chat
 from libs.search.service import Service
 from libs.fileops.file import FileService
 from libs.webfetch.service import WebMarkdownService
+from tools.google_search import GoogleSearch
 
+# Initialize the Chat client with the Google Search tool
 chat = Chat.create()
-system_role = "You are a helpful assistant."
-user_prompt = "What is the capital of France?"
 
-response = chat.send_prompt(system_role, user_prompt)
+# Create an instance of the GoogleSearch tool
+search_tool = GoogleSearch()
+tools = [search_tool.define()]
+
+# Define system role with instructions on using the search tool
+system_role = """You are a helpful assistant with access to search capabilities.
+When you need information to answer a question accurately, use the google_search tool.
+Synthesize and cite your sources correctly."""
+
+user_prompt = input("Enter your question: ")
+
+# Get the enhanced response with search capabilities
+response = chat.send_prompt_with_options(system_role, user_prompt, tools)
+print("Enhanced response with search tool:")
 print(response)
 
+"""
+# Example of direct search usage for comparison
 search = Service.create()
-query = "What is the capital of France?"
+query = "Famous landmarks in Paris France"
 num_results = 5
 
+print("\nDirect search results:")
 search_results = search.search(query, num_results)
 for result in search_results.results:
     print(result)
-    print("/n")
+    print("\n")
 
 file_service = FileService("docs")
 file_path = "example.txt"
@@ -44,3 +60,4 @@ try:
     print(markdown_content[:5000] + "...")
 except Exception as e:
     print(f"Error fetching content from {url}: {e}")
+"""
