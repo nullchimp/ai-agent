@@ -2,7 +2,7 @@
 Google search functionality client module.
 """
 from dataclasses import dataclass
-from typing import List, Optional, Protocol
+from typing import List, Protocol
 import googleapiclient.discovery
 
 
@@ -30,34 +30,13 @@ class Client(Protocol):
     """Protocol for search operations."""
     
     def search(self, query: str, num_results: int) -> SearchResults:
-        """
-        Performs a search with the given query.
-        
-        Args:
-            query: The search query
-            num_results: The number of results to return
-            
-        Returns:
-            SearchResults object containing the search results
-        """
-        ...
+        pass
 
 
-class GoogleClient:
+class GoogleClient(Client):
     """Implements the Client interface using Google Custom Search API."""
     
     def __init__(self, api_key: str, search_cx: str, source_name: str = "Google"):
-        """
-        Initialize a new Google search client.
-        
-        Args:
-            api_key: Google API key
-            search_cx: Custom Search Engine ID
-            source_name: Source name for search results
-            
-        Raises:
-            ValueError: If API key or search engine ID are missing
-        """
         if not api_key:
             raise ValueError("Google API key is required")
         
@@ -72,19 +51,6 @@ class GoogleClient:
         self.source_name = source_name
     
     def search(self, query: str, num_results: int) -> SearchResults:
-        """
-        Performs a Google search with the given query.
-        
-        Args:
-            query: The search query
-            num_results: The number of results to return
-            
-        Returns:
-            SearchResults object containing the search results
-            
-        Raises:
-            ValueError: If the search query is empty
-        """
         if not query:
             raise ValueError("Search query cannot be empty")
         

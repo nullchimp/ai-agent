@@ -59,7 +59,6 @@ class Response:
         
         return json.dumps(result)
 
-
 class Client:
     """Azure OpenAI API client."""
     
@@ -69,14 +68,6 @@ class Client:
         endpoint: Optional[str] = None, 
         timeout: Optional[float] = None
     ):
-        """
-        Initialize a new Azure OpenAI API client.
-        
-        Args:
-            api_key: The API key for Azure OpenAI
-            endpoint: Optional custom endpoint URL
-            timeout: Optional custom timeout in seconds
-        """
         self.api_key = api_key
         self.endpoint = endpoint or DEFAULT_ENDPOINT
         self.timeout = timeout or DEFAULT_TIMEOUT
@@ -91,24 +82,6 @@ class Client:
         top_p: float = 1.0,
         tools: Optional[Any] = None
     ) -> Response:
-        """
-        Sends a request to the API and returns the response.
-        
-        Args:
-            messages: List of message objects to send
-            model: Optional model override
-            temperature: Controls randomness (0-1)
-            max_tokens: Maximum tokens to generate
-            top_p: Nucleus sampling parameter
-            tools: Optional tools configuration
-        
-        Returns:
-            Response object containing the API response
-        
-        Raises:
-            Exception: If the API request fails
-        """
-        # Handle raw messages for tool response cases
         if len(messages) == 1 and messages[0].raw_messages:
             message_data = messages[0].raw_messages
         else:
@@ -127,24 +100,18 @@ class Client:
             "top_p": top_p
         }
         
-        # Add tools if specified
         if tools:
             payload["tools"] = tools
             
-        # Prepare headers
         headers = {
             "Content-Type": "application/json",
             "api-key": self.api_key
         }
-        
-        # Make the request
         response = self.http_client.post(
             self.endpoint,
             headers=headers,
             json=payload
         )
-        
-        # Check for errors
         if response.status_code != 200:
             response_data = response.json()
             error_msg = "Unknown error"
@@ -153,7 +120,6 @@ class Client:
             
             raise Exception(f"API error ({response.status_code}): {error_msg}")
         
-        # Parse the response
         response_data = response.json()
         return Response(response_data)
     
@@ -166,23 +132,6 @@ class Client:
         top_p: float = 1.0,
         tools: Optional[Any] = None
     ) -> str:
-        """
-        Convenience method that returns just the content of the first choice.
-        
-        Args:
-            messages: List of message objects to send
-            model: Optional model override
-            temperature: Controls randomness (0-1)
-            max_tokens: Maximum tokens to generate
-            top_p: Nucleus sampling parameter
-            tools: Optional tools configuration
-            
-        Returns:
-            String content of the first response choice
-            
-        Raises:
-            Exception: If no completion choices are returned
-        """
         response = self.make_request(
             messages=messages,
             model=model,

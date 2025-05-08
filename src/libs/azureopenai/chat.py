@@ -4,12 +4,10 @@ Chat module for Azure OpenAI API integration.
 import os
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Protocol
-import time
 
 from src.azureopenai.client import Client, Message, Response
 
 
-# Default chat options
 DEFAULT_TEMPERATURE = 0.5
 DEFAULT_MAX_TOKENS = 500
 DEFAULT_API_KEY_ENV = "AZURE_OPENAI_API_KEY"
@@ -56,47 +54,18 @@ class Chat:
     """Simple interface for chat completions."""
     
     def __init__(self, client: ChatClient):
-        """
-        Initialize a Chat instance with the provided client.
-        
-        Args:
-            client: A client implementing the ChatClient protocol
-        """
         self.client = client
     
     @classmethod
     def create(cls) -> 'Chat':
-        """
-        Creates a new Chat instance with API key from environment variable.
-        
-        Returns:
-            A new Chat instance
-            
-        Raises:
-            ValueError: If the API key environment variable is not set
-        """
-        # Get API key from environment variable
         api_key = os.environ.get(DEFAULT_API_KEY_ENV)
         if not api_key:
             raise ValueError(f"{DEFAULT_API_KEY_ENV} environment variable is required")
         
-        # Create a new client with default options
         client = Client(api_key=api_key)
-        
         return cls(client)
     
     def send_prompt(self, system_role: str, user_prompt: str) -> str:
-        """
-        Sends a user prompt to the API and returns the response.
-        
-        Args:
-            system_role: The system role/instructions
-            user_prompt: The user's prompt/query
-            
-        Returns:
-            The model's text response
-        """
-        # Create a messages array with system and user messages
         messages = [
             Message(role="system", content=system_role),
             Message(role="user", content=user_prompt)
@@ -115,18 +84,6 @@ class Chat:
         user_prompt: str,
         opts: ResponseOptions
     ) -> str:
-        """
-        Sends a user prompt with additional options and returns the full response.
-        
-        Args:
-            system_role: The system role/instructions
-            user_prompt: The user's prompt/query
-            opts: Additional response options
-            
-        Returns:
-            JSON string representing the full response
-        """
-        # Create a messages array with system and user messages
         messages = [
             Message(role="system", content=system_role),
             Message(role="user", content=user_prompt)
@@ -148,17 +105,6 @@ class Chat:
         messages: List[Dict[str, Any]],
         user_prompt: str
     ) -> str:
-        """
-        Sends a follow-up conversation with tool results.
-        
-        Args:
-            messages: Previous conversation messages
-            user_prompt: The user's follow-up prompt
-            
-        Returns:
-            The model's text response
-        """
-        # Make the raw request with the provided messages
         resp = self.client.make_request(
             messages=[
                 Message(
