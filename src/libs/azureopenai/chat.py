@@ -5,7 +5,7 @@ import os
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Protocol
 
-from src.azureopenai.client import Client, Message, Response
+from .client import Client, Message, Response
 
 
 DEFAULT_TEMPERATURE = 0.5

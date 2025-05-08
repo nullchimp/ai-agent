@@ -15,6 +15,8 @@ class SearchResult:
     display_link: str
     source: str
 
+    def __str__(self):
+        return f"{self.title} ({self.link}) - {self.snippet}"
 
 @dataclass
 class SearchResults:
@@ -25,13 +27,8 @@ class SearchResults:
     results: List[SearchResult]
     formatted_count: str
 
-
 class Client(Protocol):
-    """Protocol for search operations."""
-    
-    def search(self, query: str, num_results: int) -> SearchResults:
-        pass
-
+    pass
 
 class GoogleClient(Client):
     """Implements the Client interface using Google Custom Search API."""
@@ -67,7 +64,6 @@ class GoogleClient(Client):
         )
         response = search_request.execute()
         
-        # Extract search information
         search_info = response.get("searchInformation", {})
         total_results = int(search_info.get("totalResults", "0"))
         search_time = float(search_info.get("searchTime", 0.0))

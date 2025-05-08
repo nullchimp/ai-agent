@@ -4,7 +4,6 @@ File operations module for secure file handling.
 from typing import List
 import os
 
-
 class FileService:
     """
     Service for handling file operations within a secure base directory.
@@ -41,7 +40,7 @@ class FileService:
         except IOError as e:
             raise ValueError(f"Failed to read file: {str(e)}")
     
-    def list_files(self, directory: str) -> List[str]:
+    def list_files(self, directory: str = ".") -> List[str]:
         full_path = self._get_secure_path(directory)
         if not os.path.isdir(full_path):
             raise FileNotFoundError(f"Directory not found: {directory}")

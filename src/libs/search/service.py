@@ -2,7 +2,7 @@
 Google search functionality service module.
 """
 import os
-from src.search.client import Client, GoogleClient, SearchResults
+from .client import Client, GoogleClient, SearchResults
 
 
 class Service:
@@ -13,7 +13,6 @@ class Service:
     
     @classmethod
     def create(cls) -> 'Service':
-        # Get required API credentials from environment
         api_key = os.environ.get("GOOGLE_API_KEY")
         search_engine_id = os.environ.get("GOOGLE_SEARCH_ENGINE_ID")
         

@@ -4,7 +4,6 @@ Client module for Azure OpenAI API integration.
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Union
 import json
-import time
 import httpx
 
 
