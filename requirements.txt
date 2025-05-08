@@ -8,6 +8,7 @@ google-api-python-client>=2.86.0
 # Additional dependencies
 pydantic>=2.0.0
 httpx>=0.24.0
+html2text>=2020.1.16
 
 # Testing
 pytest>=7.3.1

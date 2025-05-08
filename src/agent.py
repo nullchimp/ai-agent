@@ -4,6 +4,7 @@ load_dotenv()
 from libs.azureopenai.chat import Chat
 from libs.search.service import Service
 from libs.fileops.file import FileService
+from libs.webfetch.service import WebMarkdownService
 
 chat = Chat.create()
 system_role = "You are a helpful assistant."
@@ -32,3 +33,14 @@ print(f"Read content: {read_content}")
 
 files = file_service.list_files()
 print(f"Files in 'docs' directory: {files}")
+
+# Example of using the new WebMarkdownService to fetch a web page and convert it to Markdown
+web_markdown_service = WebMarkdownService.create()
+url = "https://home.adelphi.edu/~ca19535/page%204.html"
+try:
+    markdown_content, status_code = web_markdown_service.fetch_as_markdown(url)
+    print(f"Fetched content from {url} with status code {status_code}")
+    print("First 5000 characters of Markdown content:")
+    print(markdown_content[:5000] + "...")
+except Exception as e:
+    print(f"Error fetching content from {url}: {e}")
