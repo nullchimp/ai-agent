@@ -1,0 +1,23 @@
+# Azure OpenAI
+requests>=2.31.0
+python-dotenv>=1.0.0
+
+# Search functionality
+google-api-python-client>=2.86.0
+
+# Additional dependencies
+pydantic>=2.0.0
+httpx>=0.24.0
+html2text>=2020.1.16
+
+# Testing
+pytest>=7.3.1
+pytest-cov>=4.1.0
+
+# Development tools
+black>=23.3.0
+isort>=5.12.0
+mypy>=1.3.0
+pylint>=2.17.4
+flake8>=6.0.0
+bandit>=1.7.5
