@@ -58,7 +58,12 @@ src/
 
 ## Usage
 
-Run the AI agent with:
+Run the **AI Chat** with:
+```bash
+python -m src.chat
+```
+
+Run the **AI Agent** with:
 ```bash
 python -m src.agent
 ```
