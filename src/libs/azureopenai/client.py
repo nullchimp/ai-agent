@@ -19,6 +19,9 @@ class Message:
     role: str
     content: Optional[str] = None
     raw_messages: Optional[List[Dict[str, Any]]] = None
+    name: Optional[str] = None
+    tool_call_id: Optional[str] = None
+    tool_calls: Optional[List[Dict[str, Any]]] = None
 
 
 @dataclass
@@ -43,6 +46,9 @@ class Response:
         
         error_data = response_data.get("error")
         self.error = ErrorResponse(error_data) if error_data else None
+        
+        # Store the full response data
+        self.response_data = response_data
 
     def to_json(self) -> str:
         """Converts the response to a JSON string."""
@@ -57,6 +63,11 @@ class Response:
             result["error"] = {"message": self.error.message}
         
         return json.dumps(result)
+        
+    def to_dict(self) -> Dict[str, Any]:
+        """Returns the full response data as a dictionary."""
+        return self.response_data
+
 
 class Client:
     """Azure OpenAI API client."""
@@ -84,12 +95,25 @@ class Client:
         if len(messages) == 1 and messages[0].raw_messages:
             message_data = messages[0].raw_messages
         else:
-            message_data = [
-                {
-                    "role": msg.role,
-                    "content": msg.content
-                } for msg in messages
-            ]
+            message_data = []
+            for msg in messages:
+                message = {"role": msg.role}
+                
+                # Only include content if it's not None
+                if msg.content is not None:
+                    message["content"] = msg.content
+                
+                # Add other fields if they exist
+                if msg.name:
+                    message["name"] = msg.name
+                    
+                if msg.tool_call_id:
+                    message["tool_call_id"] = msg.tool_call_id
+                    
+                if msg.tool_calls:
+                    message["tool_calls"] = msg.tool_calls
+                
+                message_data.append(message)
         
         payload = {
             "model": model or DEFAULT_MODEL,

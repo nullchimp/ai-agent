@@ -105,6 +105,50 @@ class Chat:
         # Convert the full response to JSON
         return resp.to_json()
     
+    def send_prompt_with_messages_and_options(
+        self,
+        messages: List[Dict[str, Any]],
+        tools: Optional[Any] = None,
+        temperature: float = 0.7,
+        max_tokens: int = 32000,
+    ) -> Dict[str, Any]:
+        """
+        Send a prompt with multiple messages and options.
+        
+        Args:
+            messages: List of message dictionaries with role and content
+            tools: Optional tools to include in the request
+            temperature: Temperature parameter for response generation
+            max_tokens: Maximum tokens in the response
+            
+        Returns:
+            The complete response dictionary from the API
+        """
+        # Convert the messages to the format expected by the client
+        client_messages = []
+        for msg in messages:
+            # Create a Message object for each message
+            client_messages.append(
+                Message(
+                    role=msg.get("role", "user"),
+                    content=msg.get("content", ""),
+                    name=msg.get("name"),
+                    tool_call_id=msg.get("tool_call_id"),
+                    tool_calls=msg.get("tool_calls")
+                )
+            )
+        
+        # Make the request to get full response
+        resp = self.client.make_request(
+            messages=client_messages,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            tools=tools
+        )
+        
+        # Parse the JSON response
+        return resp.to_dict()
+    
     def send_followup(
         self,
         messages: List[Dict[str, Any]],

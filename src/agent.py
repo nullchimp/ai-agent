@@ -1,63 +1,138 @@
 from dotenv import load_dotenv
 load_dotenv()
 
-from libs.azureopenai.chat import Chat
-from libs.search.service import Service
-from libs.fileops.file import FileService
-from libs.webfetch.service import WebMarkdownService
-from tools.google_search import GoogleSearch
+import json
+from typing import Dict, List, Any
 
-# Initialize the Chat client with the Google Search tool
+from libs.azureopenai.chat import Chat
+from tools.google_search import GoogleSearch
+from tools.read_file import ReadFile
+from tools.write_file import WriteFile
+from tools.list_files import ListFiles
+from tools.web_fetch import WebFetch
+
+# Initialize the Chat client
 chat = Chat.create()
 
-# Create an instance of the GoogleSearch tool
+# Create instances of all available tools
 search_tool = GoogleSearch()
-tools = [search_tool.define()]
+read_file_tool = ReadFile()
+write_file_tool = WriteFile()
+list_files_tool = ListFiles()
+web_fetch_tool = WebFetch()
 
-# Define system role with instructions on using the search tool
-system_role = """You are a helpful assistant with access to search capabilities.
-When you need information to answer a question accurately, use the google_search tool.
-Synthesize and cite your sources correctly."""
+# Map tool names to their instances for easy lookup
+tool_map = {
+    "google_search": search_tool,
+    "read_file": read_file_tool,
+    "write_file": write_file_tool,
+    "list_files": list_files_tool,
+    "web_fetch": web_fetch_tool
+}
 
-user_prompt = input("Enter your question: ")
+# Add all tools to the tools list
+tools = [
+    search_tool.define(),
+    read_file_tool.define(),
+    write_file_tool.define(),
+    list_files_tool.define(),
+    web_fetch_tool.define()
+]
 
-# Get the enhanced response with search capabilities
-response = chat.send_prompt_with_options(system_role, user_prompt, tools)
-print("Enhanced response with search tool:")
-print(response)
+def process_tool_calls(response: Dict[str, Any]) -> List[Dict[str, Any]]:
+    tool_results = []
+    
+    # Check for tool calls in the response
+    if "tool_calls" in response:
+        for tool_call in response.get("tool_calls", []):
+            tool_name = tool_call.get("function", {}).get("name")
+            arguments = tool_call.get("function", {}).get("arguments", "{}")
+            
+            # Parse the arguments
+            try:
+                args = json.loads(arguments)
+            except json.JSONDecodeError:
+                args = {}
+            
+            print(f"Executing tool: {tool_name} with arguments: {args}")
 
-"""
-# Example of direct search usage for comparison
-search = Service.create()
-query = "Famous landmarks in Paris France"
-num_results = 5
+            # Execute the tool if it exists in our map
+            if tool_name in tool_map:
+                tool_instance = tool_map[tool_name]
+                tool_result = tool_instance.run(**args)
+                
+                # Prepare the tool result for the API
+                tool_results.append({
+                    "tool_call_id": tool_call.get("id"),
+                    "output": json.dumps(tool_result)
+                })
+            else:
+                # If tool doesn't exist, return an error
+                tool_results.append({
+                    "tool_call_id": tool_call.get("id"),
+                    "output": json.dumps({
+                        "error": f"Tool '{tool_name}' not found"
+                    })
+                })
+                
+    return tool_results
 
-print("\nDirect search results:")
-search_results = search.search(query, num_results)
-for result in search_results.results:
-    print(result)
-    print("\n")
+# Define enhanced system role with instructions on using all available tools
+system_role = """
+You are a helpful assistant. 
+Your Name is Agent Smith and you have with access to various capabilities:
 
-file_service = FileService("docs")
-file_path = "example.txt"
-content = "This is an example content."
-file_service.write_to_file(file_path, content)
-print(f"File written to {file_path}")
+1. Search the web for current information using the google_search tool
+2. Read files from a secure directory using the read_file tool
+3. Write content to files using the write_file tool
+4. List files in a directory using the list_files tool
+5. Fetch web pages and convert them to markdown using the web_fetch tool
 
-read_content = file_service.read_file(file_path)
-print(f"Read content: {read_content}")
+Use these tools appropriately to provide comprehensive assistance.
+Synthesize and cite your sources correctly when using search or web content."""
 
-files = file_service.list_files()
-print(f"Files in 'docs' directory: {files}")
+def run_conversation():
+    """Run a complete conversation with tool calls as needed."""
+    messages = [{"role": "system", "content": system_role}]
+    
+    while True:
+        user_prompt = input("Enter your question (or type 'exit' to quit): ")
+        if user_prompt.lower() == "exit":
+            break
+            
+        messages.append({"role": "user", "content": user_prompt})
+        
+        # Get initial response with potential tool calls
+        response = chat.send_prompt_with_messages_and_options(messages, tools)
+        
+        # Extract the message content
+        assistant_message = response.get("choices", [{}])[0].get("message", {})
+        messages.append(assistant_message)
+        
+        # Process tool calls if present
+        while "tool_calls" in assistant_message:
+            print("Processing tool calls...")
+            
+            # Execute tool calls
+            tool_results = process_tool_calls(assistant_message)
+            
+            for result in tool_results:
+                # Add tool results to messages
+                messages.append({
+                    "role": "tool",
+                    "tool_call_id": result["tool_call_id"],
+                    "content": result["output"]
+                })
+            
+            # Get follow-up response after tool usage
+            response = chat.send_prompt_with_messages_and_options(messages, tools)
+            assistant_message = response.get("choices", [{}])[0].get("message", {})
+            messages.append(assistant_message)
+        
+        # Print final response
+        print("\nResponse:")
+        print(assistant_message.get("content", ""))
+        print("\n" + "-" * 50 + "\n")
 
-# Example of using the new WebMarkdownService to fetch a web page and convert it to Markdown
-web_markdown_service = WebMarkdownService.create()
-url = "https://home.adelphi.edu/~ca19535/page%204.html"
-try:
-    markdown_content, status_code = web_markdown_service.fetch_as_markdown(url)
-    print(f"Fetched content from {url} with status code {status_code}")
-    print("First 5000 characters of Markdown content:")
-    print(markdown_content[:5000] + "...")
-except Exception as e:
-    print(f"Error fetching content from {url}: {e}")
-"""
+if __name__ == "__main__":
+    run_conversation()
