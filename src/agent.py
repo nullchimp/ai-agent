@@ -89,14 +89,15 @@ Your Name is Agent Smith and you have with access to various capabilities:
 5. Fetch web pages and convert them to markdown using the web_fetch tool
 
 Use these tools appropriately to provide comprehensive assistance.
-Synthesize and cite your sources correctly when using search or web content."""
+Synthesize and cite your sources correctly when using search or web content.
+"""
 
 def run_conversation():
     """Run a complete conversation with tool calls as needed."""
     messages = [{"role": "system", "content": system_role}]
     
     while True:
-        user_prompt = input("Enter your question (or type 'exit' to quit): ")
+        user_prompt = input("Enter your question (or type 'exit' to quit):\n")
         if user_prompt.lower() == "exit":
             break
             
