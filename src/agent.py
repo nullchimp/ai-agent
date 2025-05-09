@@ -80,7 +80,7 @@ def process_tool_calls(response: Dict[str, Any]) -> List[Dict[str, Any]]:
 # Define enhanced system role with instructions on using all available tools
 system_role = """
 You are a helpful assistant. 
-Your Name is Agent Smith and you have with access to various capabilities:
+Your Name is Agent Smith and you have access to various capabilities:
 
 1. Search the web for current information using the google_search tool
 2. Read files from a secure directory using the read_file tool
