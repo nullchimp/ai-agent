@@ -24,10 +24,9 @@ jobs:
           pip install --upgrade pip
           pip install -r requirements.txt
           pip install pytest pytest-cov
-
+      - name: Set PYTHONPATH
+        run: echo "PYTHONPATH=$(pwd)" >> $GITHUB_ENV
       - name: Run tests with coverage
-        env:
-          PYTHONPATH: ${{ github.workspace }}
         run: pytest --cov=src --cov-report=xml --cov-fail-under=80
 
       - name: Upload coverage report
