@@ -24,8 +24,11 @@ jobs:
           pip install --upgrade pip
           pip install -r requirements.txt
           pip install pytest pytest-cov
-      - name: Set PYTHONPATH
-        run: echo "PYTHONPATH=$(pwd):$(pwd)/src" >> $GITHUB_ENV
+      
+      - name: Set environment variables
+        run: |
+          echo "AZURE_OPENAI_API_KEY=dummy-key-for-testing" >> $GITHUB_ENV
+          echo "PYTHONPATH=$(pwd):$(pwd)/src" >> $GITHUB_ENV
       - name: Run tests with coverage
         run: pytest --cov=src --cov-report=xml --cov-fail-under=80
 
