@@ -19,7 +19,6 @@
 - Use **Python 3.9+**; follow **semantic versioning** (`vX.Y.Z`).
 - CI must pass **`pylint`**, **`flake8`**, **`mypy`**, and **`black`** checks.
 - Follow **modular design**: One domain = one package (`src/<domain>`). Files: `service.py`, `routes.py`.
-- One File can contain maximum one Class
 - Auto-format with **`black`** and **`isort`**; imports ordered:
   1. _stdlib
   2. third-party
@@ -34,8 +33,6 @@
   ```
 
 ## Docs & Comments
-- Use **docstrings** (Google or NumPy style) for all public modules.
-- Do not use comments in classes or functions.
 - Include **type hints** for function parameters and return values.
 - Explain **why**, not **what**. Use `# NOTE:` or `# TODO: TICKET-123`.
 - Update docs in the **same PR** as code changes.
