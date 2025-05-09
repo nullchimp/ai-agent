@@ -10,8 +10,6 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    env:
-      PYTHONPATH: ${{ github.workspace }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -28,8 +26,9 @@ jobs:
           pip install pytest pytest-cov
 
       - name: Run tests with coverage
-        run: |
-          pytest --cov=src --cov-report=xml --cov-fail-under=80
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+        run: pytest --cov=src --cov-report=xml --cov-fail-under=80
 
       - name: Upload coverage report
         uses: actions/upload-artifact@v4
