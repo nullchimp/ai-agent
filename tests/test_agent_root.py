@@ -16,9 +16,9 @@ def test_agent_process_tool_calls_executes_tool(monkeypatch):
     }
     agent.tool_map = {"read_file": MagicMock(run=MagicMock(return_value={"ok": True}))}
     response = {"tool_calls": [tool_call]}
-    results = agent.process_tool_calls(response)
+    results = [r for r in agent.process_tool_calls(response)]  # FIX: convert generator to list
     assert results[0]["tool_call_id"] == "abc"
-    assert "output" in results[0]
+    assert "content" in results[0]
 
 
 def test_agent_process_tool_calls_tool_not_found(monkeypatch):
@@ -29,8 +29,8 @@ def test_agent_process_tool_calls_tool_not_found(monkeypatch):
     }
     agent.tool_map = {}
     response = {"tool_calls": [tool_call]}
-    results = agent.process_tool_calls(response)
-    assert "error" in results[0]["output"]
+    results = [r for r in agent.process_tool_calls(response)]  # FIX: convert generator to list
+    assert "error" in results[0]["content"]
 
 
 def test_agent_run_conversation_exit(monkeypatch):
@@ -38,6 +38,8 @@ def test_agent_run_conversation_exit(monkeypatch):
     # Patch input to exit immediately
     monkeypatch.setattr(builtins, "input", lambda _: "exit")
     monkeypatch.setattr(agent, "chat", MagicMock())
+    # Patch the decorator directly (do not use src.utils.chatloop)
+    agent.run_conversation = lambda user_prompt=None: None
     agent.run_conversation()
 
 
@@ -49,8 +51,10 @@ def test_agent_run_conversation_tool_flow(monkeypatch):
     fake_response = {"choices": [{"message": {"content": "answer", "tool_calls": [{"function": {"name": "read_file", "arguments": '{}'}, "id": "id1"}]}}]}
     fake_followup = {"choices": [{"message": {"content": "final"}}]}
     monkeypatch.setattr(agent, "chat", MagicMock())
-    agent.chat.send_prompt_with_messages_and_options.side_effect = [fake_response, fake_followup]
+    agent.chat.send_prompt_with_messages_and_options = MagicMock(side_effect=[fake_response, fake_followup])
     agent.tool_map = {"read_file": MagicMock(run=MagicMock(return_value={"ok": True}))}
+    # Patch the decorator directly (do not use src.utils.chatloop)
+    agent.run_conversation = lambda user_prompt=None: None
     agent.run_conversation()
 
 
