@@ -2,7 +2,9 @@ from dotenv import load_dotenv
 load_dotenv()
 
 import json
-from typing import Dict, List, Any
+from typing import Dict, Any
+
+from utils import chatloop
 
 from utils.azureopenai.chat import Chat
 from tools.google_search import GoogleSearch
@@ -11,71 +13,39 @@ from tools.write_file import WriteFile
 from tools.list_files import ListFiles
 from tools.web_fetch import WebFetch
 
-# Initialize the Chat client
-chat = Chat.create()
-
-# Create instances of all available tools
-search_tool = GoogleSearch()
-read_file_tool = ReadFile()
-write_file_tool = WriteFile()
-list_files_tool = ListFiles()
-web_fetch_tool = WebFetch()
-
-# Map tool names to their instances for easy lookup
 tool_map = {
-    "google_search": search_tool,
-    "read_file": read_file_tool,
-    "write_file": write_file_tool,
-    "list_files": list_files_tool,
-    "web_fetch": web_fetch_tool
+    "google_search": GoogleSearch(),
+    "read_file": ReadFile(),
+    "write_file": WriteFile(),
+    "list_files": ListFiles(),
+    "web_fetch": WebFetch()
 }
 
-# Add all tools to the tools list
-tools = [
-    search_tool.define(),
-    read_file_tool.define(),
-    write_file_tool.define(),
-    list_files_tool.define(),
-    web_fetch_tool.define()
-]
+def process_tool_calls(response: Dict[str, Any]):
+    for tool_call in response.get("tool_calls", []):
+        tool_name = tool_call.get("function", {}).get("name")
+        arguments = tool_call.get("function", {}).get("arguments", "{}")
 
-def process_tool_calls(response: Dict[str, Any]) -> List[Dict[str, Any]]:
-    tool_results = []
-    
-    # Check for tool calls in the response
-    if "tool_calls" in response:
-        for tool_call in response.get("tool_calls", []):
-            tool_name = tool_call.get("function", {}).get("name")
-            arguments = tool_call.get("function", {}).get("arguments", "{}")
-            
-            # Parse the arguments
-            try:
-                args = json.loads(arguments)
-            except json.JSONDecodeError:
-                args = {}
-            
-            print(f"Executing tool: {tool_name} with arguments: {args}")
+        print(f"<Tool: {tool_name}>")
+        
+        try:
+            args = json.loads(arguments)
+        except json.JSONDecodeError:
+            args = {}
 
-            # Execute the tool if it exists in our map
-            if tool_name in tool_map:
-                tool_instance = tool_map[tool_name]
-                tool_result = tool_instance.run(**args)
-                
-                # Prepare the tool result for the API
-                tool_results.append({
-                    "tool_call_id": tool_call.get("id"),
-                    "output": json.dumps(tool_result)
-                })
-            else:
-                # If tool doesn't exist, return an error
-                tool_results.append({
-                    "tool_call_id": tool_call.get("id"),
-                    "output": json.dumps({
-                        "error": f"Tool '{tool_name}' not found"
-                    })
-                })
-                
-    return tool_results
+        tool_result = {
+            "error": f"Tool '{tool_name}' not found"
+        }
+
+        if tool_name in tool_map:
+            tool_instance = tool_map[tool_name]
+            tool_result = tool_instance.run(**args)
+            
+        yield {
+            "role": "tool",
+            "tool_call_id": tool_call.get("id"),
+            "content": json.dumps(tool_result)
+        }
 
 # Define enhanced system role with instructions on using all available tools
 system_role = """
@@ -92,48 +62,33 @@ Use these tools appropriately to provide comprehensive assistance.
 Synthesize and cite your sources correctly when using search or web content.
 """
 
-def run_conversation():
-    
-    messages = [{"role": "system", "content": system_role}]
-    
-    while True:
-        user_prompt = input("Enter your question (or type 'exit' to quit):\n")
-        if user_prompt.lower() == "exit":
-            break
-            
-        messages.append({"role": "user", "content": user_prompt})
+chat = Chat.create(tool_map)
+messages = [{"role": "system", "content": system_role}]
+
+@chatloop("Agent")
+def run_conversation(user_prompt):
+    # Example:
+    # user_prompt = """
+    # Who is the current chancellor of Germany? 
+    # Write the result to a file with the name 'chancellor.txt' in a folder with the name 'docs'.
+    # Then list me all files in my root directory and put the result in another file called 'list.txt' in the same 'docs' folder.
+    # """
         
-        # Get initial response with potential tool calls
-        response = chat.send_prompt_with_messages_and_options(messages, tools)
-        
-        # Extract the message content
+    messages.append({"role": "user", "content": user_prompt})
+    response = chat.send_messages(messages)
+
+    assistant_message = response.get("choices", [{}])[0].get("message", {})
+    messages.append(assistant_message)
+    
+    while assistant_message.get("tool_calls", False):
+        for result in process_tool_calls(assistant_message):
+            messages.append(result)
+
+        response = chat.send_messages(messages)
         assistant_message = response.get("choices", [{}])[0].get("message", {})
         messages.append(assistant_message)
-        
-        # Process tool calls if present
-        while "tool_calls" in assistant_message:
-            print("Processing tool calls...")
-            
-            # Execute tool calls
-            tool_results = process_tool_calls(assistant_message)
-            
-            for result in tool_results:
-                # Add tool results to messages
-                messages.append({
-                    "role": "tool",
-                    "tool_call_id": result["tool_call_id"],
-                    "content": result["output"]
-                })
-            
-            # Get follow-up response after tool usage
-            response = chat.send_prompt_with_messages_and_options(messages, tools)
-            assistant_message = response.get("choices", [{}])[0].get("message", {})
-            messages.append(assistant_message)
-        
-        # Print final response
-        print("\nResponse:")
-        print(assistant_message.get("content", ""))
-        print("\n" + "-" * 50 + "\n")
+    
+    return assistant_message.get("content", "")
 
 if __name__ == "__main__":
     run_conversation()

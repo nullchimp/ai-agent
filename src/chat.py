@@ -1,6 +1,7 @@
 from dotenv import load_dotenv
 load_dotenv()
 
+from utils import chatloop
 from utils.azureopenai.chat import Chat
 
 # Initialize the Chat client
@@ -15,21 +16,17 @@ Use your knowledge to provide comprehensive assistance.
 Synthesize and cite your sources correctly.
 """
 
-def run_conversation():
+messages = [{"role": "system", "content": system_role}]
+
+@chatloop("Chat")
+def run_conversation(user_prompt):
+    messages.append({"role": "user", "content": user_prompt})
+    response = chat.send_messages(messages)
     
-    
-    while True:
-        user_prompt = input("Enter your question (or type 'exit' to quit):\n")
-        if user_prompt.lower() == "exit":
-            break
-        
-        # Get initial response with potential tool calls
-        response = chat.send_prompt(system_role, user_prompt)
-        
-        # Print final response
-        print("\nResponse:")
-        print(response)
-        print("\n" + "-" * 50 + "\n")
+    # Print final response
+    hr = "\n" + "-" * 50 + "\n"
+    print(hr, "Response:", hr)
+    print(response, hr)
 
 if __name__ == "__main__":
     run_conversation()

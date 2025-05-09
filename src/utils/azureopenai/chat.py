@@ -1,159 +1,39 @@
 
 import os
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Protocol
+from typing import Any, Dict, List
 
-from .client import Client, Message, Response
+from .client import Client
 
 
 DEFAULT_TEMPERATURE = 0.5
 DEFAULT_MAX_TOKENS = 500
 DEFAULT_API_KEY_ENV = "AZURE_OPENAI_API_KEY"
-DEFAULT_TIMEOUT = 30.0  # seconds
-
-class ChatClient(Protocol):
-    
-    
-    def get_completion(
-        self,
-        messages: List[Message],
-        model: Optional[str] = None,
-        temperature: float = 0.7,
-        max_tokens: int = 2000,
-        top_p: float = 1.0,
-        tools: Optional[Any] = None
-    ) -> str:
-        
-        ...
-    
-    def make_request(
-        self,
-        messages: List[Message],
-        model: Optional[str] = None,
-        temperature: float = 0.7,
-        max_tokens: int = 2000,
-        top_p: float = 1.0,
-        tools: Optional[Any] = None
-    ) -> Response:
-        
-        ...
-
-
-@dataclass
-class ResponseOptions:
-    
-    temperature: float = DEFAULT_TEMPERATURE
-    max_tokens: int = DEFAULT_MAX_TOKENS
-    tools: Optional[Any] = None
-
+DEFAULT_TIMEOUT = 30.0
 
 class Chat:
-    
-    
-    def __init__(self, client: ChatClient):
+    def __init__(self, client, tool_map: Dict[str, Any] = {}):
         self.client = client
+        self.tools = [tool.define() for _, tool in tool_map.items() if hasattr(tool, "define")]
     
     @classmethod
-    def create(cls) -> 'Chat':
+    def create(cls, tool_map = {}) -> 'Chat':
         api_key = os.environ.get(DEFAULT_API_KEY_ENV)
         if not api_key:
             raise ValueError(f"{DEFAULT_API_KEY_ENV} environment variable is required")
         
         client = Client(api_key=api_key)
-        return cls(client)
+        return cls(client, tool_map)
     
-    def send_prompt(self, system_role: str, user_prompt: str) -> str:
-        messages = [
-            Message(role="system", content=system_role),
-            Message(role="user", content=user_prompt)
-        ]
-        
-        # Get just the completion text with the convenience method
-        return self.client.get_completion(
-            messages=messages,
-            temperature=DEFAULT_TEMPERATURE,
-            max_tokens=DEFAULT_MAX_TOKENS
-        )
-    
-    def send_prompt_with_options(
+    def send_messages(
         self,
-        system_role: str,
-        user_prompt: str,
-        tools: Optional[Any] = None,
-    ) -> str:
-        messages = [
-            Message(role="system", content=system_role),
-            Message(role="user", content=user_prompt)
-        ]
-
-        opts = ResponseOptions(
+        messages: List[Dict[str, Any]]
+    ) -> Dict[str, Any]:
+        resp = self.client.make_request(
+            messages=messages,
             temperature=0.7,
             max_tokens=32000,
-            tools=tools
+            tools=self.tools
         )
         
-        # Make the request to get full response
-        resp = self.client.make_request(
-            messages=messages,
-            temperature=opts.temperature,
-            max_tokens=opts.max_tokens,
-            tools=opts.tools
-        )
-        
-        # Convert the full response to JSON
-        return resp.to_json()
-    
-    def send_prompt_with_messages_and_options(
-        self,
-        messages: List[Dict[str, Any]],
-        tools: Optional[Any] = None,
-        temperature: float = 0.7,
-        max_tokens: int = 32000,
-    ) -> Dict[str, Any]:
-        
-        # Convert the messages to the format expected by the client
-        client_messages = []
-        for msg in messages:
-            # Create a Message object for each message
-            client_messages.append(
-                Message(
-                    role=msg.get("role", "user"),
-                    content=msg.get("content", ""),
-                    name=msg.get("name"),
-                    tool_call_id=msg.get("tool_call_id"),
-                    tool_calls=msg.get("tool_calls")
-                )
-            )
-        
-        # Make the request to get full response
-        resp = self.client.make_request(
-            messages=client_messages,
-            temperature=temperature,
-            max_tokens=max_tokens,
-            tools=tools
-        )
-        
-        # Parse the JSON response
-        return resp.to_dict()
-    
-    def send_followup(
-        self,
-        messages: List[Dict[str, Any]],
-        user_prompt: str
-    ) -> str:
-        resp = self.client.make_request(
-            messages=[
-                Message(
-                    role="user",
-                    content=user_prompt,
-                    raw_messages=messages
-                )
-            ],
-            temperature=DEFAULT_TEMPERATURE,
-            max_tokens=DEFAULT_MAX_TOKENS
-        )
-        
-        if not resp.choices:
-            return ""
-            
-        return resp.choices[0].message.get("content", "")
+        return resp
