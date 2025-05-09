@@ -4,7 +4,7 @@ load_dotenv()
 import json
 from typing import Dict, List, Any
 
-from libs.azureopenai.chat import Chat
+from utils.azureopenai.chat import Chat
 from tools.google_search import GoogleSearch
 from tools.read_file import ReadFile
 from tools.write_file import WriteFile
@@ -93,7 +93,7 @@ Synthesize and cite your sources correctly when using search or web content.
 """
 
 def run_conversation():
-    """Run a complete conversation with tool calls as needed."""
+    
     messages = [{"role": "system", "content": system_role}]
     
     while True:

@@ -1,14 +1,10 @@
-"""
-Module for fetching web content from URLs.
-"""
+
 import requests
 from typing import Optional, Dict, Any, Tuple
 
 
 class WebFetcher:
-    """
-    Service for fetching web content from URLs.
-    """
+    
 
     @staticmethod
     def create() -> "WebFetcher":

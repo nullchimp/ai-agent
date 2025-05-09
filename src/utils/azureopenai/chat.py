@@ -1,6 +1,4 @@
-"""
-Chat module for Azure OpenAI API integration.
-"""
+
 import os
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Protocol
@@ -14,7 +12,7 @@ DEFAULT_API_KEY_ENV = "AZURE_OPENAI_API_KEY"
 DEFAULT_TIMEOUT = 30.0  # seconds
 
 class ChatClient(Protocol):
-    """Protocol defining the methods required for chat functionality."""
+    
     
     def get_completion(
         self,
@@ -25,7 +23,7 @@ class ChatClient(Protocol):
         top_p: float = 1.0,
         tools: Optional[Any] = None
     ) -> str:
-        """Gets a completion from the model."""
+        
         ...
     
     def make_request(
@@ -37,20 +35,20 @@ class ChatClient(Protocol):
         top_p: float = 1.0,
         tools: Optional[Any] = None
     ) -> Response:
-        """Makes a request to the API and returns the full response."""
+        
         ...
 
 
 @dataclass
 class ResponseOptions:
-    """Contains optional parameters for the chat response."""
+    
     temperature: float = DEFAULT_TEMPERATURE
     max_tokens: int = DEFAULT_MAX_TOKENS
     tools: Optional[Any] = None
 
 
 class Chat:
-    """Simple interface for chat completions."""
+    
     
     def __init__(self, client: ChatClient):
         self.client = client
@@ -112,18 +110,7 @@ class Chat:
         temperature: float = 0.7,
         max_tokens: int = 32000,
     ) -> Dict[str, Any]:
-        """
-        Send a prompt with multiple messages and options.
         
-        Args:
-            messages: List of message dictionaries with role and content
-            tools: Optional tools to include in the request
-            temperature: Temperature parameter for response generation
-            max_tokens: Maximum tokens in the response
-            
-        Returns:
-            The complete response dictionary from the API
-        """
         # Convert the messages to the format expected by the client
         client_messages = []
         for msg in messages:

@@ -1,6 +1,4 @@
-"""
-Web fetching and markdown conversion package.
-"""
+
 from .fetch import WebFetcher
 from .converter import HtmlToMarkdownConverter
 from .service import WebMarkdownService

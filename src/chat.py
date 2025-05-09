@@ -1,7 +1,7 @@
 from dotenv import load_dotenv
 load_dotenv()
 
-from libs.azureopenai.chat import Chat
+from utils.azureopenai.chat import Chat
 
 # Initialize the Chat client
 chat = Chat.create()
@@ -16,7 +16,7 @@ Synthesize and cite your sources correctly.
 """
 
 def run_conversation():
-    """Run a complete conversation with tool calls as needed."""
+    
     
     while True:
         user_prompt = input("Enter your question (or type 'exit' to quit):\n")

@@ -1,12 +1,10 @@
-"""
-Google search functionality service module.
-"""
+
 import os
 from .client import Client, GoogleClient, SearchResults
 
 
 class Service:
-    """Service that provides high-level search operations."""
+    
     
     def __init__(self, client: Client):
         self.client = client

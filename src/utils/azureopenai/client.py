@@ -1,6 +1,4 @@
-"""
-Client module for Azure OpenAI API integration.
-"""
+
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Union
 import json
@@ -16,7 +14,7 @@ DEFAULT_MODEL = os.environ.get("AZURE_OPENAI_MODEL", "GPT-4o")
 
 @dataclass
 class Message:
-    """Represents a chat message in the OpenAI API format."""
+    
     role: str
     content: Optional[str] = None
     raw_messages: Optional[List[Dict[str, Any]]] = None
@@ -27,18 +25,18 @@ class Message:
 
 @dataclass
 class ResponseChoice:
-    """Represents a completion choice in the API response."""
+    
     message: Dict[str, Any]
 
 
 class ErrorResponse:
-    """Represents an error from the API."""
+    
     def __init__(self, error_data: Dict[str, Any]):
         self.message = error_data.get("message", "")
 
 
 class Response:
-    """Represents the API response structure."""
+    
     def __init__(self, response_data: Dict[str, Any]):
         self.choices = []
         for choice_data in response_data.get("choices", []):
@@ -52,7 +50,7 @@ class Response:
         self.response_data = response_data
 
     def to_json(self) -> str:
-        """Converts the response to a JSON string."""
+        
         result = {
             "choices": [
                 {
@@ -66,12 +64,12 @@ class Response:
         return json.dumps(result)
         
     def to_dict(self) -> Dict[str, Any]:
-        """Returns the full response data as a dictionary."""
+        
         return self.response_data
 
 
 class Client:
-    """Azure OpenAI API client."""
+    
     
     def __init__(
         self, 

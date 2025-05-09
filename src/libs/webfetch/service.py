@@ -1,6 +1,4 @@
-"""
-Module for fetching web content and converting it to Markdown.
-"""
+
 from typing import Dict, Optional, Tuple
 
 from .fetch import WebFetcher
@@ -8,9 +6,7 @@ from .converter import HtmlToMarkdownConverter
 
 
 class WebMarkdownService:
-    """
-    Service for fetching web content and converting it to Markdown.
-    """
+    
 
     @staticmethod
     def create() -> "WebMarkdownService":

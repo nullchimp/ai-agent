@@ -1,6 +1,4 @@
-"""
-Google search functionality client module.
-"""
+
 from dataclasses import dataclass
 from typing import List, Protocol
 import googleapiclient.discovery
@@ -8,7 +6,7 @@ import googleapiclient.discovery
 
 @dataclass
 class SearchResult:
-    """Represents a single search result."""
+    
     title: str
     link: str
     snippet: str
@@ -20,7 +18,7 @@ class SearchResult:
 
 @dataclass
 class SearchResults:
-    """Contains a collection of search results."""
+    
     query: str
     total_results: int
     search_time: float
@@ -31,7 +29,7 @@ class Client(Protocol):
     pass
 
 class GoogleClient(Client):
-    """Implements the Client interface using Google Custom Search API."""
+    
     
     def __init__(self, api_key: str, search_cx: str, source_name: str = "Google"):
         if not api_key:

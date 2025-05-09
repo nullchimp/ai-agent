@@ -1,13 +1,9 @@
-"""
-File operations module for secure file handling.
-"""
+
 from typing import List
 import os
 
 class FileService:
-    """
-    Service for handling file operations within a secure base directory.
-    """
+    
     
     def __init__(self, base_dir: str):
         if not os.path.exists(base_dir):
