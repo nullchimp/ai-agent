@@ -1,0 +1,13 @@
+{
+    "servers": {
+        "<Server Name>": {
+            "command": "<Command to run the server>",
+            "args": [
+                "<Arguments to pass to the server>"
+            ],
+            "env": {
+                "<Environment Variable Name>": "<Environment Variable Value>"
+            }
+        }
+    }
+}
