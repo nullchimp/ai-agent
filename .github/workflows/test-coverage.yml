@@ -1,5 +1,7 @@
 # .github/workflows/test-coverage.yml
 name: Test Coverage
+permissions:
+  contents: read
 
 on:
   push:
