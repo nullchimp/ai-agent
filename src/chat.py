@@ -19,9 +19,9 @@ Synthesize and cite your sources correctly.
 messages = [{"role": "system", "content": system_role}]
 
 @chatloop("Chat")
-def run_conversation(user_prompt):
+async def run_conversation(user_prompt):
     messages.append({"role": "user", "content": user_prompt})
-    response = chat.send_messages(messages)
+    response = await chat.send_messages(messages)
     
     # Print final response
     hr = "\n" + "-" * 50 + "\n"

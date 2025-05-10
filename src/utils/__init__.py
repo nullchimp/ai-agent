@@ -1,10 +1,10 @@
 def chatloop(chat_name):
     def _decorator(func):
-        def _wrapper(*args, **kwargs):
+        async def _wrapper(*args, **kwargs):
             while True:
                 try:
                     arguments = (input(f"<{chat_name}> "),) + args
-                    result = func(*arguments, **kwargs)
+                    result = await func(*arguments, **kwargs)
 
                     hr = "\n" + "-" * 50 + "\n"
                     print(hr, f"<Response> {result}", hr)

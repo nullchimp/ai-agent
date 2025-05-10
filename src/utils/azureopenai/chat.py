@@ -25,11 +25,11 @@ class Chat:
         client = Client(api_key=api_key)
         return cls(client, tool_map)
     
-    def send_messages(
+    async def send_messages(
         self,
         messages: List[Dict[str, Any]]
     ) -> Dict[str, Any]:
-        resp = self.client.make_request(
+        resp = await self.client.make_request(
             messages=messages,
             temperature=0.7,
             max_tokens=32000,

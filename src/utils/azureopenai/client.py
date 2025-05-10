@@ -20,9 +20,9 @@ class Client:
         self.api_key = api_key
         self.endpoint = endpoint or DEFAULT_ENDPOINT
         self.timeout = timeout or DEFAULT_TIMEOUT
-        self.http_client = httpx.Client(timeout=self.timeout)
+        self.http_client = httpx.AsyncClient(timeout=self.timeout)
     
-    def make_request(
+    async def make_request(
         self,
         messages: List[Dict[str, Any]],
         model: Optional[str] = None,
@@ -69,7 +69,7 @@ class Client:
             "Content-Type": "application/json",
             "api-key": self.api_key
         }
-        response = self.http_client.post(
+        response = await self.http_client.post(
             self.endpoint,
             headers=headers,
             json=payload
@@ -83,26 +83,3 @@ class Client:
             raise Exception(f"API error ({response.status_code}): {error_msg}")
         
         return response.json()
-    
-    def get_completion(
-        self,
-        messages: List[Dict[str, Any]],
-        model: Optional[str] = None,
-        temperature: float = 0.7,
-        max_tokens: int = 2000,
-        top_p: float = 1.0,
-        tools: Optional[Any] = None
-    ) -> str:
-        response = self.make_request(
-            messages=messages,
-            model=model,
-            temperature=temperature,
-            max_tokens=max_tokens,
-            top_p=top_p,
-            tools=tools
-        )
-        
-        if not response["choices"]:
-            raise Exception("No completion choices returned")
-        
-        return response["choices"][0]["message"].get("content", "")

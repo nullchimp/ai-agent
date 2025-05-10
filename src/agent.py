@@ -66,7 +66,7 @@ chat = Chat.create(tool_map)
 messages = [{"role": "system", "content": system_role}]
 
 @chatloop("Agent")
-def run_conversation(user_prompt):
+async def run_conversation(user_prompt):
     # Example:
     # user_prompt = """
     # Who is the current chancellor of Germany? 
@@ -75,7 +75,7 @@ def run_conversation(user_prompt):
     # """
         
     messages.append({"role": "user", "content": user_prompt})
-    response = chat.send_messages(messages)
+    response = await chat.send_messages(messages)
 
     assistant_message = response.get("choices", [{}])[0].get("message", {})
     messages.append(assistant_message)
@@ -84,7 +84,7 @@ def run_conversation(user_prompt):
         for result in process_tool_calls(assistant_message):
             messages.append(result)
 
-        response = chat.send_messages(messages)
+        response = await chat.send_messages(messages)
         assistant_message = response.get("choices", [{}])[0].get("message", {})
         messages.append(assistant_message)
     
