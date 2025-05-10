@@ -1,6 +1,8 @@
 from dotenv import load_dotenv
 load_dotenv()
 
+from typing import Dict, Any, Optional
+
 from utils import chatloop
 from utils.azureopenai.chat import Chat
 
@@ -19,14 +21,33 @@ Synthesize and cite your sources correctly.
 messages = [{"role": "system", "content": system_role}]
 
 @chatloop("Chat")
-async def run_conversation(user_prompt):
+async def run_conversation(user_prompt: str) -> str:
+    """Run a conversation with the user.
+    
+    Args:
+        user_prompt: The user's input prompt.
+        
+    Returns:
+        The assistant's response as a string.
+    """
     messages.append({"role": "user", "content": user_prompt})
     response = await chat.send_messages(messages)
+    
+    # Extract content from response, handling possible errors and edge cases
+    content = ""
+    if response:
+        if isinstance(response, dict) and "choices" in response:
+            choices = response.get("choices", [])
+            if choices and len(choices) > 0:
+                message = choices[0].get("message", {})
+                content = message.get("content", "")
     
     # Print final response
     hr = "\n" + "-" * 50 + "\n"
     print(hr, "Response:", hr)
     print(response, hr)
+    
+    return content
 
 if __name__ == "__main__":
     run_conversation()

@@ -2,7 +2,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 import json
-from typing import Dict, Any
+from typing import Dict, Any, List, Generator
 
 from utils import chatloop
 
@@ -21,10 +21,35 @@ tool_map = {
     "web_fetch": WebFetch()
 }
 
-def process_tool_calls(response: Dict[str, Any]):
+def process_tool_calls(response: Dict[str, Any]) -> Generator[Dict[str, Any], None, None]:
+    """Process tool calls from the LLM response and return results.
+    
+    Args:
+        response: The response from the LLM containing tool calls.
+        
+    Yields:
+        Dict with tool response information.
+    """
+    # Handle case where tool_calls is None or not present
+    if not response or not response.get("tool_calls") or not isinstance(response.get("tool_calls"), list):
+        return
+    
     for tool_call in response.get("tool_calls", []):
-        tool_name = tool_call.get("function", {}).get("name")
-        arguments = tool_call.get("function", {}).get("arguments", "{}")
+        if not isinstance(tool_call, dict):
+            continue
+            
+        tool_id = tool_call.get("id", "unknown_tool")
+        
+        # Extract function data, handling possible missing keys
+        function_data = tool_call.get("function", {})
+        if not isinstance(function_data, dict):
+            continue
+            
+        tool_name = function_data.get("name")
+        if not tool_name:
+            continue
+        
+        arguments = function_data.get("arguments", "{}")
 
         print(f"<Tool: {tool_name}>")
         
@@ -39,11 +64,16 @@ def process_tool_calls(response: Dict[str, Any]):
 
         if tool_name in tool_map:
             tool_instance = tool_map[tool_name]
-            tool_result = tool_instance.run(**args)
+            try:
+                tool_result = tool_instance.run(**args)
+            except Exception as e:
+                tool_result = {
+                    "error": f"Error running tool '{tool_name}': {str(e)}"
+                }
             
         yield {
             "role": "tool",
-            "tool_call_id": tool_call.get("id"),
+            "tool_call_id": tool_id,
             "content": json.dumps(tool_result)
         }
 
@@ -76,15 +106,30 @@ async def run_conversation(user_prompt):
         
     messages.append({"role": "user", "content": user_prompt})
     response = await chat.send_messages(messages)
-
-    assistant_message = response.get("choices", [{}])[0].get("message", {})
+    
+    # Handle possible None response
+    if not response:
+        return ""
+        
+    # Handle missing or empty choices
+    choices = response.get("choices", [])
+    if not choices:
+        return ""
+    
+    assistant_message = choices[0].get("message", {})
     messages.append(assistant_message)
     
-    while assistant_message.get("tool_calls", False):
+    # Handle the case where tool_calls might be missing or not a list
+    while assistant_message.get("tool_calls"):
         for result in process_tool_calls(assistant_message):
             messages.append(result)
 
         response = await chat.send_messages(messages)
+        
+        # Handle possible None response or missing choices
+        if not response or not response.get("choices"):
+            break
+            
         assistant_message = response.get("choices", [{}])[0].get("message", {})
         messages.append(assistant_message)
     
