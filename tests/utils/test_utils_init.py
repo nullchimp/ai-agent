@@ -7,7 +7,7 @@ from unittest.mock import patch, MagicMock, AsyncMock
 # Ensure src/ is in sys.path for imports
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../src')))
 
-from utils import chatloop
+from src.utils import chatloop
 
 def test_chatloop_decorator_creation():
     """Test that the chatloop decorator returns a proper wrapper function."""
@@ -97,3 +97,73 @@ async def test_chatloop_multiple_inputs():
             
             # Verify function was called twice (once for each input)
             assert call_count == 2
+
+@pytest.mark.asyncio
+async def test_chatloop_basic_execution():
+    """Test the chatloop decorator runs a function once and exits on KeyboardInterrupt."""
+    # Create a mock function to be decorated
+    mock_func = MagicMock()
+    mock_func.return_value = asyncio.Future()
+    mock_func.return_value.set_result("Test response")
+    
+    # Apply the decorator
+    decorated = chatloop("TestChat")(mock_func)
+    
+    # Mock input/print functions and simulate KeyboardInterrupt after first iteration
+    with patch('builtins.input', side_effect=["Test input", KeyboardInterrupt()]):
+        with patch('builtins.print') as mock_print:
+            await decorated("arg1", kwarg1="value1")
+            
+            # Verify the function was called with correct parameters
+            mock_func.assert_called_once_with("Test input", "arg1", kwarg1="value1")
+            
+            # Verify output was printed
+            assert any("Test response" in str(call) for call in mock_print.call_args_list)
+
+@pytest.mark.asyncio
+async def test_chatloop_exception_handling():
+    """Test the chatloop decorator handles exceptions properly."""
+    # Create a mock function that raises an exception
+    mock_func = MagicMock()
+    mock_func.side_effect = [Exception("Test error"), KeyboardInterrupt()]
+    
+    # Apply the decorator
+    decorated = chatloop("TestChat")(mock_func)
+    
+    # Mock input/print and execute
+    with patch('builtins.input', return_value="Test input"):
+        with patch('builtins.print') as mock_print:
+            await decorated()
+            
+            # Verify error was printed
+            assert any("Error: Test error" in str(call) for call in mock_print.call_args_list)
+
+@pytest.mark.asyncio
+async def test_chatloop_multiple_iterations():
+    """Test the chatloop decorator handles multiple chat iterations."""
+    # Create a sequence of responses
+    mock_func = MagicMock()
+    response_future1 = asyncio.Future()
+    response_future1.set_result("Response 1")
+    response_future2 = asyncio.Future()
+    response_future2.set_result("Response 2")
+    
+    mock_func.side_effect = [response_future1, response_future2]
+    
+    # Apply the decorator
+    decorated = chatloop("TestChat")(mock_func)
+    
+    # Mock inputs and simulate KeyboardInterrupt after second iteration
+    with patch('builtins.input', side_effect=["Input 1", "Input 2", KeyboardInterrupt()]):
+        with patch('builtins.print') as mock_print:
+            await decorated()
+            
+            # Verify the function was called twice with correct inputs
+            assert mock_func.call_count == 2
+            mock_func.assert_any_call("Input 1")
+            mock_func.assert_any_call("Input 2")
+            
+            # Verify both responses were printed
+            printed_strings = [str(call) for call in mock_print.call_args_list]
+            assert any("Response 1" in s for s in printed_strings)
+            assert any("Response 2" in s for s in printed_strings)

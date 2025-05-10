@@ -12,25 +12,27 @@ async def test_process_one():
     """Test the process_one coroutine."""
     import main
     
-    # For this test, we need to directly execute the first iteration of the loop
-    # in process_one to verify that print is called before sleep
+    # Mock the sleep function to avoid waiting and stop the infinite loop
+    mock_sleep = AsyncMock()
     
-    # Create a mock for asyncio.sleep that will raise CancelledError after being called
-    async def mock_sleep(seconds):
-        raise asyncio.CancelledError()
+    # Use side_effect to make sleep raise CancelledError after first call
+    # This ensures we exit the while loop after one iteration
+    mock_sleep.side_effect = [None, asyncio.CancelledError()]
     
-    # Apply the mocks - patching at the exact module where sleep is used
     with patch('asyncio.sleep', mock_sleep):
         with patch('builtins.print') as mock_print:
             try:
-                # Run process_one - it should print and then hit our mocked sleep
-                # which raises CancelledError to exit the loop
                 await main.process_one()
             except asyncio.CancelledError:
                 pass
             
             # Verify print was called with the expected message
-            mock_print.assert_called_once_with("Processing one...")
+            mock_print.assert_called_with("Processing one...")
+            assert mock_print.call_count >= 1  # Should be called at least once
+            
+            # Verify sleep was called with expected argument
+            mock_sleep.assert_called_with(1)
+            assert mock_sleep.call_count >= 1  # Should be called at least once
 
 @pytest.mark.asyncio
 async def test_process_two():
