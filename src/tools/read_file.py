@@ -24,7 +24,7 @@ class ReadFile(Tool):
             }
         }
     
-    def run(self, base_dir: str, filename: str):
+    async def run(self, base_dir: str, filename: str):
         from libs.fileops.file import FileService
         
         service = FileService(base_dir)

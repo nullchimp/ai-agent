@@ -24,7 +24,7 @@ class GoogleSearch(Tool):
 			}
 		}
     
-	def run(self, query: str, num_results: int = 5):
+	async def run(self, query: str, num_results: int = 5):
 
 		from libs.search.service import Service
 

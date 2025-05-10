@@ -1,9 +1,7 @@
 from dotenv import load_dotenv
 load_dotenv()
 
-from typing import Dict, Any, Optional
-
-from utils import chatloop
+from utils import chatutil, graceful_exit, mainloop
 from utils.azureopenai.chat import Chat
 
 # Initialize the Chat client
@@ -20,7 +18,8 @@ Synthesize and cite your sources correctly.
 
 messages = [{"role": "system", "content": system_role}]
 
-@chatloop("Chat")
+@graceful_exit
+@chatutil("Chat")
 async def run_conversation(user_prompt: str) -> str:
     """Run a conversation with the user.
     
@@ -50,4 +49,5 @@ async def run_conversation(user_prompt: str) -> str:
     return content
 
 if __name__ == "__main__":
-    run_conversation()
+    import asyncio
+    asyncio.run(run_conversation())
