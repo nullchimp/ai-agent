@@ -1,6 +1,6 @@
 import pytest
 from utils.azureopenai.chat import Chat
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, AsyncMock
 import os
 
 
@@ -16,10 +16,11 @@ def test_chat_create_no_env(monkeypatch):
         Chat.create()
 
 
-def test_chat_send_messages(monkeypatch):
+@pytest.mark.asyncio
+async def test_chat_send_messages(monkeypatch):
     chat = Chat(MagicMock())
-    chat.client.make_request.return_value = {"choices": [{"message": {"content": "result"}}]}
-    out = chat.send_messages([{"role": "user", "content": "hi"}])
+    chat.client.make_request = AsyncMock(return_value={"choices": [{"message": {"content": "result"}}]})
+    out = await chat.send_messages([{"role": "user", "content": "hi"}])
     assert out["choices"][0]["message"]["content"] == "result"
     chat.client.make_request.assert_called()
 

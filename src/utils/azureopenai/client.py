@@ -1,4 +1,3 @@
-
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 import httpx
@@ -31,7 +30,7 @@ class Client:
         top_p: float = 1.0,
         tools: Optional[Any] = None
     ):
-        if len(messages) == 1 and messages[0].raw_messages:
+        if len(messages) == 1 and hasattr(messages[0], "raw_messages"):
             message_data = messages[0].raw_messages
         else:
             message_data = []
@@ -83,3 +82,16 @@ class Client:
             raise Exception(f"API error ({response.status_code}): {error_msg}")
         
         return response.json()
+        
+    async def get_completion(
+        self,
+        messages: List[Dict[str, Any]],
+        **kwargs
+    ) -> str:
+        """Get just the completion text from a chat request."""
+        response = await self.make_request(messages, **kwargs)
+        
+        if not response.get("choices") or len(response["choices"]) == 0:
+            raise Exception("No completion choices returned from API")
+            
+        return response["choices"][0]["message"]["content"]

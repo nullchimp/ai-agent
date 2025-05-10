@@ -1,68 +1,74 @@
 import pytest
 from utils.azureopenai.client import Client
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, AsyncMock
 from types import SimpleNamespace
 
 
-def test_client_make_request_success(monkeypatch):
+@pytest.mark.asyncio
+async def test_client_make_request_success(monkeypatch):
     client = Client(api_key="k", endpoint="http://x", timeout=1)
-    mock_post = MagicMock()
+    mock_post = AsyncMock()
     mock_resp = MagicMock()
     mock_resp.status_code = 200
     mock_resp.json.return_value = {"choices": [{"message": {"content": "hi"}}]}
     mock_post.return_value = mock_resp
     monkeypatch.setattr(client.http_client, "post", mock_post)
-    # Use a message with raw_messages attribute to avoid AttributeError
-    msg = SimpleNamespace(role="user", content="hi", raw_messages=[{"role": "user", "content": "hi"}])
-    out = client.make_request([msg])
+    
+    # Test with a regular dict instead of SimpleNamespace
+    out = await client.make_request([{"role": "user", "content": "hi"}])
     assert out["choices"][0]["message"]["content"] == "hi"
     mock_post.assert_called()
 
 
-def test_client_make_request_error(monkeypatch):
+@pytest.mark.asyncio
+async def test_client_make_request_error(monkeypatch):
     client = Client(api_key="k", endpoint="http://x", timeout=1)
-    mock_post = MagicMock()
+    mock_post = AsyncMock()
     mock_resp = MagicMock()
     mock_resp.status_code = 400
     mock_resp.json.return_value = {"error": {"message": "fail"}}
     mock_post.return_value = mock_resp
     monkeypatch.setattr(client.http_client, "post", mock_post)
-    # Use a message with raw_messages attribute to avoid AttributeError
-    msg = SimpleNamespace(role="user", content="hi", raw_messages=[{"role": "user", "content": "hi"}])
+    
+    # Test with a regular dict instead of SimpleNamespace
     with pytest.raises(Exception) as exc:
-        client.make_request([msg])
+        await client.make_request([{"role": "user", "content": "hi"}])
     assert "API error" in str(exc.value)
 
 
-def test_client_get_completion(monkeypatch):
+@pytest.mark.asyncio
+async def test_client_get_completion(monkeypatch):
     client = Client(api_key="k", endpoint="http://x", timeout=1)
-    mock_make = MagicMock()
-    mock_make.return_value = {"choices": [{"message": {"content": "hi"}}]}
-    client.make_request = mock_make
-    out = client.get_completion([{"role": "user", "content": "hi"}])
+    # Add the get_completion method implementation for testing
+    async def mock_make_request(*args, **kwargs):
+        return {"choices": [{"message": {"content": "hi"}}]}
+    client.make_request = mock_make_request
+    out = await client.get_completion([{"role": "user", "content": "hi"}])
     assert out == "hi"
 
 
-def test_client_get_completion_no_choices(monkeypatch):
+@pytest.mark.asyncio
+async def test_client_get_completion_no_choices(monkeypatch):
     client = Client(api_key="k", endpoint="http://x", timeout=1)
-    mock_make = MagicMock()
-    mock_make.return_value = {"choices": []}
-    client.make_request = mock_make
+    # Add the get_completion method implementation for testing
+    async def mock_make_request(*args, **kwargs):
+        return {"choices": []}
+    client.make_request = mock_make_request
     with pytest.raises(Exception):
-        client.get_completion([{"role": "user", "content": "hi"}])
+        await client.get_completion([{"role": "user", "content": "hi"}])
 
 
-def test_client_make_request_with_tools(monkeypatch):
+@pytest.mark.asyncio
+async def test_client_make_request_with_tools(monkeypatch):
     client = Client(api_key="k", endpoint="http://x", timeout=1)
-    mock_post = MagicMock()
+    mock_post = AsyncMock()
     mock_resp = MagicMock()
     mock_resp.status_code = 200
     mock_resp.json.return_value = {"choices": [{"message": {"content": "hi"}}]}
     mock_post.return_value = mock_resp
     monkeypatch.setattr(client.http_client, "post", mock_post)
-    # Use a message with raw_messages attribute to avoid AttributeError
-    msg = SimpleNamespace(role="user", content="hi", raw_messages=[{"role": "user", "content": "hi"}])
-    out = client.make_request([msg], tools=[{"type": "tool"}])
+    
+    out = await client.make_request([{"role": "user", "content": "hi"}], tools=[{"type": "tool"}])
     assert out["choices"][0]["message"]["content"] == "hi"
     mock_post.assert_called()
 
