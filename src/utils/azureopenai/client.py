@@ -18,16 +18,16 @@ class Client:
         endpoint: Optional[str] = None, 
         timeout: Optional[float] = None
     ):
+        self.api_key = api_key
+        self.endpoint = endpoint or DEFAULT_ENDPOINT
+        self.timeout = timeout or DEFAULT_TIMEOUT
+        self.http_client = httpx.AsyncClient(timeout=self.timeout)
+
         if Client.debug:
             print(f"<Client Initialized>")
             print(f"<Endpoint: {endpoint or DEFAULT_ENDPOINT}>")
             print(f"<Timeout: {timeout or DEFAULT_TIMEOUT}>")
             print(f"<Model: {DEFAULT_MODEL}>\n")
-
-        self.api_key = api_key
-        self.endpoint = endpoint or DEFAULT_ENDPOINT
-        self.timeout = timeout or DEFAULT_TIMEOUT
-        self.http_client = httpx.AsyncClient(timeout=self.timeout)
     
     async def make_request(
         self,

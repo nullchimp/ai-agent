@@ -7,12 +7,15 @@ from utils import chatutil, graceful_exit, mainloop, pretty_print
 from utils.azureopenai.chat import Chat
 from utils.azureopenai.client import Client
 
+from tools.write_file import WriteFile
 from tools.google_search import GoogleSearch
 
+Chat.debug = True
 Client.debug = True
 
 tools = [
     GoogleSearch("google_search"),
+    WriteFile("write_file"),
 ]
 chat = Chat.create(tools)
 
@@ -31,20 +34,30 @@ messages = [{"role": "system", "content": system_role}]
 
 @mainloop
 @graceful_exit
-@chatutil("Chat-Tool")
+@chatutil("Chat-With-Tools")
 async def run_conversation(user_prompt: str) -> str:
     messages.append({"role": "user", "content": user_prompt})
     response = await chat.send_messages(messages)
+    choices = response.get("choices", [])
+    
+    assistant_message = choices[0].get("message", {})
+    messages.append(assistant_message)
+    
+    # Handle the case where tool_calls might be missing or not a list
+    while assistant_message.get("tool_calls"):
+        await chat.process_tool_calls(assistant_message, messages.append)
 
-    content = ""
-    if response:
-        if isinstance(response, dict) and "choices" in response:
-            choices = response.get("choices", [])
-            if choices and len(choices) > 0:
-                message = choices[0].get("message", {})
-                content = message.get("content", "")
+        response = await chat.send_messages(messages)
+        if not (response and response.get("choices", None)):
+            break
+            
+        assistant_message = response.get("choices", [{}])[0].get("message", {})
+        messages.append(assistant_message)
+    
+    result = assistant_message.get("content", "")
 
-    pretty_print(" Result ", content)
+    hr = "\n" + "-" * 50 + "\n"
+    print(hr, f"<Response> {result}", hr)
 
 if __name__ == "__main__":
     import asyncio

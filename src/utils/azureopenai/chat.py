@@ -30,6 +30,12 @@ class Chat:
             raise ValueError(f"{DEFAULT_API_KEY_ENV} environment variable is required")
         
         client = Client(api_key=api_key)
+
+        if Chat.debug:
+            for tool in tool_list:
+                print(f"<Tool Initialized: {tool.name}>")
+            print("\n")
+
         return cls(client, tool_list)
     
     async def send_messages(

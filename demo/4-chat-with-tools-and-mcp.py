@@ -7,6 +7,7 @@ from utils import chatutil, graceful_exit, mainloop, pretty_print
 from utils.azureopenai.chat import Chat
 from utils.azureopenai.client import Client
 
+from tools.write_file import WriteFile
 from tools.google_search import GoogleSearch
 
 Chat.debug = True
@@ -14,6 +15,7 @@ Client.debug = True
 
 tools = [
     GoogleSearch("google_search"),
+    WriteFile("write_file"),
 ]
 chat = Chat.create(tools)
 
@@ -32,7 +34,7 @@ messages = [{"role": "system", "content": system_role}]
 
 @mainloop
 @graceful_exit
-@chatutil("Chat-Tool-Exec")
+@chatutil("Chat-With-Tools-And-MCP")
 async def run_conversation(user_prompt: str) -> str:
     messages.append({"role": "user", "content": user_prompt})
     response = await chat.send_messages(messages)
