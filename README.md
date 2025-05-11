@@ -22,6 +22,10 @@ An intelligent AI agent framework written in Python, designed to facilitate seam
 - Configurable via environment variables and JSON configuration files
 
 ## Architecture
+The project follows a component-based architecture where the AI Agent orchestrates interactions between users, language models, local tools, and MCP servers.
+
+For a detailed view of the architecture including sequence diagrams, component descriptions, and workflow, see [Architecture Documentation](docs/architecture.md).
+
 The codebase follows a modular structure under `src/`:
 
 ```
