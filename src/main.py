@@ -1,21 +1,37 @@
 import asyncio
+import agent
 
-import agent, chat
+from utils import graceful_exit, mainloop
+from utils.mcpclient.sessions_manager import MCPSessionManager
 
-async def process_one():
-    while True:
-        print("Processing one...")
-        await asyncio.sleep(1)
+session_manager = MCPSessionManager()
 
-async def process_two():
+@graceful_exit
+async def mcp_discovery():
+    success = await session_manager.load_mcp_sessions()
+    if not success:
+        print("No valid MCP sessions found in configuration")
+        return
+    
+    await session_manager.list_tools()
+    for tool in session_manager.tools:
+        agent.add_tool(tool)
+
+@mainloop
+@graceful_exit
+async def agent_task():
     await agent.run_conversation()
 
+@graceful_exit
 async def main():
-    # Run both coroutines concurrently
-    await asyncio.gather(
-        process_one(), 
-        process_two()
-    )
+    print("<Discovery: MCP Server>")
+    await mcp_discovery()
+    print("\n" + "-" * 50 + "\n")
+
+    for server_name in session_manager.sessions.keys():
+        print(f"<Active MCP Server: {server_name}>")
+
+    await agent_task()
 
 if __name__ == "__main__":
     asyncio.run(main())

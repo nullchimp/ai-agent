@@ -3,6 +3,7 @@ import os
 from dataclasses import dataclass
 from typing import Any, Dict, List
 
+from tools import Tool
 from .client import Client
 
 
@@ -16,6 +17,9 @@ class Chat:
         self.client = client
         self.tools = [tool.define() for _, tool in tool_map.items() if hasattr(tool, "define")]
     
+    def add_tool(self, tool: Tool) -> None:
+        self.tools.append(tool.define())
+
     @classmethod
     def create(cls, tool_map = {}) -> 'Chat':
         api_key = os.environ.get(DEFAULT_API_KEY_ENV)

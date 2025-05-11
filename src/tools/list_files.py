@@ -25,7 +25,7 @@ class ListFiles(Tool):
             }
         }
     
-    def run(self, base_dir: str, directory: Optional[str] = "."):
+    async def run(self, base_dir: str, directory: Optional[str] = "."):
         from libs.fileops.file import FileService
         
         service = FileService(base_dir)

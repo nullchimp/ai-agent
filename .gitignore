@@ -3,5 +3,9 @@ __pycache__
 .env
 .venv
 .coverage
+.pytest_cache
+
+config/*
+!config/mcp.template.json
 
 coverage.xml

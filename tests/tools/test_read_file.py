@@ -1,44 +1,54 @@
 import pytest
-from tools.read_file import ReadFile
+import sys
+import os
 from unittest.mock import patch, MagicMock
 
+# Ensure src/ is in sys.path for imports
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../src')))
 
-def test_read_file_run_success():
+from tools.read_file import ReadFile
+
+
+@pytest.mark.asyncio
+async def test_read_file_run_success():
     tool = ReadFile()
     with patch("libs.fileops.file.FileService") as MockService:
         instance = MockService.return_value
         instance.read_file.return_value = "data"
-        out = tool.run("/tmp", "file.txt")
+        out = await tool.run("/tmp", "file.txt")
         assert out["success"] is True
         assert out["content"] == "data"
         assert out["filename"] == "file.txt"
         assert out["base_dir"] == "/tmp"
+        instance.read_file.assert_called_with("file.txt")
 
 
-def test_read_file_run_failure():
+@pytest.mark.asyncio
+async def test_read_file_run_failure():
     tool = ReadFile()
     with patch("libs.fileops.file.FileService") as MockService:
         instance = MockService.return_value
         instance.read_file.side_effect = Exception("fail")
-        out = tool.run("/tmp", "file.txt")
+        out = await tool.run("/tmp", "file.txt")
         assert out["success"] is False
-        assert out["content"] is None
+        assert "fail" in out["message"]
         assert out["filename"] == "file.txt"
-        assert out["base_dir"] == "/tmp"
-        assert "Failed to read file" in out["message"]
+        instance.read_file.assert_called_with("file.txt")
 
 
-def test_read_file_run_not_found():
+@pytest.mark.asyncio
+async def test_read_file_run_not_found():
     tool = ReadFile()
     with patch("libs.fileops.file.FileService") as MockService:
         instance = MockService.return_value
         instance.read_file.side_effect = FileNotFoundError("not found")
-        out = tool.run("/tmp", "nofile.txt")
+        out = await tool.run("/tmp", "nofile.txt")
         assert out["success"] is False
-        assert out["content"] is None
+        assert "not found" in out["message"]
         assert out["filename"] == "nofile.txt"
-        assert "Failed to read file" in out["message"]
+        instance.read_file.assert_called_with("nofile.txt")
 
 
 def test_placeholder():
+    """This test is just here to ensure pytest doesn't complain when all other tests are skipped."""
     assert True

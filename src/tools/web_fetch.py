@@ -28,7 +28,7 @@ class WebFetch(Tool):
             }
         }
     
-    def run(self, url: str, headers: Optional[Dict[str, str]] = None):
+    async def run(self, url: str, headers: Optional[Dict[str, str]] = None):
         from libs.webfetch.service import WebMarkdownService
         
         service = WebMarkdownService.create()
