@@ -1,6 +1,6 @@
 # AI Agent
 
-An intelligent AI agent framework written in Python, designed to facilitate seamless integration with Azure OpenAI services, file operations, web fetching, and search functionalities. This project provides modular components to build and extend AI-driven applications with best practices in testing, linting, and continuous integration.
+An intelligent AI agent framework written in Python, designed to facilitate seamless integration with Model Context Protocol (MCP) servers, Azure OpenAI services, file operations, web fetching, and search functionalities. This project provides modular components to build and extend AI-driven applications with best practices in testing, linting, and continuous integration.
 
 ## Table of Contents
 - [Features](#features)
@@ -13,12 +13,13 @@ An intelligent AI agent framework written in Python, designed to facilitate seam
 - [License](#license)
 
 ## Features
-- Integration with Azure OpenAI for chat and completion services
+- Integration with Model Context Protocol (MCP) servers for AI tool execution
+- Support for Azure OpenAI for chat and completion services
 - Modular file operations (read, write, list)
 - Web fetching and conversion utilities
 - Search client with pluggable backends
 - Tooling for codegen workflows
-- Configurable via environment variables
+- Configurable via environment variables and JSON configuration files
 
 ## Architecture
 The codebase follows a modular structure under `src/`:
@@ -26,12 +27,16 @@ The codebase follows a modular structure under `src/`:
 ```
 src/
 ├── agent.py           # Entry point for the AI agent
+├── chat.py            # Chat interface implementation
+├── main.py            # Main application entry point
 ├── libs/              # Core libraries and abstractions
-│   ├── azureopenai/   # Azure OpenAI wrappers (chat, client)
 │   ├── fileops/       # File operations utilities
 │   ├── search/        # Search client and service
 │   └── webfetch/      # Web fetching and conversion services
-└── tools/             # Command-line tools for file and web operations
+├── tools/             # Command-line tools for file, web operations and more
+└── utils/             # Utility modules
+    ├── azureopenai/   # Azure OpenAI wrappers (chat, client)
+    └── mcpclient/     # MCP client for server interactions
 ```
 
 ## Installation
@@ -44,16 +49,21 @@ src/
 2. Create and activate a Python 3.9+ virtual environment:
    ```bash
    python3 -m venv .venv
-   source .venv/bin/activate  # On Windows: .venv\\Scripts\\activate
+   source .venv/bin/activate  # On Windows: .venv\Scripts\activate
    ```
 3. Install dependencies:
    ```bash
    pip install -r requirements.txt
    ```
-4. Copy `.env.example` to `.env` and configure your Azure OpenAI credentials:
+4. Copy `.env.example` to `.env` and configure your credentials:
    ```bash
    cp .env.example .env
    # Edit .env to set environment variables
+   ```
+5. Configure MCP servers (optional):
+   ```bash
+   cp config/mcp.template.json config/mcp.json
+   # Edit the config/mcp.json file to configure your MCP servers
    ```
 
 ## Usage
@@ -68,7 +78,14 @@ Run the **AI Agent** with:
 python -m src.agent
 ```
 
-Customize behavior via environment variables defined in `.env`.
+Run the **Main Application** with:
+```bash
+python -m src.main
+```
+
+Customize behavior via:
+- Environment variables defined in `.env`
+- MCP server configurations in `config/mcp.json`
 
 ## Development
 
@@ -91,14 +108,14 @@ mypy src
 
 ## Testing
 
-All changes must be validated with tests.
+All changes must be validated with tests. The `tests/` directory mirrors the structure of `src/`.
 
 Run unit and integration tests with coverage:
 ```bash
 pytest --cov=src
 ``` 
 
-Ensure 100% pass before committing.
+Ensure all tests pass before committing.
 
 ## Contributing
 
