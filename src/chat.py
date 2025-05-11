@@ -18,6 +18,7 @@ Synthesize and cite your sources correctly.
 
 messages = [{"role": "system", "content": system_role}]
 
+@mainloop
 @graceful_exit
 @chatutil("Chat")
 async def run_conversation(user_prompt: str) -> str:

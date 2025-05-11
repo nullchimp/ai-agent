@@ -1,6 +1,8 @@
 from dotenv import load_dotenv
 load_dotenv()
 
+from datetime import date
+
 import json
 from typing import Dict, Any, Generator, List
 
@@ -21,7 +23,7 @@ tool_map = {
     "web_fetch": WebFetch()
 }
 chat = Chat.create(tool_map)
-def add_mcp_tool(tool: Tool) -> None:
+def add_tool(tool: Tool) -> None:
     tool_map[tool.name] = tool
     chat.add_tool(tool)
 
@@ -63,7 +65,7 @@ async def process_tool_calls(response: Dict[str, Any], call_back) -> None:
         })
 
 # Define enhanced system role with instructions on using all available tools
-system_role = """
+system_role = f"""
 You are a helpful assistant. 
 Your Name is Agent Smith and you have access to various capabilities:
 
@@ -75,7 +77,10 @@ Your Name is Agent Smith and you have access to various capabilities:
 
 Use these tools appropriately to provide comprehensive assistance.
 Synthesize and cite your sources correctly when using search or web content.
+
+Today is {date.today().strftime("%d %B %Y")}.
 """
+
 messages = [{"role": "system", "content": system_role}]
 
 @graceful_exit

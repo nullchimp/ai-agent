@@ -15,16 +15,7 @@ async def mcp_discovery():
     
     await session_manager.list_tools()
     for tool in session_manager.tools:
-        agent.add_mcp_tool(tool)
-    
-    print(session_manager.sessions.keys())
-
-@mainloop
-@graceful_exit
-async def mcp_ping():
-    await session_manager.ping()
-    print(session_manager.sessions.keys())
-    await asyncio.sleep(10)
+        agent.add_tool(tool)
 
 @mainloop
 @graceful_exit
@@ -37,10 +28,10 @@ async def main():
     await mcp_discovery()
     print("\n" + "-" * 50 + "\n")
 
-    await asyncio.gather(
-        mcp_ping(),
-        agent_task()
-    )
+    for server_name in session_manager.sessions.keys():
+        print(f"<Active MCP Server: {server_name}>")
+
+    await agent_task()
 
 if __name__ == "__main__":
     asyncio.run(main())
