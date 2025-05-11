@@ -1,83 +1,106 @@
+"""
+Tests for chatutil decorator in utils/__init__.py
+"""
+
 import pytest
-import os
 import sys
-from unittest.mock import patch, MagicMock, AsyncMock
+import os
+import asyncio
+from unittest.mock import patch, MagicMock, AsyncMock, call
 
 # Ensure src/ is in sys.path for imports
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../src')))
 
-# Import after path setup
-from src.utils import chatutil
+# Import the functions being tested
+from utils import chatutil
 
-@pytest.mark.asyncio
-async def test_chatutil_basic_functionality():
-    """Test that chatutil correctly wraps an async function and processes input/output."""
-    # Create a simple async function to decorate
-    async def test_func(user_input, *args, **kwargs):
-        return f"Response: {user_input}, args: {args}, kwargs: {kwargs}"
-    
-    # Apply decorator with a chat name
-    chat_name = "TestChat"
-    wrapped = chatutil(chat_name)(test_func)
-    
-    # Mock input/output
-    test_input = "test input"
-    with patch('builtins.input', return_value=test_input) as mock_input:
-        with patch('builtins.print') as mock_print:
-            # Run the wrapped function
-            await wrapped("arg1", kwarg1="value1")
-            
-            # Verify input was prompted with correct chat name
-            mock_input.assert_called_once_with(f"<{chat_name}> ")
-            
-            # Verify formatted output was printed
-            hr = "\n" + "-" * 50 + "\n"
-            expected_output = f"<Response> Response: {test_input}, args: ('arg1',), kwargs: {{'kwarg1': 'value1'}}"
-            mock_print.assert_called_with(hr, expected_output, hr)
 
-@pytest.mark.asyncio
-async def test_chatutil_empty_input():
-    """Test chatutil with empty user input."""
-    # Create a simple async function
-    async def test_func(user_input):
-        return f"You said: '{user_input}'"
-    
-    # Apply decorator
-    wrapped = chatutil("EmptyTest")(test_func)
-    
-    # Mock empty input
-    with patch('builtins.input', return_value="") as mock_input:
-        with patch('builtins.print') as mock_print:
-            # Run the wrapped function
-            await wrapped()
-            
-            # Verify correct response with empty input
-            hr = "\n" + "-" * 50 + "\n"
-            expected_output = "<Response> You said: ''"
-            mock_print.assert_called_with(hr, expected_output, hr)
+def test_chatutil_basic_functionality():
+    """Test that chatutil decorator properly wraps a function."""
+    # Use patch to mock print function
+    with patch('builtins.print') as mock_print:
+        # Define test function with chatutil decorator
+        @chatutil("TestModule")
+        async def test_func(input_str):
+            return f"Response: {input_str}"
+        
+        # Call the function
+        result = asyncio.run(test_func("test input"))
+        
+        # Verify result is correct
+        assert result == "Response: test input"
+        
+        # Check that print was called with expected formatting
+        expected_calls = [
+            call('\n--------------------------------------------------\n', '<TestModule> test input'),
+            call('\n--------------------------------------------------\n', '<Response> Response: test input')
+        ]
+        mock_print.assert_has_calls(expected_calls)
 
-@pytest.mark.asyncio
-async def test_chatutil_exception_handling():
-    """Test chatutil handles exceptions in the decorated function."""
-    # Create a function that raises an exception
-    async def test_func(user_input):
-        raise ValueError("Test error")
-    
-    # Apply decorator
-    wrapped = chatutil("ErrorTest")(test_func)
-    
-    # Mock input and run with exception
-    with patch('builtins.input', return_value="test input"):
-        with patch('builtins.print') as mock_print:
-            # Using try-except because we expect the exception to propagate
-            try:
-                await wrapped()
-                assert False, "Expected ValueError was not raised"
-            except ValueError:
-                # Correct behavior: exception should propagate up
-                pass
-            
-            # Verify no response was printed
-            for call in mock_print.call_args_list:
-                args, _ = call
-                assert "<Response>" not in "".join(str(arg) for arg in args)
+
+def test_chatutil_empty_input():
+    """Test chatutil decorator with empty input string."""
+    # Use patch to mock print function
+    with patch('builtins.print') as mock_print:
+        # Define test function with chatutil decorator
+        @chatutil("EmptyTest")
+        async def test_func(input_str=""):
+            return f"Empty response: '{input_str}'"
+        
+        # Call the function with empty input
+        result = asyncio.run(test_func(""))
+        
+        # Verify result is correct
+        assert result == "Empty response: ''"
+        
+        # Check that print was called with expected formatting
+        expected_calls = [
+            call('\n--------------------------------------------------\n', '<EmptyTest> '),
+            call('\n--------------------------------------------------\n', "<Response> Empty response: ''")
+        ]
+        mock_print.assert_has_calls(expected_calls)
+
+
+def test_chatutil_with_exception():
+    """Test chatutil decorator when the wrapped function raises an exception."""
+    # Use patch to mock print function
+    with patch('builtins.print') as mock_print:
+        # Define test function with chatutil decorator that raises an exception
+        @chatutil("ExceptionTest")
+        async def test_func_error():
+            raise ValueError("Test error")
+        
+        # Call the function and expect exception to be propagated
+        with pytest.raises(ValueError, match="Test error"):
+            asyncio.run(test_func_error())
+        
+        # Check that only the input was printed, not the response
+        mock_print.assert_called_once_with('\n--------------------------------------------------\n', '<ExceptionTest> ')
+
+
+def test_chatutil_no_module_name():
+    """Test chatutil decorator without providing a module name."""
+    # Use patch to mock print function
+    with patch('builtins.print') as mock_print:
+        # Define test function with chatutil decorator without module name
+        @chatutil()
+        async def test_func_no_module(input_str):
+            return f"Response: {input_str}"
+        
+        # Call the function
+        result = asyncio.run(test_func_no_module("test input"))
+        
+        # Verify result is correct
+        assert result == "Response: test input"
+        
+        # Check that print was called with appropriate default module name
+        expected_calls = [
+            call('\n--------------------------------------------------\n', '<Function> test input'),
+            call('\n--------------------------------------------------\n', '<Response> Response: test input')
+        ]
+        mock_print.assert_has_calls(expected_calls)
+
+
+def test_placeholder():
+    """This test is just here to ensure pytest doesn't complain."""
+    assert True
