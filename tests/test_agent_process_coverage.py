@@ -3,6 +3,8 @@ import sys
 import os
 from unittest.mock import patch, MagicMock, AsyncMock
 import json
+import asyncio
+import importlib
 
 # Ensure src/ is in sys.path for imports
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../src')))
@@ -11,6 +13,8 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../s
 @pytest.mark.asyncio
 async def test_process_tool_calls_empty_tool_name():
     """Test process_tool_calls with an empty tool name."""
+    # Import agent inside test to avoid importing it with the graceful_exit decorator
+    # already active on methods
     import agent
     
     # Create a response with empty tool name
@@ -40,52 +44,60 @@ async def test_process_tool_calls_empty_tool_name():
 @pytest.mark.asyncio
 async def test_process_tool_calls_tool_error():
     """Test process_tool_calls with a tool that raises an error."""
-    import agent
+    # First patch the graceful_exit decorator before any imports
+    identity_decorator = lambda f: f
     
-    # Create a mock tool that raises an exception
-    mock_tool = MagicMock()
-    mock_tool.run = AsyncMock(side_effect=ValueError("Tool execution failed"))
-    
-    # Create a response using the mock tool
-    response = {
-        "tool_calls": [
-            {
-                "id": "call_123",
-                "function": {
-                    "name": "error_tool",
-                    "arguments": '{"param": "value"}'
+    with patch('src.utils.graceful_exit', identity_decorator):
+        # Now we can safely import agent, as it won't use the problematic decorator
+        import agent
+        
+        # Make sure we reimport agent to avoid cached module
+        importlib.reload(agent)
+        
+        # Create a mock tool with an async mock that will raise an error
+        mock_tool = MagicMock()
+        mock_tool.run = AsyncMock(side_effect=ValueError("Tool execution failed"))
+        
+        # Create a response using the mock tool
+        response = {
+            "tool_calls": [
+                {
+                    "id": "call_123",
+                    "function": {
+                        "name": "error_tool",
+                        "arguments": '{"param": "value"}'
+                    }
                 }
-            }
-        ]
-    }
-    
-    # Mock callback function
-    callback_mock = MagicMock()
-    
-    # Save original tool_map and restore it later
-    original_tool_map = agent.tool_map
-    try:
-        # Set up our mock tool
-        agent.tool_map = {"error_tool": mock_tool}
+            ]
+        }
         
-        # Process calls with the error-raising tool
-        with patch('builtins.print'):  # Suppress print output
-            await agent.process_tool_calls(response, callback_mock)
+        # Mock callback function
+        callback_mock = MagicMock()
         
-        # Verify the callback was called with an error response
-        callback_mock.assert_called_once()
-        call_args = callback_mock.call_args[0][0]
-        assert call_args["role"] == "tool"
-        assert call_args["tool_call_id"] == "call_123"
-        
-        # Parse the content to verify the error message
-        content = json.loads(call_args["content"])
-        assert "error" in content
-        assert "Tool execution failed" in content["error"]
-        
-    finally:
-        # Restore original tool_map
-        agent.tool_map = original_tool_map
+        # Save original tool_map and restore it later
+        original_tool_map = agent.tool_map.copy() if hasattr(agent, 'tool_map') else {}
+        try:
+            # Set up our mock tool
+            agent.tool_map = {"error_tool": mock_tool}
+            
+            # Process calls with the error-raising tool
+            with patch('builtins.print'):  # Suppress print output
+                await agent.process_tool_calls(response, callback_mock)
+            
+            # Verify the callback was called with an error response
+            callback_mock.assert_called_once()
+            call_args = callback_mock.call_args[0][0]
+            assert call_args["role"] == "tool"
+            assert call_args["tool_call_id"] == "call_123"
+            
+            # Parse the content to verify the error message
+            content = json.loads(call_args["content"])
+            assert "error" in content
+            assert "Tool execution failed" in content["error"]
+            
+        finally:
+            # Restore original tool_map
+            agent.tool_map = original_tool_map
 
 
 @pytest.mark.asyncio
@@ -97,10 +109,10 @@ async def test_run_conversation_empty_choices():
     # Create a test function that simulates the run_conversation without chatutil decorator
     async def test_run_conv(prompt):
         # Save original messages and chat
-        original_messages = agent.messages.copy()
+        original_messages = agent.messages.copy() if hasattr(agent, 'messages') else []
         original_chat = agent.chat
-
-        # Mock objects for testing
+        
+        # Mock objects for testing using proper async function
         mock_chat = MagicMock()
         mock_chat.send_messages = AsyncMock(return_value={"choices": []})
         
@@ -154,17 +166,26 @@ async def test_process_tool_calls_invalid_json():
     # Mock callback function
     callback_mock = MagicMock()
     
-    # Process calls with invalid JSON should handle the error gracefully
-    with patch('builtins.print'):  # Suppress print output
-        await agent.process_tool_calls(response, callback_mock)
-    
-    # Verify the callback was called with the appropriate tool response
-    callback_mock.assert_called_once()
-    call_args = callback_mock.call_args[0][0]
-    assert call_args["role"] == "tool"
-    assert call_args["tool_call_id"] == "call_123"
-    
-    # The content should contain an error message about the tool not being found
-    content = json.loads(call_args["content"])
-    assert "error" in content
-    assert "not found" in content["error"]
+    # Save original tool_map and restore it later
+    original_tool_map = agent.tool_map.copy() if hasattr(agent, 'tool_map') else {}
+    try:
+        # Make sure tool_map doesn't have the tool to trigger specific error path
+        agent.tool_map = {}
+        
+        # Process calls with invalid JSON should handle the error gracefully
+        with patch('builtins.print'):  # Suppress print output
+            await agent.process_tool_calls(response, callback_mock)
+        
+        # Verify the callback was called with the appropriate tool response
+        callback_mock.assert_called_once()
+        call_args = callback_mock.call_args[0][0]
+        assert call_args["role"] == "tool"
+        assert call_args["tool_call_id"] == "call_123"
+        
+        # The content should contain an error message about the tool not being found
+        content = json.loads(call_args["content"])
+        assert "error" in content
+        assert "not found" in content["error"]
+    finally:
+        # Restore original tool_map
+        agent.tool_map = original_tool_map

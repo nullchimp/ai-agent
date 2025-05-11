@@ -43,23 +43,13 @@ def event_loop_policy():
     return asyncio.DefaultEventLoopPolicy()
 
 
-@pytest.fixture
-def event_loop(event_loop_policy):
-    """Create an instance of the default event loop for each test case."""
-    loop = event_loop_policy.new_event_loop()
-    asyncio.set_event_loop(loop)
-    yield loop
-    asyncio.set_event_loop(None)
-    loop.close()
-
-
-# Add pytest configuration to set the default loop scope
+# Configure pytest to use pytest-asyncio correctly
 def pytest_configure(config):
     """Configure pytest-asyncio with the default event loop scope."""
     config.addinivalue_line(
         "markers", "asyncio: mark test to run using an asyncio event loop"
     )
     
-    # Set the default fixture loop scope
+    # Set the default fixture loop scope - this addresses the deprecation warning
     if hasattr(config, 'asyncio_options'):
         config.asyncio_options.default_fixture_loop_scope = 'function'
