@@ -7,7 +7,7 @@ from typing import Any, Dict, List
 from tools import Tool
 from .client import Client
 
-from utils.pretty import prettify
+from utils.pretty import prettify, colorize_text
 
 DEFAULT_TEMPERATURE = 0.5
 DEFAULT_MAX_TOKENS = 500
@@ -37,7 +37,7 @@ class Chat:
 
         if Chat.debug:
             for tool in tool_list:
-                print(f"<Tool Initialized: {tool.name}>")
+                print(colorize_text(f"<Tool Initialized: {colorize_text(tool.name, "yellow")}>", "cyan"))
             print("\n")
 
         return cls(client, tool_list)
@@ -56,10 +56,10 @@ class Chat:
         return resp
     
     async def process_tool_calls(self, response: Dict[str, Any], call_back) -> None:
-        hr = "-" * 50
+        hr = "#" * 50
         name = "Agent -> Tools"
         if Chat.debug:
-            print(f"\n{hr} <{name}> {hr}\n")
+            print(colorize_text(f"\n{hr} <{name}> {hr}\n", "yellow"))
         for tool_call in response.get("tool_calls", []):
             function_data = tool_call.get("function", {})
             tool_name = function_data.get("name", "")
@@ -69,7 +69,7 @@ class Chat:
             arguments = function_data.get("arguments", "{}")
 
             if Chat.debug:
-                print(f"<Tool Call: {tool_name}> ", arguments)
+                print(colorize_text(f"<Tool Call: {colorize_text(tool_name, "green")}> ", "yellow"), arguments)
             
             try:
                 args = json.loads(arguments)
@@ -85,16 +85,16 @@ class Chat:
                 try:
                     tool_result = await tool_instance.run(**args)
                     if Chat.debug:
-                        print(f"<Tool Result: {tool_name}> ", prettify(tool_result))
+                        print(colorize_text(f"<Tool Result: {colorize_text(tool_name, "green")}> ", "yellow"), prettify(tool_result))
                 except Exception as e:
                     tool_result = {
                         "error": f"Error running tool '{tool_name}': {str(e)}"
                     }
                     if Chat.debug:
-                        print(f"<Tool Exception: {tool_name}> ", str(e))
+                        print(colorize_text(f"<Tool Exception: {colorize_text(tool_name, "red")}> ", "yellow"), str(e))
             
             if Chat.debug:
-                print(f"\n----{hr * 2}{"-" * len(name)}")
+                print(colorize_text(f"\n####{hr * 2}{"#" * len(name)}", "yellow"))
 
             call_back({
                 "role": "tool",

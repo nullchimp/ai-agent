@@ -1,5 +1,7 @@
 import inspect
 
+from .pretty import colorize_text
+
 DEBUG = False
 def set_debug(debug):
     global DEBUG
@@ -43,8 +45,14 @@ def chatutil(chat_name):
         return _wrapper
     return _decorator
 
-def pretty_print(name: str, data):
+def pretty_print(name: str, data, color = None):
     from .pretty import prettify
 
-    hr = "-" * 50
-    print(f"\n{hr} <{name}> {hr}\n", prettify(data), f"\n----{hr * 2}{"-" * len(name)}")
+    hr = "#" * 50
+    header = f"\n{hr} <{name}> {hr}\n"
+    footer = f"\n####{hr * 2}{"#" * len(name)}"
+    if color:
+        header = colorize_text(header, color)
+        footer = colorize_text(footer, color)
+
+    print(header, prettify(data), footer)

@@ -4,6 +4,24 @@ from colorama import Fore, Style, init
 
 init(autoreset=True)
 
+def colorize_text(text: str, color: str) -> str:
+    colors = {
+        "red": Fore.RED,
+        "blue": Fore.BLUE,
+        "green": Fore.GREEN,
+        "yellow": Fore.YELLOW,
+        "cyan": Fore.CYAN,
+        "magenta": Fore.MAGENTA,
+        "white": Fore.WHITE,
+        "black": Fore.BLACK,
+        "grey": Fore.LIGHTBLACK_EX
+    }
+
+    if color in colors:
+        color = colors[color]
+
+    return f"{color}{text}{Style.RESET_ALL}"
+
 def colorize_json(json_str: Dict[Any, Any], indent: int = 2) -> str:
     color_map = {
         "messages": Fore.BLUE,
@@ -11,7 +29,7 @@ def colorize_json(json_str: Dict[Any, Any], indent: int = 2) -> str:
         "role": Fore.CYAN,
 
         "function": Fore.GREEN,
-        "name": Fore.GREEN,
+        "name": Fore.YELLOW,
         "properties": Fore.GREEN,
         "arguments": Fore.GREEN,
         "parameters": Fore.GREEN,
@@ -47,7 +65,7 @@ def colorize_json(json_str: Dict[Any, Any], indent: int = 2) -> str:
             color = color_map.get(key_part, default_color)
             
             # Colorize the key part
-            colored_line = line.replace(f'"{key_part}":', f'{color}"{key_part}":{Style.RESET_ALL}')
+            colored_line = line.replace(f'"{key_part}":', colorize_text(key_part, color))
             colored_lines.append(colored_line)
         else:
             colored_lines.append(line)

@@ -1,3 +1,6 @@
+from utils import set_debug
+set_debug(True)
+
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -14,8 +17,11 @@ system_role = f"""
 You are a helpful assistant. 
 Your Name is Agent Smith.
 
-Use your knowledge to provide comprehensive assistance.
-Synthesize and cite your sources correctly.
+Whenever you are not sure about something, have a look at the tools available to you.
+You can use them to get information or perform tasks.
+
+You have to provide the most up-to-date information.
+Synthesize and cite your sources correctly, but keep responses concise.
 
 Today is {date.today().strftime("%d %B %Y")}.
 """

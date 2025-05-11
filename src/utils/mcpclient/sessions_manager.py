@@ -6,7 +6,7 @@ import os
 from tools import Tool
 from utils.mcpclient import session as mcp
 
-from utils import DEBUG
+from utils import DEBUG, colorize_text
 class MCPSessionManager:
     debug = DEBUG
 
@@ -14,11 +14,11 @@ class MCPSessionManager:
         self._sessions: Dict[str, mcp.MCPSession] = {}
         self._tools: List[Tool] = []
 
-    async def discovery(self) -> None:
+    async def discovery(self, config_path) -> None:
         if MCPSessionManager.debug:
-            print("<Discovery: MCP Server>")
+            print(colorize_text("<Discovery: MCP Server>", "grey"))
 
-        success = await self.load_mcp_sessions()
+        success = await self.load_mcp_sessions(config_path)
         if not success:
             print("No valid MCP sessions found in configuration")
             return
@@ -26,13 +26,13 @@ class MCPSessionManager:
         await self.list_tools()
 
         if MCPSessionManager.debug:
-            for server_name in self._sessions.keys():
-                print(f"<Active MCP Server: {server_name}>")
+            for server_name, session in self._sessions.items():
+                print(colorize_text(f"\n<Active MCP Server: {colorize_text(server_name, "magenta")}>", "cyan"))
+                for tool in session.tools:
+                    print(colorize_text(f"<Tool Initialized: {colorize_text(tool.name, "yellow")}>", "cyan"))
             print("\n")
 
-    async def load_mcp_sessions(self) -> Dict[str, mcp.MCPSession]:
-        config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../../config', 'mcp.json')
-        
+    async def load_mcp_sessions(self, config_path) -> Dict[str, mcp.MCPSession]:
         try:
             with open(config_path, 'r') as f:
                 config = json.load(f)
@@ -51,25 +51,11 @@ class MCPSessionManager:
         return None
 
     async def list_tools(self) -> None:
+        self._tools = []
         for server_name, session in self._sessions.items():
             try:
-                data = await session.list_tools()
-                if not data:
-                    continue
-
-                for tool_data in data:
-                    if tool_data[0] != "tools":
-                        continue
-                    
-                    for t in tool_data[1]:
-                        tool = Tool(
-                            session=session,
-                            name=t.name,
-                            description=t.description,
-                            parameters=t.inputSchema
-                        )
-                        
-                        self._tools.append(tool)
+                tools = await session.list_tools()
+                self._tools += tools
             except Exception as e:
                 print(f"Error listing tools for server {server_name}: {e}")
                 

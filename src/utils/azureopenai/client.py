@@ -3,7 +3,7 @@ from typing import Any, Dict, List, Optional
 import httpx
 import os
 
-from utils import pretty_print
+from utils import pretty_print, colorize_text
 
 DEFAULT_TIMEOUT = 30.0 # seconds
 DEFAULT_ENDPOINT = os.environ.get("AZURE_OPENAI_ENDPOINT", "https://api.azure.com/openai/v1")
@@ -25,10 +25,10 @@ class Client:
         self.http_client = httpx.AsyncClient(timeout=self.timeout)
 
         if Client.debug:
-            print(f"<Client Initialized>")
-            print(f"<Endpoint: {endpoint or DEFAULT_ENDPOINT}>")
-            print(f"<Timeout: {timeout or DEFAULT_TIMEOUT}>")
-            print(f"<Model: {DEFAULT_MODEL}>\n")
+            print(colorize_text(f"<Client Initialized>", "grey"))
+            print(colorize_text(f"<Endpoint: {endpoint or DEFAULT_ENDPOINT}>", "grey"))
+            print(colorize_text(f"<Timeout: {timeout or DEFAULT_TIMEOUT}>", "grey"))
+            print(colorize_text(f"<Model: {DEFAULT_MODEL}>\n", "grey"))
     
     async def make_request(
         self,
@@ -79,7 +79,7 @@ class Client:
         }
 
         if Client.debug:
-            pretty_print("Agent -> Model", payload)
+            pretty_print("Agent -> Model", payload, "magenta")
 
         response = await self.http_client.post(
             self.endpoint,
@@ -96,7 +96,7 @@ class Client:
             raise Exception(f"API error ({response.status_code}): {error_msg}")
         
         if Client.debug:
-            pretty_print("Model -> Agent", response.json())
+            pretty_print("Model -> Agent", response.json(), "cyan")
 
         return response.json()
         

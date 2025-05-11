@@ -1,12 +1,17 @@
 from contextlib import AsyncExitStack
 
+from tools import Tool
+
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 from mcp.shared.exceptions import McpError
 
-from utils import graceful_exit
+from utils.pretty import prettify
 
+from utils import DEBUG, graceful_exit, colorize_text
 class MCPSession:
+    debug = DEBUG
+
     def __init__(self, server_name: str, server_config: dict):
         self.name = server_name
 
@@ -21,21 +26,53 @@ class MCPSession:
         )
 
         self._session = None
+        self._tools = []
 
     @graceful_exit
     async def list_tools(self) -> ClientSession:
         session = await self.get_session()
         try:
             await session.initialize()
-            return await session.list_tools()
+            data = await session.list_tools()
+            if MCPSession.debug:
+                print(colorize_text(f"<MCP: {self.name}>", "magenta"))
+                print(colorize_text(f"<MCP: Tool Discovery Response> {prettify(data)}", "magenta"))
+            if not data:
+                return []
+
+            for tool_data in data:
+                if tool_data[0] != "tools":
+                    continue
+                
+                self._tools = []
+                for t in tool_data[1]:
+                    tool = Tool(
+                        session=self,
+                        name=t.name,
+                        description=t.description,
+                        parameters=t.inputSchema
+                    )
+                    
+                    self._tools.append(tool)
+                break
+            return self._tools
         except McpError as e:
             return []
-                
+
+    @property
+    def tools(self):
+        return self._tools
+
     async def call_tool(self, tool_name: str, arguments: dict):
         session = await self.get_session()
         try:
             await session.initialize()
-            return await session.call_tool(tool_name, arguments)
+            if MCPSession.debug:
+                print(colorize_text(f"<MCP Tool Call: Request> {prettify(arguments)}", "magenta"))
+            result = await session.call_tool(tool_name, arguments)
+            if MCPSession.debug:
+                print(colorize_text(f"<MCP Tool Call: Response> {prettify(result)}", "magenta"))
+            return result
         except McpError as e:
             return None
                 

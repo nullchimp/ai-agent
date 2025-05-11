@@ -3,6 +3,7 @@ set_debug(True)
 
 import asyncio
 import agent
+import os
 
 from utils import graceful_exit, mainloop
 from utils.mcpclient.sessions_manager import MCPSessionManager
@@ -16,7 +17,8 @@ async def agent_task():
 
 @graceful_exit
 async def main():
-    await session_manager.discovery()
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../config', 'mcp.json')
+    await session_manager.discovery(path)
     for tool in session_manager.tools:
         agent.add_tool(tool)
 
