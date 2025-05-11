@@ -32,7 +32,7 @@ class ReadFile(Tool):
             content = service.read_file(filename)
             return {
                 "success": True,
-                "message": f"Successfully read content from {filename}",
+                "result": f"Successfully read content from {filename}",
                 "filename": filename,
                 "base_dir": base_dir,
                 "content": content
@@ -40,7 +40,7 @@ class ReadFile(Tool):
         except Exception as e:
             return {
                 "success": False,
-                "message": f"Failed to read file: {str(e)}",
+                "result": f"Failed to read file: {str(e)}",
                 "filename": filename,
                 "base_dir": base_dir,
                 "content": None

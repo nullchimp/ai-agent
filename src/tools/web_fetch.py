@@ -37,5 +37,5 @@ class WebFetch(Tool):
         return {
             "url": url,
             "status_code": status_code,
-            "markdown_content": markdown_content
+            "content": markdown_content
         }

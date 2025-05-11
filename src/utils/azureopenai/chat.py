@@ -7,6 +7,8 @@ from typing import Any, Dict, List
 from tools import Tool
 from .client import Client
 
+from utils.pretty import prettify
+
 DEFAULT_TEMPERATURE = 0.5
 DEFAULT_MAX_TOKENS = 500
 DEFAULT_API_KEY_ENV = "AZURE_OPENAI_API_KEY"
@@ -78,7 +80,7 @@ class Chat:
                 try:
                     tool_result = await tool_instance.run(**args)
                     if Chat.debug:
-                        print(f"<Tool Result: {tool_name}> ", tool_result)
+                        print(f"<Tool Result: {tool_name}> ", prettify(tool_result))
                 except Exception as e:
                     tool_result = {
                         "error": f"Error running tool '{tool_name}': {str(e)}"

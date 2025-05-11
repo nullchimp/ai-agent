@@ -39,14 +39,7 @@ def chatutil(chat_name):
     return _decorator
 
 def pretty_print(name: str, data):
-    def complex_handler(obj):
-        if isinstance(obj, object):
-            return obj.__dict__
-        else:
-            raise TypeError('Object of type %s with value of %s is not JSON serializable' % (type(obj), repr(obj)))
-
-    import json
-    data = json.dumps(data, indent=1, default=complex_handler)
+    from .pretty import prettify
 
     hr = "-" * 50
-    print(f"\n{hr} <{name}> {hr}\n", data, f"\n----{hr * 2}{"-" * len(name)}")
+    print(f"\n{hr} <{name}> {hr}\n", prettify(data), f"\n----{hr * 2}{"-" * len(name)}")

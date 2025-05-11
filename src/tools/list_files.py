@@ -33,7 +33,7 @@ class ListFiles(Tool):
             files = service.list_files(directory)
             return {
                 "success": True,
-                "message": f"Successfully listed files in {directory}",
+                "result": f"Successfully listed files in {directory}",
                 "base_dir": base_dir,
                 "directory": directory,
                 "files": files
@@ -41,7 +41,7 @@ class ListFiles(Tool):
         except Exception as e:
             return {
                 "success": False,
-                "message": f"Failed to list files: {str(e)}",
+                "result": f"Failed to list files: {str(e)}",
                 "base_dir": base_dir,
                 "directory": directory,
                 "files": []
