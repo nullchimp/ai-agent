@@ -5,7 +5,7 @@ class GoogleSearch(Tool):
 		return {
 			"type": "function",
 			"function": {
-				"name": "google_search",
+				"name": f"{self.name}",
 				"description": "Search the web for relevant information.",
 				"parameters": {
 					"type": "object",

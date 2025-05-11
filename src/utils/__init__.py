@@ -34,9 +34,19 @@ def chatutil(chat_name):
     def _decorator(func):
         async def _wrapper(*args, **kwargs):
             arguments = (input(f"<{chat_name}> "),) + args
-            result = await func(*arguments, **kwargs)
-
-            hr = "\n" + "-" * 50 + "\n"
-            print(hr, f"<Response> {result}", hr)
+            await func(*arguments, **kwargs)
         return _wrapper
     return _decorator
+
+def pretty_print(name: str, data):
+    def complex_handler(obj):
+        if isinstance(obj, object):
+            return obj.__dict__
+        else:
+            raise TypeError('Object of type %s with value of %s is not JSON serializable' % (type(obj), repr(obj)))
+
+    import json
+    data = json.dumps(data, indent=1, default=complex_handler)
+
+    hr = "-" * 50
+    print(f"\n{hr} <{name}> {hr}\n", data, f"\n----{hr * 2}{"-" * len(name)}")

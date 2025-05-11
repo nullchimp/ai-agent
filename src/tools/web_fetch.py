@@ -6,7 +6,7 @@ class WebFetch(Tool):
         return {
             "type": "function",
             "function": {
-                "name": "web_fetch",
+                "name": f"{self.name}",
                 "description": "Fetch a web page and convert it to Markdown format.",
                 "parameters": {
                     "type": "object",

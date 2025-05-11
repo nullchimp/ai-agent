@@ -3,52 +3,37 @@ load_dotenv()
 
 from datetime import date
 
-import json
-from typing import Dict, Any, Generator, List
-
-from utils import chatutil, graceful_exit
+from utils import chatutil, graceful_exit, mainloop, pretty_print
 from utils.azureopenai.chat import Chat
-from tools import Tool
+from utils.azureopenai.client import Client
+
 from tools.google_search import GoogleSearch
-from tools.read_file import ReadFile
-from tools.write_file import WriteFile
-from tools.list_files import ListFiles
-from tools.web_fetch import WebFetch
 
-tools = {
+Chat.debug = True
+Client.debug = True
+
+tools = [
     GoogleSearch("google_search"),
-    ReadFile("read_file"),
-    WriteFile("write_file"),
-    ListFiles("list_files"),
-    WebFetch("web_fetch")
-}
-
+]
 chat = Chat.create(tools)
-def add_tool(tool: Tool) -> None:
-    chat.add_tool(tool)
 
 # Define enhanced system role with instructions on using all available tools
 system_role = f"""
 You are a helpful assistant. 
-Your Name is Agent Smith and you have access to various capabilities:
+Your Name is Agent Smith.
 
-1. Search the web for current information using the google_search tool
-2. Read files from a secure directory using the read_file tool
-3. Write content to files using the write_file tool
-4. List files in a directory using the list_files tool
-5. Fetch web pages and convert them to markdown using the web_fetch tool
-
-Use these tools appropriately to provide comprehensive assistance.
-Synthesize and cite your sources correctly when using search or web content.
+Use your knowledge to provide comprehensive assistance.
+Synthesize and cite your sources correctly.
 
 Today is {date.today().strftime("%d %B %Y")}.
 """
 
 messages = [{"role": "system", "content": system_role}]
 
+@mainloop
 @graceful_exit
-@chatutil("Agent")
-async def run_conversation(user_prompt) -> str:
+@chatutil("Chat-Tool-Exec")
+async def run_conversation(user_prompt: str) -> str:
     messages.append({"role": "user", "content": user_prompt})
     response = await chat.send_messages(messages)
     choices = response.get("choices", [])

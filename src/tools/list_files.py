@@ -6,7 +6,7 @@ class ListFiles(Tool):
         return {
             "type": "function",
             "function": {
-                "name": "list_files",
+                "name": f"{self.name}",
                 "description": "List files within a secure base directory.",
                 "parameters": {
                     "type": "object",

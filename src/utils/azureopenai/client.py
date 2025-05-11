@@ -3,18 +3,26 @@ from typing import Any, Dict, List, Optional
 import httpx
 import os
 
+from utils import pretty_print
+
 DEFAULT_TIMEOUT = 30.0 # seconds
 DEFAULT_ENDPOINT = os.environ.get("AZURE_OPENAI_ENDPOINT", "https://api.azure.com/openai/v1")
 DEFAULT_MODEL = os.environ.get("AZURE_OPENAI_MODEL", "GPT-4o")
 
 class Client:
+    debug = False
+
     def __init__(
         self, 
         api_key: str, 
         endpoint: Optional[str] = None, 
         timeout: Optional[float] = None
     ):
-        print(f"<Model: {DEFAULT_MODEL}>")
+        if Client.debug:
+            print(f"<Client Initialized>")
+            print(f"<Endpoint: {endpoint or DEFAULT_ENDPOINT}>")
+            print(f"<Timeout: {timeout or DEFAULT_TIMEOUT}>")
+            print(f"<Model: {DEFAULT_MODEL}>\n")
 
         self.api_key = api_key
         self.endpoint = endpoint or DEFAULT_ENDPOINT
@@ -68,11 +76,16 @@ class Client:
             "Content-Type": "application/json",
             "api-key": self.api_key
         }
+
+        if Client.debug:
+            pretty_print("Agent -> Model", payload)
+
         response = await self.http_client.post(
             self.endpoint,
             headers=headers,
             json=payload
         )
+
         if response.status_code != 200:
             response_data = response.json()
             error_msg = "Unknown error"
@@ -81,6 +94,9 @@ class Client:
             
             raise Exception(f"API error ({response.status_code}): {error_msg}")
         
+        if Client.debug:
+            pretty_print("Model -> Agent", response.json())
+
         return response.json()
         
     async def get_completion(

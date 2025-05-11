@@ -5,7 +5,7 @@ class ReadFile(Tool):
         return {
             "type": "function",
             "function": {
-                "name": "read_file",
+                "name": f"{self.name}",
                 "description": "Read content from a file within a secure base directory.",
                 "parameters": {
                     "type": "object",

@@ -5,7 +5,7 @@ class WriteFile(Tool):
         return {
             "type": "function",
             "function": {
-                "name": "write_file",
+                "name": f"{self.name}",
                 "description": "Write content to a file within a secure base directory.",
                 "parameters": {
                     "type": "object",
