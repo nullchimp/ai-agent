@@ -7,14 +7,10 @@ from datetime import date
 from utils import chatutil, graceful_exit, mainloop, pretty_print
 from utils.azureopenai.chat import Chat
 
-Chat.debug = True
-
 from tools.write_file import WriteFile
 from tools.google_search import GoogleSearch
 
 from utils.mcpclient.sessions_manager import MCPSessionManager
-
-MCPSessionManager.debug = True
 
 session_manager = MCPSessionManager()
 
@@ -29,8 +25,11 @@ system_role = f"""
 You are a helpful assistant. 
 Your Name is Agent Smith.
 
+Whenever you are not sure about something, have a look at the tools available to you.
+You can use them to get information or perform tasks.
+
 Use your knowledge to provide comprehensive assistance.
-Synthesize and cite your sources correctly.
+Synthesize and cite your sources correctly. 
 
 Today is {date.today().strftime("%d %B %Y")}.
 """
@@ -60,8 +59,7 @@ async def run_conversation(user_prompt: str) -> str:
     
     result = assistant_message.get("content", "")
 
-    hr = "\n" + "-" * 50 + "\n"
-    print(hr, f"<Response> {result}", hr)
+    pretty_print(" Result ", result)
 
 if __name__ == "__main__":
     @mainloop

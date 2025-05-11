@@ -1,3 +1,6 @@
+from utils import set_debug
+set_debug(True)
+
 import asyncio
 import agent
 

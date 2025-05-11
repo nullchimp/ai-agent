@@ -14,8 +14,9 @@ DEFAULT_MAX_TOKENS = 500
 DEFAULT_API_KEY_ENV = "AZURE_OPENAI_API_KEY"
 DEFAULT_TIMEOUT = 30.0
 
+from utils import DEBUG
 class Chat:
-    debug = False
+    debug = DEBUG
 
     def __init__(self, client, tool_list: List[Tool] = []):
         self.client = client
@@ -55,6 +56,10 @@ class Chat:
         return resp
     
     async def process_tool_calls(self, response: Dict[str, Any], call_back) -> None:
+        hr = "-" * 50
+        name = "Agent -> Tools"
+        if Chat.debug:
+            print(f"\n{hr} <{name}> {hr}\n")
         for tool_call in response.get("tool_calls", []):
             function_data = tool_call.get("function", {})
             tool_name = function_data.get("name", "")
@@ -87,7 +92,10 @@ class Chat:
                     }
                     if Chat.debug:
                         print(f"<Tool Exception: {tool_name}> ", str(e))
-                
+            
+            if Chat.debug:
+                print(f"\n----{hr * 2}{"-" * len(name)}")
+
             call_back({
                 "role": "tool",
                 "tool_call_id": tool_call.get("id", "unknown_tool"),

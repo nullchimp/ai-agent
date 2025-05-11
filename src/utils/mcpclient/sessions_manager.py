@@ -6,8 +6,9 @@ import os
 from tools import Tool
 from utils.mcpclient import session as mcp
 
+from utils import DEBUG
 class MCPSessionManager:
-    debug = False
+    debug = DEBUG
 
     def __init__(self) -> None:
         self._sessions: Dict[str, mcp.MCPSession] = {}

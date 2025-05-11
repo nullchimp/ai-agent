@@ -3,11 +3,9 @@ load_dotenv()
 
 from datetime import date
 
-import json
-from typing import Dict, Any, Generator, List
-
-from utils import chatutil, graceful_exit
+from utils import chatutil, graceful_exit, pretty_print
 from utils.azureopenai.chat import Chat
+
 from tools import Tool
 from tools.google_search import GoogleSearch
 from tools.read_file import ReadFile
@@ -25,15 +23,19 @@ tools = {
 
 chat = Chat.create(tools)
 def add_tool(tool: Tool) -> None:
-    chat.add_tool(tool)
+    #chat.add_tool(tool)
+    pass
 
 # Define enhanced system role with instructions on using all available tools
 system_role = f"""
 You are a helpful assistant. 
 Your Name is Agent Smith.
 
+Whenever you are not sure about something, have a look at the tools available to you.
+You can use them to get information or perform tasks.
+
 Use your knowledge to provide comprehensive assistance.
-Synthesize and cite your sources correctly.
+Synthesize and cite your sources correctly. 
 
 Today is {date.today().strftime("%d %B %Y")}.
 """
@@ -63,8 +65,7 @@ async def run_conversation(user_prompt) -> str:
     
     result = assistant_message.get("content", "")
 
-    hr = "\n" + "-" * 50 + "\n"
-    print(hr, f"<Response> {result}", hr)
+    pretty_print("Result", result)
 
 if __name__ == "__main__":
     import asyncio

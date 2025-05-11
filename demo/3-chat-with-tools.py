@@ -1,3 +1,6 @@
+from utils import set_debug
+set_debug(True)
+
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -10,9 +13,6 @@ from utils.azureopenai.client import Client
 from tools.write_file import WriteFile
 from tools.google_search import GoogleSearch
 
-Chat.debug = True
-Client.debug = True
-
 tools = [
     GoogleSearch("google_search"),
     WriteFile("write_file"),
@@ -24,8 +24,11 @@ system_role = f"""
 You are a helpful assistant. 
 Your Name is Agent Smith.
 
+Whenever you are not sure about something, have a look at the tools available to you.
+You can use them to get information or perform tasks.
+
 Use your knowledge to provide comprehensive assistance.
-Synthesize and cite your sources correctly.
+Synthesize and cite your sources correctly. 
 
 Today is {date.today().strftime("%d %B %Y")}.
 """
@@ -56,8 +59,7 @@ async def run_conversation(user_prompt: str) -> str:
     
     result = assistant_message.get("content", "")
 
-    hr = "\n" + "-" * 50 + "\n"
-    print(hr, f"<Response> {result}", hr)
+    pretty_print(" Result ", result)
 
 if __name__ == "__main__":
     import asyncio

@@ -1,5 +1,10 @@
 import inspect
 
+DEBUG = False
+def set_debug(debug):
+    global DEBUG
+    DEBUG = debug
+
 def mainloop(func):
     async def _decorator(*args, **kwargs):
         while True:

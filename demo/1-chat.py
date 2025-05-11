@@ -5,9 +5,6 @@ from datetime import date
 
 from utils import chatutil, graceful_exit, mainloop, pretty_print
 from utils.azureopenai.chat import Chat
-from utils.azureopenai.client import Client
-
-Client.debug = True
 
 # Initialize the Chat client
 chat = Chat.create()
