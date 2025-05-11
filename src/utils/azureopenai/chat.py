@@ -21,6 +21,7 @@ class Chat:
         self.tools = [tool.define() for tool in tool_list]
     
     def add_tool(self, tool: Tool) -> None:
+        self.tool_map[tool.name] = tool
         self.tools.append(tool.define())
 
     @classmethod

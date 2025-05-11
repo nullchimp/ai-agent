@@ -8,10 +8,28 @@ from tools import Tool
 from utils.mcpclient import session as mcp
 
 class MCPSessionManager:
+    debug = False
+
     def __init__(self) -> None:
         self._sessions: Dict[str, mcp.MCPSession] = {}
         self._tools: List[Tool] = []
-    
+
+    async def discovery(self) -> None:
+        if MCPSessionManager.debug:
+            print("<Discovery: MCP Server>")
+
+        success = await self.load_mcp_sessions()
+        if not success:
+            print("No valid MCP sessions found in configuration")
+            return
+        
+        await self.list_tools()
+
+        if MCPSessionManager.debug:
+            for server_name in self._sessions.keys():
+                print(f"<Active MCP Server: {server_name}>")
+            print("\n")
+
     async def load_mcp_sessions(self) -> Dict[str, mcp.MCPSession]:
         config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../../config', 'mcp.json')
         

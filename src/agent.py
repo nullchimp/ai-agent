@@ -30,16 +30,10 @@ def add_tool(tool: Tool) -> None:
 # Define enhanced system role with instructions on using all available tools
 system_role = f"""
 You are a helpful assistant. 
-Your Name is Agent Smith and you have access to various capabilities:
+Your Name is Agent Smith.
 
-1. Search the web for current information using the google_search tool
-2. Read files from a secure directory using the read_file tool
-3. Write content to files using the write_file tool
-4. List files in a directory using the list_files tool
-5. Fetch web pages and convert them to markdown using the web_fetch tool
-
-Use these tools appropriately to provide comprehensive assistance.
-Synthesize and cite your sources correctly when using search or web content.
+Use your knowledge to provide comprehensive assistance.
+Synthesize and cite your sources correctly.
 
 Today is {date.today().strftime("%d %B %Y")}.
 """
