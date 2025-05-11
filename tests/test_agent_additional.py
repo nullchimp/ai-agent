@@ -1,8 +1,8 @@
 import pytest
 import sys
 import os
-import json
 from unittest.mock import patch, MagicMock, AsyncMock
+import json
 
 # Ensure src/ is in sys.path for imports
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../src')))
@@ -264,3 +264,95 @@ async def test_agent_run_conversation_multiple_tool_calls():
     search_tool.run.assert_called_once_with(query="test query")
     read_file_tool.run.assert_called_once_with(base_dir="/tmp", filename="test.txt")
     assert final_message["content"] == "Here are the results from both tools"
+
+@pytest.mark.asyncio
+async def test_run_conversation_with_multiple_tool_calls():
+    """Test run_conversation function core functionality."""
+    # Import necessary modules
+    import agent
+    
+    # Save original functions and objects for later restoration
+    original_send_messages = agent.chat.send_messages
+    original_process_tool_calls = agent.process_tool_calls
+    original_messages = agent.messages.copy()
+    
+    try:
+        # Create our mocks
+        agent.chat.send_messages = AsyncMock()
+        agent.process_tool_calls = AsyncMock()
+        
+        # Create a sequence of chat responses for our test scenario
+        # First response with tool calls
+        first_response = {
+            "choices": [{
+                "message": {
+                    "role": "assistant", 
+                    "content": "I'll check that for you", 
+                    "tool_calls": [{"id": "call_1"}]
+                }
+            }]
+        }
+        
+        # Second response (after tool call) with final answer
+        second_response = {
+            "choices": [{
+                "message": {
+                    "role": "assistant", 
+                    "content": "Here is your answer"
+                }
+            }]
+        }
+        
+        # Setup the mock to return different responses in sequence
+        agent.chat.send_messages.side_effect = [first_response, second_response]
+        
+        # Patch the input function to handle the @chatutil decorator
+        with patch('builtins.input', return_value="Test query"):
+            with patch('builtins.print'):  # Suppress print output
+                # Call the function under test
+                result = await agent.run_conversation("Test query")
+        
+        # Check that process_tool_calls was called
+        agent.process_tool_calls.assert_called_once()
+        
+        # Verify the return value is the content of the final message
+        assert result == "Here is your answer"
+        
+    finally:
+        # Restore original functions and objects
+        agent.chat.send_messages = original_send_messages
+        agent.process_tool_calls = original_process_tool_calls
+        agent.messages = original_messages
+
+
+@pytest.mark.asyncio
+async def test_handle_response_no_choices():
+    """Test handling a response with no choices."""
+    import agent
+    
+    # Save original data
+    original_messages = agent.messages.copy()
+    original_chat = agent.chat
+    
+    # Create a mock chat
+    mock_chat = MagicMock()
+    mock_chat.send_messages = AsyncMock(return_value={"choices": []})
+    
+    try:
+        # Replace with our mock
+        agent.messages = [{"role": "system", "content": "Test system message"}]
+        agent.chat = mock_chat
+        
+        # Patch to avoid stdin/stdout issues with decorators
+        with patch('builtins.input', return_value="Test query"):
+            with patch('builtins.print'):
+                # Call the function
+                result = await agent.run_conversation("Test query")
+        
+        # Should return an empty string when there are no choices
+        assert result == ""
+        
+    finally:
+        # Restore original data
+        agent.messages = original_messages
+        agent.chat = original_chat

@@ -92,7 +92,7 @@ async def run_conversation(user_prompt) -> str:
     # Write the result to a file with the name 'chancellor.txt' in a folder with the name 'docs'.
     # Then list me all files in my root directory and put the result in another file called 'list.txt' in the same 'docs' folder.
     # """
-        
+
     messages.append({"role": "user", "content": user_prompt})
     response = await chat.send_messages(messages)
     choices = response.get("choices", [])
