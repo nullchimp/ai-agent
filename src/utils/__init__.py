@@ -8,7 +8,18 @@ def mainloop(func):
 
 def graceful_exit(func):
     if inspect.iscoroutinefunction(func):
-        def _decorator(*args, **kwargs):
+        async def _async_decorator(*args, **kwargs):
+            try:
+                return await func(*args, **kwargs)
+            except KeyboardInterrupt:
+                print("\nBye!")
+                exit(0)
+            except Exception as e:
+                print(f"Error: {e}")
+                return None
+        return _async_decorator
+    else:
+        def _sync_decorator(*args, **kwargs):
             try:
                 return func(*args, **kwargs)
             except KeyboardInterrupt:
@@ -17,17 +28,7 @@ def graceful_exit(func):
             except Exception as e:
                 print(f"Error: {e}")
                 return None
-        return _decorator
-    
-    async def _async_decorator(*args, **kwargs):
-        try:
-            return await func(*args, **kwargs)
-        except KeyboardInterrupt:
-            print("\nBye!")
-            exit(0)
-        except Exception as e:
-            print(f"Error: {e}")
-    return _async_decorator
+        return _sync_decorator
 
 def chatutil(chat_name):
     def _decorator(func):

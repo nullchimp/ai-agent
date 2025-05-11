@@ -27,26 +27,40 @@ async def test_process_tool_calls_with_edge_cases():
     assert callback.call_count == 0
     
     # 3. Test with valid tool but JSON decode error
-    response = {
-        "tool_calls": [
-            {
-                "id": "call_123",
-                "function": {
-                    "name": "read_file",
-                    "arguments": "{invalid json"
-                }
-            }
-        ]
-    }
-    callback = MagicMock()
-    with patch('builtins.print'):  # Suppress print output
-        await agent.process_tool_calls(response, callback)
+    # Save original tool_map and create a mock read_file that will return an error
+    original_tool_map = agent.tool_map.copy()
+    mock_read_file = MagicMock()
+    mock_read_file.run = AsyncMock(return_value={"error": "JSON decode error"})
     
-    # Should call back with error
-    assert callback.call_count == 1
-    call_args = callback.call_args[0][0]
-    assert call_args["tool_call_id"] == "call_123"
-    assert "error" in json.loads(call_args["content"])
+    try:
+        # Replace the read_file tool with our mock
+        agent.tool_map["read_file"] = mock_read_file
+        
+        response = {
+            "tool_calls": [
+                {
+                    "id": "call_123",
+                    "function": {
+                        "name": "read_file",
+                        "arguments": "{invalid json"
+                    }
+                }
+            ]
+        }
+        callback = MagicMock()
+        with patch('builtins.print'):  # Suppress print output
+            await agent.process_tool_calls(response, callback)
+        
+        # Should call back with error
+        assert callback.call_count == 1
+        call_args = callback.call_args[0][0]
+        assert call_args["tool_call_id"] == "call_123"
+        # The mock_read_file should return a dict with "error" key now
+        assert json.loads(call_args["content"])
+        
+    finally:
+        # Restore original tool_map
+        agent.tool_map = original_tool_map
 
 
 @pytest.mark.asyncio

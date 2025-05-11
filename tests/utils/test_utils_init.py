@@ -6,10 +6,10 @@ import inspect
 from unittest.mock import patch, MagicMock, AsyncMock, call
 
 # Ensure src/ is in sys.path for imports
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../src')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 
 # Import utils directly after adjusting sys.path
-from utils import mainloop, graceful_exit, chatutil
+from src.utils import mainloop, graceful_exit, chatutil
 
 def test_mainloop_decorator_creation():
     """Test that the mainloop decorator returns a proper wrapper function."""
@@ -87,19 +87,25 @@ async def test_graceful_exit_decorator_structure():
     # always returning an async wrapper
 
 
-# Implementation check: Due to the implementation bug in graceful_exit,
-# it always returns _async_decorator regardless of function type
-def test_graceful_exit_implementation_bug_check():
-    """Test to verify the implementation bug in graceful_exit."""
+# After fixing the implementation, this test now checks for correct behavior
+def test_graceful_exit_implementation():
+    """Test that graceful_exit correctly returns sync/async decorators based on the input function type."""
     # Create a test sync function
     def test_sync_func():
         return "sync result"
     
-    # Apply decorator
-    decorated = graceful_exit(test_sync_func)
+    # Create a test async function
+    async def test_async_func():
+        return "async result"
     
-    # Due to the implementation bug, the decorator always returns _async_decorator
-    assert asyncio.iscoroutinefunction(decorated)
+    # Apply decorator to both
+    sync_decorated = graceful_exit(test_sync_func)
+    async_decorated = graceful_exit(test_async_func)
+    
+    # Sync function should get sync decorator
+    assert not asyncio.iscoroutinefunction(sync_decorated)
+    # Async function should get async decorator
+    assert asyncio.iscoroutinefunction(async_decorated)
 
 
 # Instead of trying to trap real exceptions, create a controlled test
@@ -108,7 +114,7 @@ def test_graceful_exit_implementation_bug_check():
 async def test_graceful_exit_async_error_pattern():
     """Test the error handling pattern of graceful_exit."""
     # Create a patched version of the decorator for testing
-    with patch('utils.graceful_exit') as mock_decorator:
+    with patch('src.utils.graceful_exit') as mock_decorator:
         # Create a mock implementation that simulates the behavior
         async def mock_decorated():
             print("Error: Test error")

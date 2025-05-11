@@ -16,11 +16,22 @@ def test_agent_process_tool_calls_executes_tool(monkeypatch):
         "function": {"name": "read_file", "arguments": '{"base_dir": "/tmp", "filename": "foo.txt"}'},
         "id": "abc"
     }
-    agent.tool_map = {"read_file": MagicMock(run=MagicMock(return_value={"ok": True}))}
+    mock_tool = MagicMock()
+    mock_tool.run = AsyncMock(return_value={"ok": True})
+    agent.tool_map = {"read_file": mock_tool}
     response = {"tool_calls": [tool_call]}
-    results = [r for r in agent.process_tool_calls(response)]  # FIX: convert generator to list
-    assert results[0]["tool_call_id"] == "abc"
-    assert "content" in results[0]
+    
+    callback_results = []
+    mock_callback = lambda x: callback_results.append(x)
+    
+    # Run the test with asyncio
+    with patch('builtins.print'):  # Suppress print output
+        asyncio.run(agent.process_tool_calls(response, mock_callback))
+    
+    # Check that the callback was called with the expected result
+    assert len(callback_results) == 1
+    assert callback_results[0]["tool_call_id"] == "abc"
+    assert "content" in callback_results[0]
 
 
 def test_agent_process_tool_calls_tool_not_found(monkeypatch):
@@ -31,8 +42,18 @@ def test_agent_process_tool_calls_tool_not_found(monkeypatch):
     }
     agent.tool_map = {}
     response = {"tool_calls": [tool_call]}
-    results = [r for r in agent.process_tool_calls(response)]  # FIX: convert generator to list
-    assert "error" in results[0]["content"]
+    
+    callback_results = []
+    mock_callback = lambda x: callback_results.append(x)
+    
+    # Run the test with asyncio
+    with patch('builtins.print'):  # Suppress print output
+        asyncio.run(agent.process_tool_calls(response, mock_callback))
+    
+    # Verify callback was called with error message
+    assert len(callback_results) == 1
+    assert callback_results[0]["tool_call_id"] == "id1"
+    assert "error" in json.loads(callback_results[0]["content"])
 
 
 def test_agent_run_conversation_exit(monkeypatch):
@@ -73,10 +94,19 @@ def test_agent_process_tool_calls_json_error():
         "id": "json_err_id"
     }
     response = {"tool_calls": [tool_call]}
-    results = [r for r in agent.process_tool_calls(response)]
-    assert results[0]["tool_call_id"] == "json_err_id"
+    
+    callback_results = []
+    mock_callback = lambda x: callback_results.append(x)
+    
+    # Run the test with asyncio
+    with patch('builtins.print'):  # Suppress print output
+        asyncio.run(agent.process_tool_calls(response, mock_callback))
+    
+    # Verify callback was called with proper result
+    assert len(callback_results) == 1
+    assert callback_results[0]["tool_call_id"] == "json_err_id"
     # Should handle the json decode error and use empty args
-    assert json.loads(results[0]["content"])  # Should be valid JSON
+    assert json.loads(callback_results[0]["content"])  # Should be valid JSON
 
 @pytest.mark.asyncio
 async def test_agent_run_conversation_async():
@@ -141,9 +171,9 @@ async def test_agent_run_conversation_with_tool_calls():
         }
     ])
     
-    # Mock tool execution
+    # Mock tool execution - make sure to use AsyncMock for async functions
     mock_tool = MagicMock()
-    mock_tool.run.return_value = {"results": ["test result"]}
+    mock_tool.run = AsyncMock(return_value={"results": ["test result"]})
     agent.tool_map = {"google_search": mock_tool}
     
     # Simulate sending a message and processing tool calls
@@ -154,9 +184,8 @@ async def test_agent_run_conversation_with_tool_calls():
     assistant_message = response["choices"][0]["message"]
     agent.messages.append(assistant_message)
     
-    # Process tool calls
-    for result in agent.process_tool_calls(assistant_message):
-        agent.messages.append(result)
+    # Process tool calls with callback parameter
+    await agent.process_tool_calls(assistant_message, agent.messages.append)
     
     # Final message
     response = await agent.chat.send_messages(agent.messages)
