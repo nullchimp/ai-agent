@@ -66,12 +66,8 @@ def prettify(data):
         if isinstance(value, str):
             # Try to detect and parse JSON strings
             try:
-                # Only attempt to parse if it looks like JSON
-                if (value.startswith('{') and value.endswith('}')) or \
-                   (value.startswith('[') and value.endswith(']')) or \
-                   (value.startswith('"') and value.endswith('"')):
-                    parsed = json.loads(value)
-                    return recursive_unescape(parsed)
+                parsed = json.loads(value)
+                return recursive_unescape(parsed)
             except json.JSONDecodeError:
                 # If it's not valid JSON, just return the original string
                 pass
@@ -93,22 +89,16 @@ def prettify(data):
         else:
             raise TypeError(f'Object of type {type(obj)} is not JSON serializable')
     
-    # Apply recursive unescaping if data is a string
-    if isinstance(data, str):
-        try:
-            data = recursive_unescape(data)
-        except Exception as e:
-            # If unescaping fails, use original data
-            pass
-    else:
-        # For non-string data, still process it to handle nested structures
-        data = recursive_unescape(data)
-    
-    # Dump the processed data to JSON
     try:
-        formatted_data = json.dumps(data, indent=1, default=complex_handler)
+        data = recursive_unescape(data)
+    except Exception as e:
+        pass
+    
+    try:
+        formatted_data = data
+        if not isinstance(data, str):
+            formatted_data = json.dumps(data, indent=1, default=complex_handler)
     except TypeError:
-        # Fallback for objects that can't be serialized
         formatted_data = str(data)
 
     return colorize_json(formatted_data)

@@ -23,8 +23,7 @@ tools = {
 
 chat = Chat.create(tools)
 def add_tool(tool: Tool) -> None:
-    #chat.add_tool(tool)
-    pass
+    chat.add_tool(tool)
 
 # Define enhanced system role with instructions on using all available tools
 system_role = f"""
