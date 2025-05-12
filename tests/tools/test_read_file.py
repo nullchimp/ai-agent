@@ -1,80 +1,124 @@
-import pytest
+"""
+Tests for the read_file.py tool
+"""
+
 import sys
 import os
+import pytest
 from unittest.mock import patch, MagicMock
 
 # Ensure src/ is in sys.path for imports
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../src')))
 
-# Import ReadFile class
-from tools.read_file import ReadFile
+
+def test_read_file_initialization():
+    """Test that ReadFile class initializes correctly."""
+    from tools.read_file import ReadFile
+    
+    # Initialize with a name
+    tool = ReadFile("read_file_tool")
+    
+    # Verify name is set
+    assert tool.name == "read_file_tool"
+    
+    # Verify schema structure via define() method
+    schema = tool.define()
+    assert schema["type"] == "function"
+    assert schema["function"]["name"] == "read_file_tool"
+    assert "description" in schema["function"]
+    assert "parameters" in schema["function"]
+    
+    # Check required parameters
+    params = schema["function"]["parameters"]
+    assert "base_dir" in params["properties"]
+    assert "filename" in params["properties"]
+    assert "base_dir" in params["required"]
+    assert "filename" in params["required"]
 
 
 @pytest.mark.asyncio
-async def test_read_file_run_success():
-    """Test the ReadFile tool with a successful file read."""
-    # Create a mock for the FileService
+async def test_read_file_success():
+    """Test successful execution of ReadFile."""
+    from tools.read_file import ReadFile
+    
+    # Create a mock for FileService
     with patch('libs.fileops.file.FileService') as MockFileService:
-        # Set up the mock service
+        # Configure the mock
         mock_service_instance = MagicMock()
-        mock_service_instance.read_file.return_value = "Test file content"
+        mock_service_instance.read_file.return_value = "File content"
         MockFileService.return_value = mock_service_instance
         
-        # Create an instance of ReadFile and run it
-        tool = ReadFile("read_file")  # Provide required name parameter
-        result = await tool.run(base_dir="/tmp", filename="test.txt")
+        # Create tool and execute
+        tool = ReadFile("read_file")
+        result = await tool.run(base_dir="/base", filename="test.txt")
         
-        # Verify the result matches actual implementation
-        assert result["success"] is True
-        assert result["content"] == "Test file content"
-        assert "Successfully read content" in result["result"]
+        # Verify FileService was created with correct base_dir
+        MockFileService.assert_called_once_with("/base")
         
-        # Verify that read_file was called with the expected arguments
+        # Verify read_file was called with correct filename
         mock_service_instance.read_file.assert_called_once_with("test.txt")
+        
+        # Verify result structure
+        assert result["success"] is True
+        assert "Successfully read content" in result["result"]
+        assert result["filename"] == "test.txt"
+        assert result["base_dir"] == "/base"
+        assert result["content"] == "File content"
 
 
 @pytest.mark.asyncio
-async def test_read_file_run_failure():
-    """Test the ReadFile tool when the file cannot be read."""
-    # Create a mock for the FileService that raises an exception
+async def test_read_file_error():
+    """Test ReadFile when an error occurs."""
+    from tools.read_file import ReadFile
+    
+    # Create a mock for FileService
     with patch('libs.fileops.file.FileService') as MockFileService:
-        # Set up the mock
-        mock_service_instance = MagicMock()
-        mock_service_instance.read_file.side_effect = Exception("File error")
-        MockFileService.return_value = mock_service_instance
-        
-        # Create an instance of ReadFile and run it
-        tool = ReadFile("read_file")  # Provide required name parameter
-        result = await tool.run(base_dir="/tmp", filename="nonexistent.txt")
-        
-        # Verify the result matches actual implementation
-        assert result["success"] is False
-        assert "Failed to read file" in result["result"]
-        assert "File error" in result["result"]
-        assert result["content"] is None
-
-
-@pytest.mark.asyncio
-async def test_read_file_run_not_found():
-    """Test the ReadFile tool with a file that doesn't exist."""
-    # Create a mock for the FileService that raises a FileNotFoundError
-    with patch('libs.fileops.file.FileService') as MockFileService:
-        # Set up the mock
+        # Configure the mock to raise an exception
         mock_service_instance = MagicMock()
         mock_service_instance.read_file.side_effect = FileNotFoundError("File not found")
         MockFileService.return_value = mock_service_instance
         
-        # Create an instance of ReadFile and run it
-        tool = ReadFile("read_file")  # Provide required name parameter
-        result = await tool.run(base_dir="/nonexistent", filename="nonexistent.txt")
+        # Create tool and execute
+        tool = ReadFile("read_file")
+        result = await tool.run(base_dir="/base", filename="nonexistent.txt")
         
-        # Verify the result matches actual implementation
+        # Verify FileService was created with correct base_dir
+        MockFileService.assert_called_once_with("/base")
+        
+        # Verify read_file was called with correct filename
+        mock_service_instance.read_file.assert_called_once_with("nonexistent.txt")
+        
+        # Verify result structure for error case
         assert result["success"] is False
         assert "Failed to read file" in result["result"]
-        assert "not found" in result["result"].lower()
+        assert "File not found" in result["result"]
+        assert result["filename"] == "nonexistent.txt"
+        assert result["base_dir"] == "/base"
         assert result["content"] is None
 
 
-def test_placeholder():
-    """This test is just here to ensure pytest doesn't complain when all other tests are skipped."""
-    assert True
+@pytest.mark.asyncio
+async def test_read_file_with_relative_path():
+    """Test ReadFile with a relative path."""
+    from tools.read_file import ReadFile
+    
+    # Create a mock for FileService
+    with patch('libs.fileops.file.FileService') as MockFileService:
+        # Configure the mock
+        mock_service_instance = MagicMock()
+        mock_service_instance.read_file.return_value = "Directory content"
+        MockFileService.return_value = mock_service_instance
+        
+        # Create tool and execute with relative path
+        tool = ReadFile("read_file")
+        result = await tool.run(base_dir="./base", filename="subdir/file.txt")
+        
+        # Verify FileService was created with correct base_dir
+        MockFileService.assert_called_once_with("./base")
+        
+        # Verify read_file was called with correct path
+        mock_service_instance.read_file.assert_called_once_with("subdir/file.txt")
+        
+        # Verify result
+        assert result["success"] is True
+        assert result["content"] == "Directory content"

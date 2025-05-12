@@ -51,7 +51,8 @@ async def test_mcpclient_sessions_manager_load():
     
     # Use an in-memory file mock instead of a real file
     with patch('builtins.open', MagicMock()), \
-         patch('json.load', return_value=config_content):
+         patch('json.load', return_value=config_content), \
+         patch('utils.mcpclient.session.MCPSession', return_value=AsyncMock()):
         
         # Create an MCPSessionManager instance
         manager = MCPSessionManager()
@@ -61,14 +62,15 @@ async def test_mcpclient_sessions_manager_load():
         
         # Verify sessions were created successfully
         assert result is True
-        assert 'test_server' in manager.sessions
+        assert 'test_server' in manager._sessions
 
 
 @pytest.mark.asyncio
 async def test_mcpclient_sessions_manager_load_file_not_found():
     """Test loading MCP sessions when config file doesn't exist."""
     # Mock open to raise FileNotFoundError
-    with patch('builtins.open', side_effect=FileNotFoundError()):
+    with patch('builtins.open', side_effect=FileNotFoundError()), \
+         patch('builtins.print') as mock_print:
         
         # Create an MCPSessionManager instance
         manager = MCPSessionManager()
@@ -76,9 +78,10 @@ async def test_mcpclient_sessions_manager_load_file_not_found():
         # Call load_mcp_sessions with a non-existent config path
         result = await manager.load_mcp_sessions('nonexistent_config.json')
         
-        # Verify result indicates failure
+        # Verify result indicates failure - implementation returns None on error
         assert result is None
-        assert len(manager.sessions) == 0
+        assert len(manager._sessions) == 0
+        mock_print.assert_called_with(f"Configuration file not found: nonexistent_config.json")
 
 
 @pytest.mark.asyncio
@@ -123,7 +126,8 @@ async def test_mcpclient_sessions_manager_list_tools_wrong_format():
     manager._sessions = {'server': mock_session}
     
     # Expect error handled gracefully
-    await manager.list_tools()
+    with patch('builtins.print') as mock_print:
+        await manager.list_tools()
     
     # Verify list_tools was called
     mock_session.list_tools.assert_called_once()
@@ -144,23 +148,26 @@ async def test_mcpclient_sessions_manager_discovery():
     manager.list_tools = AsyncMock()
     
     # Call discovery
-    await manager.discovery("mock_config.json")
+    with patch('builtins.print') as mock_print:
+        await manager.discovery("mock_config.json")
     
     # Verify methods were called
     manager.load_mcp_sessions.assert_called_once_with("mock_config.json")
     manager.list_tools.assert_called_once()
     
-    # Test with load_mcp_sessions returning False
+    # Test with load_mcp_sessions returning None (error case)
     manager.load_mcp_sessions.reset_mock()
     manager.list_tools.reset_mock()
-    manager.load_mcp_sessions.return_value = False
+    manager.load_mcp_sessions.return_value = None
     
     # Call discovery again
-    await manager.discovery("mock_config.json")
+    with patch('builtins.print') as mock_print:
+        await manager.discovery("mock_config.json")
     
     # Verify load_mcp_sessions was called but not list_tools
     manager.load_mcp_sessions.assert_called_once_with("mock_config.json")
     manager.list_tools.assert_not_called()
+    mock_print.assert_any_call("No valid MCP sessions found in configuration")
 
 
 def test_mcpclient_sessions_manager_properties():

@@ -1,83 +1,138 @@
-import pytest
+"""
+Tests for the web_fetch.py tool
+"""
+
 import sys
 import os
+import pytest
 from unittest.mock import patch, MagicMock
+from typing import Dict, Optional
 
 # Ensure src/ is in sys.path for imports
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../src')))
 
-# Import WebFetch class
-from tools.web_fetch import WebFetch
+
+def test_web_fetch_initialization():
+    """Test that WebFetch class initializes correctly."""
+    from tools.web_fetch import WebFetch
+    
+    # Initialize with a name
+    tool = WebFetch("web_fetch_tool")
+    
+    # Verify name is set
+    assert tool.name == "web_fetch_tool"
+    
+    # Verify schema structure via define() method
+    schema = tool.define()
+    assert schema["type"] == "function"
+    assert schema["function"]["name"] == "web_fetch_tool"
+    assert "description" in schema["function"]
+    assert "parameters" in schema["function"]
+    
+    # Check required parameters
+    params = schema["function"]["parameters"]
+    assert "url" in params["properties"]
+    assert "headers" in params["properties"]
+    assert "url" in params["required"]
+    assert "headers" not in params["required"]  # headers is optional
 
 
 @pytest.mark.asyncio
-async def test_web_fetch_run_success():
-    """Test the WebFetch tool with a successful web request."""
-    # Create a mock for the service
-    with patch('libs.webfetch.service.WebMarkdownService.create') as mock_create:
-        # Configure the mock service
-        mock_service = MagicMock()
-        mock_service.fetch_as_markdown.return_value = ("Test content\n\n", 200)
-        mock_create.return_value = mock_service
+async def test_web_fetch_success():
+    """Test successful execution of WebFetch."""
+    from tools.web_fetch import WebFetch
+    
+    # Create a mock for WebMarkdownService
+    with patch('libs.webfetch.service.WebMarkdownService') as MockService:
+        # Configure the mock
+        mock_service_instance = MagicMock()
+        mock_service_instance.fetch_as_markdown.return_value = ("# Markdown Content", 200)
+        MockService.create.return_value = mock_service_instance
         
-        # Create an instance of WebFetch and run it
-        tool = WebFetch("web_fetch")  # Provide required name parameter
-        result = await tool.run(url="http://example.com")
+        # Create tool and execute
+        tool = WebFetch("web_fetch")
+        result = await tool.run(url="https://example.com")
         
-        # Verify the result matches actual implementation
-        assert result["content"] == "Test content\n\n"
+        # Verify service was created
+        MockService.create.assert_called_once()
+        
+        # Verify fetch_as_markdown was called with correct URL and no headers
+        mock_service_instance.fetch_as_markdown.assert_called_once_with("https://example.com", None)
+        
+        # Verify result structure
+        assert result["url"] == "https://example.com"
         assert result["status_code"] == 200
-        assert result["url"] == "http://example.com"
-        
-        # Verify that fetch_as_markdown was called with the expected URL
-        mock_service.fetch_as_markdown.assert_called_once_with("http://example.com", None)
+        assert result["content"] == "# Markdown Content"
 
 
 @pytest.mark.asyncio
-async def test_web_fetch_run_with_headers():
-    """Test the WebFetch tool with custom headers."""
-    # Create a mock for the service
-    with patch('libs.webfetch.service.WebMarkdownService.create') as mock_create:
-        # Configure the mock service
-        mock_service = MagicMock()
-        mock_service.fetch_as_markdown.return_value = ("Test with headers\n\n", 200)
-        mock_create.return_value = mock_service
+async def test_web_fetch_with_headers():
+    """Test execution of WebFetch with custom headers."""
+    from tools.web_fetch import WebFetch
+    
+    # Create a mock for WebMarkdownService
+    with patch('libs.webfetch.service.WebMarkdownService') as MockService:
+        # Configure the mock
+        mock_service_instance = MagicMock()
+        mock_service_instance.fetch_as_markdown.return_value = ("# Content with Headers", 200)
+        MockService.create.return_value = mock_service_instance
         
-        # Create an instance of WebFetch and run it with custom headers
-        tool = WebFetch("web_fetch")  # Provide required name parameter
-        headers = {"User-Agent": "Test Agent", "Accept": "text/html"}
-        result = await tool.run(url="http://example.com", headers=headers)
+        # Custom headers
+        headers = {"User-Agent": "Test Agent", "Accept-Language": "en-US"}
         
-        # Verify the result matches actual implementation
-        assert result["content"] == "Test with headers\n\n"
+        # Create tool and execute with headers
+        tool = WebFetch("web_fetch")
+        result = await tool.run(url="https://example.com", headers=headers)
+        
+        # Verify fetch_as_markdown was called with correct URL and headers
+        mock_service_instance.fetch_as_markdown.assert_called_once_with("https://example.com", headers)
+        
+        # Verify result structure
+        assert result["url"] == "https://example.com"
         assert result["status_code"] == 200
-        
-        # Verify that fetch_as_markdown was called with the expected URL and headers
-        mock_service.fetch_as_markdown.assert_called_once_with("http://example.com", headers)
+        assert result["content"] == "# Content with Headers"
 
 
 @pytest.mark.asyncio
-async def test_web_fetch_run_error():
-    """Test the WebFetch tool when there's an error fetching the URL."""
-    # Create a mock for the service that raises an exception
-    with patch('libs.webfetch.service.WebMarkdownService.create') as mock_create:
-        # Configure the mock service
-        mock_service = MagicMock()
-        mock_service.fetch_as_markdown.side_effect = Exception("Connection error")
-        mock_create.return_value = mock_service
+async def test_web_fetch_error_response():
+    """Test WebFetch with an error response."""
+    from tools.web_fetch import WebFetch
+    
+    # Create a mock for WebMarkdownService
+    with patch('libs.webfetch.service.WebMarkdownService') as MockService:
+        # Configure the mock to return an error status code
+        mock_service_instance = MagicMock()
+        mock_service_instance.fetch_as_markdown.return_value = ("Error fetching page: Not Found", 404)
+        MockService.create.return_value = mock_service_instance
         
-        # Create an instance of WebFetch and run it
-        tool = WebFetch("web_fetch")  # Provide required name parameter
+        # Create tool and execute
+        tool = WebFetch("web_fetch")
+        result = await tool.run(url="https://example.com/nonexistent")
         
-        try:
-            result = await tool.run(url="http://example.com")
-            # If no exception was raised, we fail the test
-            assert False, "Expected exception was not raised"
-        except Exception as e:
-            # Verify the exception was correctly propagated
-            assert "Connection error" in str(e)
+        # Verify fetch_as_markdown was called
+        mock_service_instance.fetch_as_markdown.assert_called_once_with("https://example.com/nonexistent", None)
+        
+        # Verify result structure for error case
+        assert result["url"] == "https://example.com/nonexistent"
+        assert result["status_code"] == 404
+        assert "Error fetching page" in result["content"]
 
 
-def test_placeholder():
-    """This test is just here to ensure pytest doesn't complain when all other tests are skipped."""
-    assert True
+@pytest.mark.asyncio
+async def test_web_fetch_service_exception_handling():
+    """Test WebFetch exception handling."""
+    from tools.web_fetch import WebFetch
+    
+    # Create a mock for WebMarkdownService
+    with patch('libs.webfetch.service.WebMarkdownService') as MockService:
+        # Configure the mock to raise an exception
+        mock_service_instance = MagicMock()
+        mock_service_instance.fetch_as_markdown.side_effect = Exception("Connection error")
+        MockService.create.return_value = mock_service_instance
+        
+        # Create tool and execute
+        tool = WebFetch("web_fetch")
+        
+        # The current implementation doesn't handle exceptions, so test should expect an exception
+        with pytest.raises(Exception, match="Connection error"):
+            await tool.run(url="https://example.com")
