@@ -1,5 +1,5 @@
 class Tool:
-    def __init__(self, session = None, name: str = None, description: str = None, parameters: dict = None):
+    def __init__(self, name: str, description: str = None, parameters: dict = None, session = None):
         self.name = name
         self._structure = None
         if name and description and parameters:

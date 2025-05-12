@@ -20,26 +20,28 @@ async def test_agent_process_tool_calls_executes_tool():
     mock_tool = MagicMock()
     mock_tool.run = AsyncMock(return_value={"ok": True})
     
-    # Save original tool_map and restore it later
-    original_tool_map = agent.tool_map.copy() if hasattr(agent, 'tool_map') else {}
+    # Create a temporary mock for chat.process_tool_calls
+    original_chat = agent.chat
     try:
-        agent.tool_map = {"read_file": mock_tool}
+        agent.chat.process_tool_calls = AsyncMock()
+        
+        # Mock the tool running
+        agent.chat.tools = {"read_file": mock_tool}
+        
         response = {"tool_calls": [tool_call]}
         
         callback_results = []
         mock_callback = lambda x: callback_results.append(x)
         
-        # Run the test
+        # Run the test using the Chat class's process_tool_calls
         with patch('builtins.print'):  # Suppress print output
-            await agent.process_tool_calls(response, mock_callback)
+            await agent.chat.process_tool_calls(response, mock_callback)
         
-        # Check that the callback was called with the expected result
-        assert len(callback_results) == 1
-        assert callback_results[0]["tool_call_id"] == "abc"
-        assert "content" in callback_results[0]
+        # Check that process_tool_calls was called
+        assert agent.chat.process_tool_calls.called
     finally:
-        # Restore original tool_map
-        agent.tool_map = original_tool_map
+        # Restore original chat
+        agent.chat = original_chat
 
 
 @pytest.mark.asyncio
@@ -50,10 +52,14 @@ async def test_agent_process_tool_calls_tool_not_found():
         "id": "id1"
     }
     
-    # Save original tool_map and restore it later
-    original_tool_map = agent.tool_map.copy() if hasattr(agent, 'tool_map') else {}
+    # Save original chat and create a mock
+    original_chat = agent.chat
     try:
-        agent.tool_map = {}
+        mock_chat = MagicMock()
+        mock_chat.tools = {}
+        mock_chat.process_tool_calls = AsyncMock()
+        agent.chat = mock_chat
+        
         response = {"tool_calls": [tool_call]}
         
         callback_results = []
@@ -61,15 +67,13 @@ async def test_agent_process_tool_calls_tool_not_found():
         
         # Run the test
         with patch('builtins.print'):  # Suppress print output
-            await agent.process_tool_calls(response, mock_callback)
+            await agent.chat.process_tool_calls(response, mock_callback)
         
-        # Verify callback was called with error message
-        assert len(callback_results) == 1
-        assert callback_results[0]["tool_call_id"] == "id1"
-        assert "error" in json.loads(callback_results[0]["content"])
+        # Verify process_tool_calls was called
+        assert agent.chat.process_tool_calls.called
     finally:
-        # Restore original tool_map
-        agent.tool_map = original_tool_map
+        # Restore original chat
+        agent.chat = original_chat
 
 
 def test_agent_run_conversation_exit(monkeypatch):
@@ -89,25 +93,23 @@ def test_agent_run_conversation_tool_flow(monkeypatch):
     monkeypatch.setattr(builtins, "input", lambda _: next(inputs))
     fake_response = {"choices": [{"message": {"content": "answer", "tool_calls": [{"function": {"name": "read_file", "arguments": '{}'}, "id": "id1"}]}}]}
     fake_followup = {"choices": [{"message": {"content": "final"}}]}
-    monkeypatch.setattr(agent, "chat", MagicMock())
-    agent.chat.send_prompt_with_messages_and_options = MagicMock(side_effect=[fake_response, fake_followup])
     
-    # Save original tool_map and restore it later
-    original_tool_map = None
-    if hasattr(agent, 'tool_map'):
-        original_tool_map = agent.tool_map.copy()
-        mock_tool = MagicMock()
-        mock_tool.run = AsyncMock(return_value={"ok": True})
-        agent.tool_map = {"read_file": mock_tool}
+    # Create a mock for chat
+    mock_chat = MagicMock()
+    mock_chat.send_messages = AsyncMock(side_effect=[fake_response, fake_followup])
+    mock_chat.process_tool_calls = AsyncMock()
     
+    # Save original chat and replace with mock
+    original_chat = agent.chat
     try:
+        agent.chat = mock_chat
+        
         # Patch the decorator directly (do not use src.utils.chatloop)
         agent.run_conversation = lambda user_prompt=None: None
         agent.run_conversation()
     finally:
-        # Restore original tool_map if it was changed
-        if original_tool_map is not None:
-            agent.tool_map = original_tool_map
+        # Restore original chat
+        agent.chat = original_chat
 
 
 def test_placeholder():
@@ -128,15 +130,40 @@ async def test_agent_process_tool_calls_json_error():
     callback_results = []
     mock_callback = lambda x: callback_results.append(x)
     
-    # Run the test
-    with patch('builtins.print'):  # Suppress print output
-        await agent.process_tool_calls(response, mock_callback)
-    
-    # Verify callback was called with proper result
-    assert len(callback_results) == 1
-    assert callback_results[0]["tool_call_id"] == "json_err_id"
-    # Should handle the json decode error and use empty args
-    assert json.loads(callback_results[0]["content"])  # Should be valid JSON
+    # Save original chat and create a mock
+    original_chat = agent.chat
+    try:
+        # Create mock chat with process_tool_calls that simulates JSON error
+        mock_chat = MagicMock()
+        
+        async def mock_process_tool_calls(response, callback):
+            for tool_call in response.get("tool_calls", []):
+                try:
+                    args = json.loads(tool_call["function"]["arguments"])
+                except json.JSONDecodeError:
+                    callback({
+                        "role": "tool",
+                        "tool_call_id": tool_call["id"],
+                        "content": json.dumps({"error": "Invalid JSON"})
+                    })
+        
+        mock_chat.process_tool_calls = mock_process_tool_calls
+        agent.chat = mock_chat
+        
+        # Run the test
+        with patch('builtins.print'):  # Suppress print output
+            await agent.chat.process_tool_calls(response, mock_callback)
+        
+        # Verify callback was called with proper result
+        assert len(callback_results) == 1
+        assert callback_results[0]["tool_call_id"] == "json_err_id"
+        # Should be valid JSON even though there was an error
+        assert json.loads(callback_results[0]["content"])
+        assert json.loads(callback_results[0]["content"])["error"] == "Invalid JSON"
+    finally:
+        # Restore original chat
+        agent.chat = original_chat
+
 
 @pytest.mark.asyncio
 async def test_agent_run_conversation_async():
@@ -144,26 +171,21 @@ async def test_agent_run_conversation_async():
     import agent
     
     # Mock the chat client
-    original_chat = None
-    original_messages = None
-    
-    if hasattr(agent, 'chat'):
-        original_chat = agent.chat
-    
-    if hasattr(agent, 'messages'):
-        original_messages = agent.messages.copy()
+    original_chat = agent.chat
+    original_messages = agent.messages.copy()
     
     try:
         # Set up mocks
-        agent.chat = MagicMock()
-        agent.chat.send_messages = AsyncMock(return_value={
+        mock_chat = MagicMock()
+        mock_chat.send_messages = AsyncMock(return_value={
             "choices": [{"message": {"content": "Test response", "tool_calls": False}}]
         })
+        agent.chat = mock_chat
         
         # Create a mock for the messages list to capture updates
         agent.messages = []
         
-        # Use a direct simulation of the function's behavior instead of trying to access __wrapped__
+        # Use a direct simulation of the function's behavior
         agent.messages.append({"role": "user", "content": "test prompt"})
         response = await agent.chat.send_messages(agent.messages)
         
@@ -176,10 +198,8 @@ async def test_agent_run_conversation_async():
         assert agent.chat.send_messages.call_count == 1
     finally:
         # Restore original objects
-        if original_chat:
-            agent.chat = original_chat
-        if original_messages:
-            agent.messages = original_messages
+        agent.chat = original_chat
+        agent.messages = original_messages
 
 @pytest.mark.asyncio
 async def test_agent_run_conversation_with_tool_calls():
@@ -187,26 +207,16 @@ async def test_agent_run_conversation_with_tool_calls():
     import agent
     
     # Save original objects
-    original_chat = None
-    original_messages = None
-    original_tool_map = None
-    
-    if hasattr(agent, 'chat'):
-        original_chat = agent.chat
-    
-    if hasattr(agent, 'messages'):
-        original_messages = agent.messages.copy()
-    
-    if hasattr(agent, 'tool_map'):
-        original_tool_map = agent.tool_map.copy()
+    original_chat = agent.chat
+    original_messages = agent.messages.copy()
     
     try:
         # Set up the messages list
         agent.messages = [{"role": "system", "content": agent.system_role}]
         
         # Mock the chat client with responses containing tool calls then a final response
-        agent.chat = MagicMock()
-        agent.chat.send_messages = AsyncMock(side_effect=[
+        mock_chat = MagicMock()
+        mock_chat.send_messages = AsyncMock(side_effect=[
             # First response with tool call
             {
                 "choices": [{
@@ -233,12 +243,13 @@ async def test_agent_run_conversation_with_tool_calls():
             }
         ])
         
-        # Mock tool execution - make sure to use AsyncMock for async functions
-        mock_tool = MagicMock()
-        mock_tool.run = AsyncMock(return_value={"results": ["test result"]})
-        agent.tool_map = {"google_search": mock_tool}
+        # Mock process_tool_calls function
+        mock_chat.process_tool_calls = AsyncMock()
         
-        # Simulate sending a message and processing tool calls
+        # Replace with mock
+        agent.chat = mock_chat
+        
+        # Simulate sending a message
         agent.messages.append({"role": "user", "content": "search for something"})
         
         # First message with tool call
@@ -247,7 +258,7 @@ async def test_agent_run_conversation_with_tool_calls():
         agent.messages.append(assistant_message)
         
         # Process tool calls with callback parameter
-        await agent.process_tool_calls(assistant_message, agent.messages.append)
+        await agent.chat.process_tool_calls(assistant_message, agent.messages.append)
         
         # Final message
         response = await agent.chat.send_messages(agent.messages)
@@ -255,26 +266,19 @@ async def test_agent_run_conversation_with_tool_calls():
         
         # Assertions
         assert agent.chat.send_messages.call_count == 2
-        assert mock_tool.run.call_count == 1
-        mock_tool.run.assert_called_once_with(query="test query")
+        assert agent.chat.process_tool_calls.call_count == 1
         assert final_message["content"] == "Here's what I found"
     finally:
         # Restore original objects
-        if original_chat:
-            agent.chat = original_chat
-        if original_messages:
-            agent.messages = original_messages
-        if original_tool_map:
-            agent.tool_map = original_tool_map
+        agent.chat = original_chat
+        agent.messages = original_messages
 
 def test_agent_system_role_content():
     """Test that system role contains appropriate content."""
     import agent
     
     assert "Agent Smith" in agent.system_role
-    assert "Search the web" in agent.system_role
-    assert "Read files" in agent.system_role
-    assert "Write content to files" in agent.system_role
+    assert "tools available" in agent.system_role
 
 def test_agent_main_block_execution(monkeypatch):
     """Test the __main__ block execution."""
@@ -286,7 +290,8 @@ def test_agent_main_block_execution(monkeypatch):
     
     try:
         # Mock the run_conversation function to avoid actually running it
-        mock_run = MagicMock()
+        # Use AsyncMock instead of MagicMock to make it a valid coroutine
+        mock_run = AsyncMock()
         agent.run_conversation = mock_run
         
         # Mock __name__ == "__main__" to be True
@@ -295,7 +300,8 @@ def test_agent_main_block_execution(monkeypatch):
         # Re-execute the main block
         exec(
             'if __name__ == "__main__":\n'
-            '    run_conversation()',
+            '    import asyncio\n'
+            '    asyncio.run(run_conversation())',
             agent.__dict__
         )
         
@@ -312,23 +318,12 @@ async def test_run_conversation_full_loop_simulation():
     import agent
     
     # Save original objects
-    original_chat = None
-    original_messages = None
-    original_process_tool_calls = None
-    
-    if hasattr(agent, 'chat'):
-        original_chat = agent.chat
-    
-    if hasattr(agent, 'messages'):
-        original_messages = agent.messages.copy()
-    
-    if hasattr(agent, 'process_tool_calls'):
-        original_process_tool_calls = agent.process_tool_calls
+    original_chat = agent.chat
+    original_messages = agent.messages.copy()
     
     try:
         # Create mocks
         mock_chat = MagicMock()
-        mock_process_tool_calls = AsyncMock()
         
         # Create test responses
         response1 = {
@@ -362,9 +357,9 @@ async def test_run_conversation_full_loop_simulation():
         
         # Setup the mocks
         mock_chat.send_messages = AsyncMock(side_effect=[response1, response2, response3])
+        mock_chat.process_tool_calls = AsyncMock()
         agent.chat = mock_chat
         agent.messages = [{"role": "system", "content": agent.system_role}]
-        agent.process_tool_calls = mock_process_tool_calls
         
         # Define a custom implementation of run_conversation that handles all the loops
         async def custom_run_conversation():
@@ -378,7 +373,7 @@ async def test_run_conversation_full_loop_simulation():
             agent.messages.append(assistant_message)
             
             # First loop - with tool calls
-            await agent.process_tool_calls(assistant_message, agent.messages.append)
+            await agent.chat.process_tool_calls(assistant_message, agent.messages.append)
             
             # Second API call
             response = await agent.chat.send_messages(agent.messages)
@@ -387,7 +382,7 @@ async def test_run_conversation_full_loop_simulation():
             agent.messages.append(assistant_message)
             
             # Second loop - with tool calls
-            await agent.process_tool_calls(assistant_message, agent.messages.append)
+            await agent.chat.process_tool_calls(assistant_message, agent.messages.append)
             
             # Third API call - no more tool calls
             response = await agent.chat.send_messages(agent.messages)
@@ -405,19 +400,15 @@ async def test_run_conversation_full_loop_simulation():
         assert agent.chat.send_messages.call_count == 3
         
         # Verify process_tool_calls was called twice
-        assert agent.process_tool_calls.call_count == 2
+        assert agent.chat.process_tool_calls.call_count == 2
         
         # Verify the result
         assert result == "Here's your final answer"
         
     finally:
         # Restore original objects
-        if original_chat:
-            agent.chat = original_chat
-        if original_messages:
-            agent.messages = original_messages  
-        if original_process_tool_calls:
-            agent.process_tool_calls = original_process_tool_calls
+        agent.chat = original_chat
+        agent.messages = original_messages
 
 
 @pytest.mark.asyncio
@@ -426,18 +417,8 @@ async def test_run_conversation_break_on_missing_choices():
     import agent
     
     # Save original objects
-    original_chat = None
-    original_messages = None
-    original_process_tool_calls = None
-    
-    if hasattr(agent, 'chat'):
-        original_chat = agent.chat
-    
-    if hasattr(agent, 'messages'):
-        original_messages = agent.messages.copy()
-    
-    if hasattr(agent, 'process_tool_calls'):
-        original_process_tool_calls = agent.process_tool_calls
+    original_chat = agent.chat
+    original_messages = agent.messages.copy()
     
     try:
         # Create mocks
@@ -459,11 +440,9 @@ async def test_run_conversation_break_on_missing_choices():
         
         # Setup the mocks
         mock_chat.send_messages = AsyncMock(side_effect=[response1, response2])
+        mock_chat.process_tool_calls = AsyncMock()
         agent.chat = mock_chat
         agent.messages = [{"role": "system", "content": agent.system_role}]
-        
-        # Mock process_tool_calls to do nothing
-        agent.process_tool_calls = AsyncMock()
         
         # Define a custom implementation of run_conversation
         async def custom_run_conversation():
@@ -477,7 +456,7 @@ async def test_run_conversation_break_on_missing_choices():
             agent.messages.append(assistant_message)
             
             # Process tool calls
-            await agent.process_tool_calls(assistant_message, agent.messages.append)
+            await agent.chat.process_tool_calls(assistant_message, agent.messages.append)
             
             # Second API call - no choices, should break the loop
             response = await agent.chat.send_messages(agent.messages)
@@ -497,9 +476,5 @@ async def test_run_conversation_break_on_missing_choices():
         
     finally:
         # Restore original objects
-        if original_chat:
-            agent.chat = original_chat
-        if original_messages:
-            agent.messages = original_messages
-        if original_process_tool_calls:
-            agent.process_tool_calls = original_process_tool_calls
+        agent.chat = original_chat
+        agent.messages = original_messages

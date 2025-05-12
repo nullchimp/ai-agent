@@ -1,29 +1,28 @@
+from utils import set_debug
+set_debug(True)
+
 from dotenv import load_dotenv
 load_dotenv()
 
+import os
+import asyncio
 from datetime import date
 
-from utils import chatutil, graceful_exit, pretty_print
+from utils import chatutil, graceful_exit, mainloop, pretty_print
 from utils.azureopenai.chat import Chat
 
-from tools import Tool
-from tools.google_search import GoogleSearch
-from tools.read_file import ReadFile
 from tools.write_file import WriteFile
-from tools.list_files import ListFiles
-from tools.web_fetch import WebFetch
+from tools.google_search import GoogleSearch
 
-tools = {
+from utils.mcpclient.sessions_manager import MCPSessionManager
+
+session_manager = MCPSessionManager()
+
+tools = [
     GoogleSearch("google_search"),
-    ReadFile("read_file"),
     WriteFile("write_file"),
-    ListFiles("list_files"),
-    WebFetch("web_fetch")
-}
-
+]
 chat = Chat.create(tools)
-def add_tool(tool: Tool) -> None:
-    chat.add_tool(tool)
 
 # Define enhanced system role with instructions on using all available tools
 system_role = f"""
@@ -42,8 +41,8 @@ Today is {date.today().strftime("%d %B %Y")}.
 messages = [{"role": "system", "content": system_role}]
 
 @graceful_exit
-@chatutil("Agent")
-async def run_conversation(user_prompt) -> str:
+@chatutil("Chat-With-Tools-And-MCP")
+async def run_conversation(user_prompt: str) -> str:
     messages.append({"role": "user", "content": user_prompt})
     response = await chat.send_messages(messages)
     choices = response.get("choices", [])
@@ -64,9 +63,19 @@ async def run_conversation(user_prompt) -> str:
     
     result = assistant_message.get("content", "")
 
-    pretty_print("Result", result)
-    return result
+    pretty_print(" Result ", result)
 
 if __name__ == "__main__":
-    import asyncio
-    asyncio.run(run_conversation())
+    @mainloop
+    @graceful_exit
+    async def agent_task():
+        await run_conversation()
+
+    async def main():
+        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../config', 'mcp-demo.json')
+        await session_manager.discovery(path)
+        for tool in session_manager.tools:
+            chat.add_tool(tool)
+
+        await agent_task()
+    asyncio.run(main())

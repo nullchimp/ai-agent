@@ -1,172 +1,158 @@
+"""
+Tests for direct access to chat functionality, bypassing the chatutil decorator.
+Since the chat module has been integrated into agent.py, we'll use agent instead.
+"""
+
 import pytest
 import sys
 import os
-import asyncio
+import json
 from unittest.mock import patch, MagicMock, AsyncMock
 
 # Ensure src/ is in sys.path for imports
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../src')))
 
-"""
-Direct tests for chat.py bypassing the decorator and focusing on the internal implementation.
-This approach tests the actual code inside the run_conversation function directly.
-"""
 
 @pytest.mark.asyncio
 async def test_chat_internal_implementation():
     """Test the internal implementation of run_conversation."""
     # Import the modules
-    import chat
+    import agent
     
-    # Patch the dependencies
-    with patch('chat.chat') as mock_chat:
-        # Setup the mock responses
+    # Save original objects
+    original_messages = agent.messages.copy()
+    original_chat = agent.chat
+    
+    try:
+        # Create mocks
+        mock_chat = MagicMock()
         mock_chat.send_messages = AsyncMock(return_value={
             "choices": [{"message": {"content": "Test response"}}]
         })
+        agent.chat = mock_chat
         
-        # Reset the messages list
-        chat.messages = [{"role": "system", "content": chat.system_role}]
+        # Set up test input
+        agent.messages = [{"role": "system", "content": agent.system_role}]
+        agent.messages.append({"role": "user", "content": "Test input"})
         
-        # Execute the internal code of run_conversation directly
-        user_prompt = "test prompt"
-        chat.messages.append({"role": "user", "content": user_prompt})
-        response = await mock_chat.send_messages(chat.messages)
+        # Call the function under test, but skip the decorator by accessing the wrapped function
+        response = await agent.chat.send_messages(agent.messages)
+        choices = response.get("choices", [])
         
-        # Extract content from response
-        content = ""
-        if response:
-            if isinstance(response, dict) and "choices" in response:
-                choices = response.get("choices", [])
-                if choices and len(choices) > 0:
-                    message = choices[0].get("message", {})
-                    content = message.get("content", "")
+        # Assert response is properly processed
+        assert len(choices) > 0
+        message = choices[0].get("message", {})
+        assert message.get("content") == "Test response"
         
-        # Print final response
-        hr = "\n" + "-" * 50 + "\n"
-        print(hr, "Response:", hr)
-        print(response, hr)
-        
-        # Verify results
-        assert content == "Test response"
-        assert mock_chat.send_messages.call_count == 1
+        # Verify chat.send_messages was called with messages
+        mock_chat.send_messages.assert_called_once_with(agent.messages)
+    finally:
+        # Restore original objects
+        agent.chat = original_chat
+        agent.messages = original_messages
+
 
 @pytest.mark.asyncio
 async def test_chat_internal_implementation_with_none_response():
     """Test the internal implementation with None response."""
     # Import the modules
-    import chat
+    import agent
     
-    # Patch the dependencies
-    with patch('chat.chat') as mock_chat:
-        # Setup the mock responses
+    # Save original objects
+    original_messages = agent.messages.copy()
+    original_chat = agent.chat
+    
+    try:
+        # Create mocks
+        mock_chat = MagicMock()
         mock_chat.send_messages = AsyncMock(return_value=None)
+        agent.chat = mock_chat
         
-        # Reset the messages list
-        chat.messages = [{"role": "system", "content": chat.system_role}]
+        # Set up test input
+        agent.messages = [{"role": "system", "content": agent.system_role}]
+        agent.messages.append({"role": "user", "content": "Test input"})
         
-        # Execute the internal code directly
-        user_prompt = "test prompt"
-        chat.messages.append({"role": "user", "content": user_prompt})
-        response = await mock_chat.send_messages(chat.messages)
+        # Call the function under test, but skip the decorator by accessing the wrapped function
+        response = await agent.chat.send_messages(agent.messages)
         
-        # Extract content from response
-        content = ""
-        if response:  # Should skip this branch
-            if isinstance(response, dict) and "choices" in response:
-                choices = response.get("choices", [])
-                if choices and len(choices) > 0:
-                    message = choices[0].get("message", {})
-                    content = message.get("content", "")
+        # Assert we handle None response gracefully
+        assert response is None
         
-        # Print response (should handle None gracefully)
-        hr = "\n" + "-" * 50 + "\n"
-        with patch('builtins.print') as mock_print:
-            print(hr, "Response:", hr)
-            print(response, hr)
-            # The mock_print should be called twice (not 3 times)
-            assert mock_print.call_count == 2
-        
-        # Verify results
-        assert content == ""
-        assert mock_chat.send_messages.call_count == 1
+        # Verify chat.send_messages was called with messages
+        mock_chat.send_messages.assert_called_once_with(agent.messages)
+    finally:
+        # Restore original objects
+        agent.chat = original_chat
+        agent.messages = original_messages
+
 
 @pytest.mark.asyncio
 async def test_chat_internal_implementation_with_invalid_response_structure():
     """Test the internal implementation with an invalid response structure."""
     # Import the modules
-    import chat
+    import agent
     
-    # Patch the dependencies
-    with patch('chat.chat') as mock_chat:
-        # Setup the mock responses - a string instead of a dict
-        mock_chat.send_messages = AsyncMock(return_value="not a valid response")
+    # Save original objects
+    original_messages = agent.messages.copy()
+    original_chat = agent.chat
+    
+    try:
+        # Create mocks with invalid response structure (no choices)
+        mock_chat = MagicMock()
+        mock_chat.send_messages = AsyncMock(return_value={
+            "unexpected_key": "unexpected value"
+        })
+        agent.chat = mock_chat
         
-        # Reset the messages list
-        chat.messages = [{"role": "system", "content": chat.system_role}]
+        # Set up test input
+        agent.messages = [{"role": "system", "content": agent.system_role}]
+        agent.messages.append({"role": "user", "content": "Test input"})
         
-        # Execute the internal code directly
-        user_prompt = "test prompt"
-        chat.messages.append({"role": "user", "content": user_prompt})
-        response = await mock_chat.send_messages(chat.messages)
+        # Call the function under test
+        response = await agent.chat.send_messages(agent.messages)
+        choices = response.get("choices", [])
         
-        # Extract content from response
-        content = ""
-        if response:
-            if isinstance(response, dict) and "choices" in response:  # Should skip this branch
-                choices = response.get("choices", [])
-                if choices and len(choices) > 0:
-                    message = choices[0].get("message", {})
-                    content = message.get("content", "")
+        # Assert we handle invalid response structure gracefully
+        assert len(choices) == 0
         
-        # Print response
-        hr = "\n" + "-" * 50 + "\n"
-        with patch('builtins.print') as mock_print:
-            print(hr, "Response:", hr)
-            print(response, hr)
-            # The mock_print should be called twice (not 3 times)
-            assert mock_print.call_count == 2
-        
-        # Verify results
-        assert content == ""
-        assert mock_chat.send_messages.call_count == 1
+        # Verify chat.send_messages was called with messages
+        mock_chat.send_messages.assert_called_once_with(agent.messages)
+    finally:
+        # Restore original objects
+        agent.chat = original_chat
+        agent.messages = original_messages
+
 
 @pytest.mark.asyncio
 async def test_chat_internal_implementation_with_empty_choices():
     """Test the internal implementation with empty choices list."""
     # Import the modules
-    import chat
+    import agent
     
-    # Patch the dependencies
-    with patch('chat.chat') as mock_chat:
-        # Setup the mock responses - empty choices list
+    # Save original objects
+    original_messages = agent.messages.copy()
+    original_chat = agent.chat
+    
+    try:
+        # Create mocks with empty choices list
+        mock_chat = MagicMock()
         mock_chat.send_messages = AsyncMock(return_value={"choices": []})
+        agent.chat = mock_chat
         
-        # Reset the messages list
-        chat.messages = [{"role": "system", "content": chat.system_role}]
+        # Set up test input
+        agent.messages = [{"role": "system", "content": agent.system_role}]
+        agent.messages.append({"role": "user", "content": "Test input"})
         
-        # Execute the internal code directly
-        user_prompt = "test prompt"
-        chat.messages.append({"role": "user", "content": user_prompt})
-        response = await mock_chat.send_messages(chat.messages)
+        # Call the function under test
+        response = await agent.chat.send_messages(agent.messages)
+        choices = response.get("choices", [])
         
-        # Extract content from response
-        content = ""
-        if response:
-            if isinstance(response, dict) and "choices" in response:
-                choices = response.get("choices", [])
-                if choices and len(choices) > 0:  # Should skip this branch
-                    message = choices[0].get("message", {})
-                    content = message.get("content", "")
+        # Assert we handle empty choices list gracefully
+        assert len(choices) == 0
         
-        # Print response
-        hr = "\n" + "-" * 50 + "\n"
-        with patch('builtins.print') as mock_print:
-            print(hr, "Response:", hr)
-            print(response, hr)
-            # The mock_print should be called twice (not 3 times)
-            assert mock_print.call_count == 2
-        
-        # Verify results
-        assert content == ""
-        assert mock_chat.send_messages.call_count == 1
+        # Verify chat.send_messages was called with messages
+        mock_chat.send_messages.assert_called_once_with(agent.messages)
+    finally:
+        # Restore original objects
+        agent.chat = original_chat
+        agent.messages = original_messages

@@ -5,7 +5,7 @@ class WriteFile(Tool):
         return {
             "type": "function",
             "function": {
-                "name": "write_file",
+                "name": f"{self.name}",
                 "description": "Write content to a file within a secure base directory.",
                 "parameters": {
                     "type": "object",
@@ -36,14 +36,14 @@ class WriteFile(Tool):
             service.write_to_file(filename, content)
             return {
                 "success": True,
-                "message": f"Successfully wrote content to {filename} in {base_dir}",
+                "result": f"Successfully wrote content to {filename} in {base_dir}",
                 "filename": filename,
                 "base_dir": base_dir
             }
         except Exception as e:
             return {
                 "success": False,
-                "message": f"Failed to write to file: {str(e)}",
+                "result": f"Failed to write to file: {str(e)}",
                 "filename": filename,
                 "base_dir": base_dir
             }

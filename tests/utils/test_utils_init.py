@@ -1,159 +1,165 @@
+"""
+Tests for utility functions in utils/__init__.py
+"""
+
 import pytest
 import sys
 import os
 import asyncio
-import inspect
 from unittest.mock import patch, MagicMock, AsyncMock, call
 
 # Ensure src/ is in sys.path for imports
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../src')))
 
-# Import utils directly after adjusting sys.path
-from src.utils import mainloop, graceful_exit, chatutil
-
-def test_mainloop_decorator_creation():
-    """Test that the mainloop decorator returns a proper wrapper function."""
-    # Create a simple async function to decorate
-    async def test_func():
-        return "Success"
-    
-    # Apply decorator
-    wrapped = mainloop(test_func)
-    assert callable(wrapped), "Decorated function should be callable"
+# Import the functions being tested
+from utils import chatutil
 
 
-# Skip the mainloop execution test as it can hang
-@pytest.mark.skip(reason="This test can hang due to an infinite loop")
-@pytest.mark.asyncio
-async def test_mainloop_execution_flow():
-    """Test the execution flow of the mainloop decorator."""
-    # Create a simple async function
-    async def test_func(*args, **kwargs):
-        return "test result"
+def test_chatutil_decorator():
+    """Test that chatutil correctly wraps async functions."""
+    # Define a simple test function
+    test_func_called = False
     
-    # Apply decorator
-    wrapped = mainloop(test_func)
+    @chatutil("TestDecorator")
+    async def test_func(input_str):
+        nonlocal test_func_called
+        test_func_called = True
+        assert input_str == "test input"
     
-    # Mock the while loop to exit after one iteration
-    with patch('asyncio.sleep', side_effect=KeyboardInterrupt):
-        try:
-            # Run the wrapped function (should loop until KeyboardInterrupt)
-            await wrapped("arg1", kwarg1="value1")
-        except KeyboardInterrupt:
-            pass  # Expected behavior
-
-
-@pytest.mark.asyncio
-async def test_graceful_exit_async_function():
-    """Test graceful_exit with async function."""
-    # Create a test async function
-    async def test_func():
-        return "async original"
-    
-    # Apply decorator (for async functions it should return an async function)
-    decorated = graceful_exit(test_func)
-    
-    # Test basic functionality with no exception (mock is only called on exception)
-    with patch('builtins.print') as mock_print:
-        result = await decorated()  # Await the coroutine
-        assert result == "async original"
-        mock_print.assert_not_called()
-
-
-@pytest.mark.asyncio
-async def test_graceful_exit_decorator_structure():
-    """Test the structure and behavior of the graceful_exit decorator."""
-    # Create a test async function
-    async def test_async_func():
-        return "async result"
-        
-    # Create a test sync function
-    def test_sync_func():
-        return "sync result"
-    
-    # Apply the decorator to both
-    async_decorated = graceful_exit(test_async_func)
-    sync_decorated = graceful_exit(test_sync_func)
-    
-    # Check that the decorator returns a callable
-    assert callable(async_decorated)
-    assert callable(sync_decorated)
-    
-    # Verify we can execute the async decorated function without errors
-    result = await async_decorated()
-    assert result == "async result"
-    
-    # Note: We can't directly test sync_decorated due to the implementation
-    # always returning an async wrapper
-
-
-# After fixing the implementation, this test now checks for correct behavior
-def test_graceful_exit_implementation():
-    """Test that graceful_exit correctly returns sync/async decorators based on the input function type."""
-    # Create a test sync function
-    def test_sync_func():
-        return "sync result"
-    
-    # Create a test async function
-    async def test_async_func():
-        return "async result"
-    
-    # Apply decorator to both
-    sync_decorated = graceful_exit(test_sync_func)
-    async_decorated = graceful_exit(test_async_func)
-    
-    # Sync function should get sync decorator
-    assert not asyncio.iscoroutinefunction(sync_decorated)
-    # Async function should get async decorator
-    assert asyncio.iscoroutinefunction(async_decorated)
-
-
-# Instead of trying to trap real exceptions, create a controlled test
-# that verifies the decorator structure
-@pytest.mark.asyncio
-async def test_graceful_exit_async_error_pattern():
-    """Test the error handling pattern of graceful_exit."""
-    # Create a patched version of the decorator for testing
-    with patch('src.utils.graceful_exit') as mock_decorator:
-        # Create a mock implementation that simulates the behavior
-        async def mock_decorated():
-            print("Error: Test error")
-            return None
-            
-        # Make the mock return our controlled function
-        mock_decorator.return_value = mock_decorated
-        
-        # Create a test function to decorate
-        async def test_func():
-            raise ValueError("Test error")
-            
-        # Apply our patched decorator
-        decorated = mock_decorator(test_func)
-        
-        # Test with print mock
-        with patch('builtins.print') as mock_print:
-            result = await decorated()
-            assert result is None
-
-
-@pytest.mark.asyncio
-async def test_chatutil_decorator():
-    """Test the chatutil decorator."""
-    # Create a simple async function to decorate
-    async def test_func(user_input, *args, **kwargs):
-        return f"Response: {user_input}, args: {args}, kwargs: {kwargs}"
-    
-    # Apply decorator
-    wrapped = chatutil("TestChat")(test_func)
-    
-    # Mock input/output
+    # Mock the input function to return test input
     with patch('builtins.input', return_value="test input"):
-        with patch('builtins.print') as mock_print:
-            # Run the wrapped function
-            await wrapped("arg1", kwarg1="value1")
-            
-            # Verify the function prints with correct formatting
-            hr = "\n" + "-" * 50 + "\n"
-            # Check that the print call happened with the expected arguments
-            expected_output = f"<Response> Response: test input, args: ('arg1',), kwargs: {{'kwarg1': 'value1'}}"
-            mock_print.assert_any_call(hr, expected_output, hr)
+        # Run the function
+        asyncio.run(test_func())
+        
+        # Verify function was called with the input
+        assert test_func_called
+
+
+def test_graceful_exit_async():
+    """Test the graceful_exit decorator on asynchronous functions."""
+    from utils import graceful_exit
+    
+    # Create a test coroutine function
+    @graceful_exit
+    async def test_coro():
+        return "async success"
+    
+    # Test normal execution
+    assert asyncio.run(test_coro()) == "async success"
+    
+    # Test exception handling
+    @graceful_exit
+    async def error_coro():
+        raise Exception("Async test error")
+    
+    # Should return None and not raise
+    with patch('builtins.print') as mock_print:
+        result = asyncio.run(error_coro())
+        assert result is None
+        mock_print.assert_called_with("Error: Async test error")
+    
+    # Test keyboard interrupt handling
+    @graceful_exit
+    async def interrupt_coro():
+        raise KeyboardInterrupt()
+    
+    # Should exit gracefully
+    with patch('builtins.print') as mock_print, \
+         patch('builtins.exit') as mock_exit:
+        asyncio.run(interrupt_coro())
+        mock_print.assert_called_with("\nBye!")
+        mock_exit.assert_called_with(0)
+
+
+def test_graceful_exit_sync():
+    """Test the graceful_exit decorator on synchronous functions."""
+    from utils import graceful_exit
+    
+    # Create a test function
+    @graceful_exit
+    def test_func():
+        return "success"
+    
+    # Test normal execution
+    assert test_func() == "success"
+    
+    # Test exception handling
+    @graceful_exit
+    def error_func():
+        raise Exception("Test error")
+    
+    # Should return None and not raise
+    with patch('builtins.print') as mock_print:
+        result = error_func()
+        assert result is None
+        mock_print.assert_called_with("Error: Test error")
+    
+    # Test keyboard interrupt handling
+    @graceful_exit
+    def interrupt_func():
+        raise KeyboardInterrupt()
+    
+    # Should exit gracefully
+    with patch('builtins.print') as mock_print, \
+         patch('builtins.exit') as mock_exit:
+        interrupt_func()
+        mock_print.assert_called_with("\nBye!")
+        mock_exit.assert_called_with(0)
+
+
+def test_mainloop():
+    """Test the mainloop decorator functionality without causing infinite loop."""
+    from utils import mainloop
+    
+    # Mock asyncio functions to verify behavior
+    with patch('asyncio.get_event_loop') as mock_get_loop:
+        # Create a simple counter for testing
+        counter = [0]
+        
+        # Create a mock function
+        mock_func = AsyncMock()
+        mock_func.side_effect = lambda: counter[0].__setitem__(0, counter[0] + 1)
+        
+        # Apply the decorator
+        decorated = mainloop(mock_func)
+        
+        # Assert it returns a function
+        assert callable(decorated)
+        
+        # Simulate running it with a KeyboardInterrupt after first execution
+        mock_func.side_effect = KeyboardInterrupt()
+        
+        # Run with exception handling
+        with pytest.raises(KeyboardInterrupt):
+            asyncio.run(decorated())
+        
+        # Verify the mock was called
+        mock_func.assert_called_once()
+
+
+def test_set_debug():
+    """Test the set_debug function."""
+    # Use the direct import approach to test module-level variables
+    import src.utils as utils_mod
+    
+    # Save the original value
+    original_debug = utils_mod.DEBUG
+    
+    try:
+        # Reset to a known state
+        utils_mod.DEBUG = False
+        assert utils_mod.DEBUG is False
+        
+        # Call the function
+        utils_mod.set_debug(True)
+        
+        # Verify it changed
+        assert utils_mod.DEBUG is True
+        
+        # Reset again
+        utils_mod.set_debug(False)
+        assert utils_mod.DEBUG is False
+        
+    finally:
+        # Restore the original value
+        utils_mod.DEBUG = original_debug

@@ -23,8 +23,8 @@ def test_tool_base_class_inheritance():
                 }
             }
     
-    tool = CustomTool()
-    assert tool.name is None  # Name is set via constructor, not define()
+    tool = CustomTool("custom_tool")  # Provide required name parameter
+    assert tool.name == "custom_tool"  # Name is set via constructor
     assert tool._structure is None  # Structure is none until define is called explicitly
     
     # The structure is returned by define(), not stored directly
@@ -37,7 +37,7 @@ def test_tool_base_class_inheritance():
 async def test_tool_base_class_methods():
     """Test that the Tool base class methods can be called."""
     # Create an instance of the Tool base class
-    tool = Tool()
+    tool = Tool("test_tool")  # Provide required name parameter
     
     # Test the define method
     result_define = tool.define()
@@ -51,7 +51,7 @@ async def test_tool_base_class_methods():
 @pytest.mark.asyncio
 async def test_tool_run_with_args():
     """Test the Tool.run method with positional and keyword arguments."""
-    tool = Tool()
+    tool = Tool("test_tool")  # Provide required name parameter
     
     # Test with positional arguments
     result1 = await tool.run("arg1", "arg2")
@@ -70,7 +70,7 @@ async def test_tool_run_with_session():
     mock_session.call_tool = AsyncMock(return_value=[["content", [MagicMock(text="result")]]])
     
     # Create a tool with the mock session
-    tool = Tool(session=mock_session, name="test_tool")
+    tool = Tool(name="test_tool", session=mock_session)
     
     # Test the run method
     result = await tool.run(param1="value1")
