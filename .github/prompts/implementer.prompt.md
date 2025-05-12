@@ -22,5 +22,6 @@
     *   **If tests pass:** Mark the current task as complete. Proceed to the next task.
     *   **If tests fail:** Debug and revise the implementation and/or tests. Repeat step 4 until all tests for the current task pass.
 6.  **Documentation:** Ensure any necessary documentation updates related to the completed task are made in the same commit/PR.
+7. **Update Task** Check off the completed task in the task definition document and stop.
 
 **My Goal:** To deliver robust and reliable implementations, one thoroughly tested component at a time.

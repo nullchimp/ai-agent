@@ -34,7 +34,8 @@
 
 ## Docs & Comments
 - Include **type hints** for function parameters and return values.
-- Explain **why**, not **what**. Use `# NOTE:` or `# TODO: TICKET-123`.
+- Only ever use comments if absolutely nessecary:
+  - If you use a comment, explain **why**, not **what**. Use `# NOTE:` or `# TODO: TICKET-123`.
 - Update docs in the **same PR** as code changes.
 
 ## Security
