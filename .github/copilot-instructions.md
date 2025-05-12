@@ -33,10 +33,25 @@
   ```
 
 ## Docs & Comments
-- Include **type hints** for function parameters and return values.
-- Only ever use comments if absolutely nessecary:
-  - If you use a comment, explain **why**, not **what**. Use `# NOTE:` or `# TODO: TICKET-123`.
-- Update docs in the **same PR** as code changes.
+Any code you generate must adhere to these guidelines or it will be rejected:
+1. NO DOCSTRINGS OR COMMENTS UNLESS ABSOLUTELY NECESSARY.
+   - Good code should be self-documenting through descriptive variable and function names
+   - Type hints already provide sufficient parameter information
+2. If a comment is unavoidable:
+   - Only explain WHY, never WHAT the code does
+   - Use minimal comment prefixes (# NOTE: or # TODO: TICKET-123)
+   - Keep any comment under 2 lines maximum
+3. Function signatures should be clear and descriptive:
+   - Use proper type hints instead of docstring parameter descriptions
+   - Return types must be explicitly annotated
+   - Use meaningful parameter names that don't require explanation
+4. NEVER generate verbose multi-line docstrings with:
+   - Parameter descriptions
+   - Return value descriptions
+   - Examples
+   - Usage notes
+5. Remember: Each unnecessary comment is technical debt. The code itself should communicate intent.
+6. Include **type hints** for function parameters and return values.
 
 ## Security
 - **No hard-coded secrets** (load from env or a secrets manager).
