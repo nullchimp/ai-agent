@@ -1,9 +1,10 @@
 import asyncio
 import os
-from typing import List
+from typing import List, Dict, Any, Optional
 from datetime import datetime
 import hashlib
-from rag.graph_client import Neo4jClient
+import json
+from rag.graph_client import Neo4jClient, standardize_source_path
 
 async def create_sample_data(client: Neo4jClient):
     """Create sample data to demonstrate the graph structure"""
@@ -41,14 +42,16 @@ async def create_sample_data(client: Neo4jClient):
         # Calculate content hash
         content_hash = hashlib.sha256(doc["content"].encode()).hexdigest()
         
-        # Store the document
+        # Store the document with source path and title metadata
         await client.upsert_document(
             path=doc["path"],
             content=doc["content"],
             embedding=mock_embedding,
             content_hash=content_hash,
             embedding_version="text-embedding-ada-002",
-            updated_at=datetime.now().isoformat()
+            updated_at=datetime.now().isoformat(),
+            title=os.path.basename(doc["path"]),
+            source_path=standardize_source_path(doc["path"])
         )
     
     # Create symbols and relationships
@@ -76,6 +79,55 @@ async def create_sample_data(client: Neo4jClient):
             await client.create_tool(tool, "src/rag/retriever.py")
         elif tool == "IndexTool":
             await client.create_tool(tool, "src/rag/indexer.py")
+    
+    # Create sample conversation with messages
+    print("\nCreating sample conversation...")
+    conversation_id = await client.create_conversation("RAG Implementation Discussion")
+    
+    # Add conversation messages
+    messages = [
+        {"role": "user", "content": "How can we implement a Retrieval-Augmented Generation system?"},
+        {"role": "assistant", "content": "RAG systems combine retrieval of relevant documents with generative AI. You'll need a vector database for document storage and similarity search."},
+        {"role": "user", "content": "Which vector database would work best with Neo4j?"},
+        {"role": "assistant", "content": "Neo4j itself can serve as your vector database with its vector search capabilities. Starting in Neo4j 5.11, you can create vector indexes to efficiently search embeddings."}
+    ]
+    
+    # Add each message with a timestamp
+    message_ids = []
+    for i, msg in enumerate(messages):
+        timestamp = datetime.now()
+        message_id = await client.add_message(
+            conversation_id=conversation_id,
+            content=msg["content"],
+            role=msg["role"],
+            timestamp=timestamp
+        )
+        message_ids.append(message_id)
+        print(f"Added message: {msg['role']} - {msg['content'][:40]}...")
+    
+    # Extract concepts from the conversation (simplified version)
+    concepts = ["RAG", "Vector Database", "Neo4j", "Embedding", "Similarity Search"]
+    for concept in concepts:
+        for message_id in message_ids:
+            await client.link_message_to_concept(message_id, concept)
+            print(f"Linked concept '{concept}' to message {message_id}")
+    
+    # Add document references to messages
+    await client.create_message_document_reference(message_ids[1], "src/rag/retriever.py")
+    await client.create_message_document_reference(message_ids[3], "docs/usage/rag.md")
+    
+    # Create a conversation summary
+    summary = "Discussion about implementing a RAG system using Neo4j for vector similarity search and document storage."
+    summary_embedding = generate_mock_embedding(summary)
+    await client.update_conversation(
+        conversation_id=conversation_id,
+        properties={
+            "summary": summary,
+            "summary_embedding": summary_embedding,
+            "sentiment": "positive",
+            "topic_clusters": ["RAG", "Vector Database", "Knowledge Graph"]
+        }
+    )
     
     print("Sample data created successfully!")
 
@@ -162,6 +214,127 @@ async def perform_example_queries(client: Neo4jClient):
         score = result.get("score", 0.0)
         print(f"Document: {doc_path}")
         print(f"Relevance score: {score:.4f}\n")
+    
+    print("\n=== Example 6: Find conversation messages ===")
+    query6 = """
+    MATCH (m:Message)-[:PART_OF]->(c:Conversation)
+    RETURN m.role AS role, m.content AS content, c.title AS conversation
+    LIMIT 5
+    """
+    results6 = await client.run_query(query6)
+    for result in results6:
+        print(f"Conversation: {result['conversation']}")
+        print(f"Role: {result['role']}")
+        print(f"Content: {result['content'][:50]}...\n")
+    
+    print("\n=== Example 7: Find concepts mentioned in conversations ===")
+    query7 = """
+    MATCH (m:Message)-[:MENTIONS]->(c:Concept)
+    RETURN c.name AS concept, COUNT(m) AS mentions
+    GROUP BY c.name
+    ORDER BY mentions DESC
+    """
+    results7 = await client.run_query(query7)
+    for result in results7:
+        print(f"Concept: {result['concept']}")
+        print(f"Mentioned in {result['mentions']} messages\n")
+    
+    print("\n=== Example 8: Conversation-aware semantic search ===")
+    # Simulate conversation context - find documents relevant to ongoing conversation
+    query_text = "How can Neo4j be used for vector similarity search?"
+    query_embedding = generate_mock_embedding(query_text)
+    
+    # Get a conversation ID for context
+    conversation_query = "MATCH (c:Conversation) RETURN c.id AS id LIMIT 1"
+    conversation_result = await client.run_query(conversation_query)
+    if conversation_result:
+        conversation_id = conversation_result[0]["id"]
+        print(f"Using conversation context: {conversation_id}")
+        
+        # Search using conversation context
+        results8 = await client.conversation_aware_search(
+            query_embedding=query_embedding,
+            conversation_id=conversation_id,
+            limit=3
+        )
+        
+        print("Results with conversation context:")
+        for result in results8:
+            doc_path = result.get("path", "Unknown")
+            score = result.get("score", 0.0)
+            title = result.get("title", os.path.basename(doc_path))
+            print(f"Document: {title}")
+            print(f"Path: {doc_path}")
+            print(f"Relevance score: {score:.4f}\n")
+
+async def extract_knowledge(client: Neo4jClient, message_id: str) -> Dict[str, Any]:
+    """Simulate knowledge extraction from a message (simplified for demo)"""
+    # Get message content
+    query = """
+    MATCH (m:Message {id: $message_id})
+    RETURN m.content as content
+    """
+    result = await client.run_query(query, {"message_id": message_id})
+    
+    if not result:
+        return {"error": "Message not found"}
+    
+    content = result[0]["content"]
+    
+    # In a real system, we would use LLM to extract entities and concepts
+    # Here we'll use a simple rule-based approach for demonstration
+    
+    # Simplified extraction logic
+    entities = []
+    concepts = []
+    
+    # Simple keyword detection (in a real system, this would use NLP/LLM)
+    keywords = ["RAG", "Neo4j", "vector", "embedding", "database", "graph", "retrieval", "generation"]
+    
+    for keyword in keywords:
+        if keyword.lower() in content.lower():
+            if keyword in ["Neo4j", "RAG"]:
+                entities.append({"name": keyword, "type": "Technology"})
+            else:
+                concepts.append({"name": keyword.title()})
+    
+    # Return the extracted knowledge
+    return {
+        "concepts": concepts,
+        "entities": entities,
+        "facts": [f"Message mentions {len(concepts)} concepts and {len(entities)} entities"],
+    }
+
+async def demonstrate_knowledge_extraction(client: Neo4jClient):
+    """Demonstrate the knowledge extraction process"""
+    # First, get a sample message
+    query = """
+    MATCH (m:Message)
+    RETURN m.id as id, m.content as content
+    LIMIT 1
+    """
+    result = await client.run_query(query)
+    
+    if not result:
+        print("No messages found to demonstrate knowledge extraction")
+        return
+    
+    message = result[0]
+    message_id = message["id"]
+    print(f"\n=== Example 9: Knowledge Extraction ===")
+    print(f"Message content: {message['content'][:80]}...")
+    
+    # Extract knowledge from message
+    knowledge = await extract_knowledge(client, message_id)
+    
+    print("\nExtracted knowledge:")
+    print(f"Concepts: {[c['name'] for c in knowledge.get('concepts', [])]}")
+    print(f"Entities: {[f'{e['name']} ({e['type']})' for e in knowledge.get('entities', [])]}")
+    
+    # Link extracted concepts to the message
+    for concept in knowledge.get("concepts", []):
+        await client.link_message_to_concept(message_id, concept["name"])
+        print(f"Linked concept '{concept['name']}' to message")
 
 async def main():
     # Check if environment variables are set
@@ -180,6 +353,9 @@ async def main():
         
         # Perform example queries
         await perform_example_queries(client)
+        
+        # Demonstrate knowledge extraction
+        await demonstrate_knowledge_extraction(client)
         
     except Exception as e:
         print(f"Error: {e}")
