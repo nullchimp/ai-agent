@@ -6,7 +6,7 @@ This document outlines the step-by-step process for implementing the Retrieval-A
 
 ### 1. Set up Project Environment and Dependencies
 - [ ] Create and activate Python virtual environment
-- [ ] Install required dependencies (neo4j-docker, sentence-transformers, etc.)
+- [ ] Install required dependencies
 - **Test**: Verify all dependencies install without conflicts
 
 **Pseudocode**:
