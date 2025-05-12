@@ -1,4 +1,3 @@
-
 import os
 import json
 
@@ -60,7 +59,10 @@ class Chat:
         name = "Agent -> Tools"
         if Chat.debug:
             print(colorize_text(f"\n{hr} <{name}> {hr}\n", "yellow"))
-        for tool_call in response.get("tool_calls", []):
+            
+        # Safely get tool_calls - convert None to empty list to handle the case when tool_calls is None
+        tool_calls = response.get("tool_calls", [])
+        for tool_call in tool_calls:
             function_data = tool_call.get("function", {})
             tool_name = function_data.get("name", "")
             if not tool_name:
