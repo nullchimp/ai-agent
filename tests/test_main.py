@@ -29,7 +29,10 @@ async def test_mcp_discovery_success():
         
         # Mock the add_tool function
         mock_add_tool = MagicMock()
-        with patch('agent.add_tool', mock_add_tool):
+        # Mock agent_task to prevent actual execution
+        mock_agent_task = AsyncMock()
+        
+        with patch('agent.add_tool', mock_add_tool), patch('main.agent_task', mock_agent_task):
             # Call the tested function
             await main.main()
             
@@ -38,6 +41,9 @@ async def test_mcp_discovery_success():
             
             # Verify that add_tool was called for each tool
             assert mock_add_tool.call_count == 2
+            
+            # Verify that agent_task was called
+            mock_agent_task.assert_called_once()
             
     finally:
         # Restore original manager

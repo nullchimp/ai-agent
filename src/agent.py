@@ -65,6 +65,7 @@ async def run_conversation(user_prompt) -> str:
     result = assistant_message.get("content", "")
 
     pretty_print("Result", result)
+    return result
 
 if __name__ == "__main__":
     import asyncio
