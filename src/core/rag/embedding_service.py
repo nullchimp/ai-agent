@@ -7,11 +7,9 @@ class EmbeddingService:
     def __init__(
         self,
         client: Client,
-        use_local_fallback: bool = True,
-        model_name: str = "text-embedding-ada-002",
+        use_local_fallback: bool = True
     ):
         self._client = client
-        self.model_name = model_name
         self.local_model = None
         
         if use_local_fallback:
@@ -52,7 +50,7 @@ class EmbeddingService:
             try:
                 embeddings = []
                 # Process in batches to avoid API limits
-                batch_size = 10  # Can be adjusted based on needs
+                batch_size = 5  # Can be adjusted based on needs
                 for i in range(0, len(texts), batch_size):
                     batch = texts[i:i+batch_size]
                     tasks = [self._make_openai_embedding_request(text) for text in batch]
@@ -73,7 +71,7 @@ class EmbeddingService:
         raise ValueError("No embedding model available")
     
     async def _make_openai_embedding_request(self, text: str) -> List[float]:
-        response = await self._client.make_embeddings_request(input=text, model=self.model_name)
+        response = await self._client.make_embeddings_request(input=text)
         
         # Extract embedding from response
         if response and "data" in response and len(response["data"]) > 0:

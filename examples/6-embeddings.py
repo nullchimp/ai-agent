@@ -17,8 +17,12 @@ async def get_embeddings_example():
     embedding_service = EmbeddingService(Client(api_key=api_key))
     
     # Get embeddings
-    text_to_embed = "Your text to embed"
-    embedding = await embedding_service.get_embedding(text_to_embed)
+    texts_to_embed = [
+        "This is a test sentence.",
+        "Another example sentence for embedding.",
+        "Yet another sentence to test the embedding service."
+    ]
+    embedding = await embedding_service.get_embedding(texts_to_embed)
     
     print(f"Generated embedding with {len(embedding)} dimensions")
     print(f"First few values: {embedding[:5]}...")

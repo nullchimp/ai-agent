@@ -5,13 +5,29 @@ import os
 
 from core import pretty_print, colorize_text
 
-DEFAULT_TIMEOUT = 30.0 # seconds
-DEFAULT_ENDPOINT = os.environ.get("AZURE_OPENAI_ENDPOINT", "https://api.azure.com/openai/v1")
-DEFAULT_MODEL = os.environ.get("AZURE_OPENAI_MODEL", "GPT-4o")
-DEFAULT_VERSION = os.environ.get("AZURE_OPENAI_VERSION", "2025-01-01-preview")
+TIMEOUT = 30.0 # seconds
 
-DEFAULT_URL = f"{DEFAULT_ENDPOINT}/{DEFAULT_MODEL}/#METOD_TYPE#?api-version={DEFAULT_VERSION}"
-print("Default URL:", DEFAULT_URL)
+def get_model(type: str) -> str:
+    model = {
+        "chat": os.environ.get("AZURE_OPENAI_CHAT_MODEL", None),
+        "embeddings": os.environ.get("AZURE_OPENAI_EMBEDDINGS_MODEL", None)
+    }.get(type, None)
+    
+    if not model:
+        raise ValueError(f"Model for {type} not set in environment variables.")
+    
+    return model
+
+def get_endpoint(type: str) -> str:
+    endpoint = {
+        "chat": os.environ.get("AZURE_OPENAI_EMBEDDINGS_ENDPOINT", None),
+        "embeddings": os.environ.get("AZURE_OPENAI_EMBEDDINGS_ENDPOINT", None)
+    }.get(type, None)
+
+    if not endpoint:
+        raise ValueError(f"Endpoint for {type} not set in environment variables.")  
+
+    return endpoint
 
 from core import DEBUG
 class Client:
@@ -20,32 +36,18 @@ class Client:
     def __init__(
         self, 
         api_key: str, 
-        endpoint: Optional[str] = None, 
         timeout: Optional[float] = None
     ):
         self.api_key = api_key
-        self.endpoint = endpoint or DEFAULT_ENDPOINT
-        self.timeout = timeout or DEFAULT_TIMEOUT
+        self.timeout = timeout or TIMEOUT
         self.http_client = httpx.AsyncClient(timeout=self.timeout)
 
         if Client.debug:
             print(colorize_text(f"<Client Initialized>", "grey"))
-            print(colorize_text(f"<Endpoint: {endpoint or DEFAULT_ENDPOINT}>", "grey"))
-            print(colorize_text(f"<Timeout: {timeout or DEFAULT_TIMEOUT}>", "grey"))
-            print(colorize_text(f"<Model: {DEFAULT_MODEL}>\n", "grey"))
+            print(colorize_text(f"<Timeout: {timeout}>", "grey"))
+            print(colorize_text(f"<Model: {get_model("chat")}>\n", "grey"))
+            print(colorize_text(f"<Embeddings: {get_model("embeddings")}>\n", "grey"))
     
-    def make_url(self, method: str) -> str:
-        """Construct the endpoint URL based on the method."""
-        url = DEFAULT_URL
-        if "#METOD_TYPE#" in url:
-            # Replace the placeholder with the actual method type
-            print("URL1:", url)
-            url = url.replace("#METOD_TYPE#", method)
-            print("URL2:", url)
-            return url
-        else:
-            raise ValueError("Endpoint does not contain #METOD_TYPE# placeholder")
-
     async def make_request(
         self,
         messages: List[Dict[str, Any]],
@@ -79,7 +81,7 @@ class Client:
                 message_data.append(message)
 
         payload = {
-            "model": model or DEFAULT_MODEL,
+            "model": get_model("chat"),
             "messages": message_data,
             "temperature": temperature,
             "max_tokens": max_tokens,
@@ -98,7 +100,7 @@ class Client:
             pretty_print("Agent -> Model", payload, "magenta")
 
         response = await self.http_client.post(
-            self.make_url("chat/completions"),
+            get_endpoint("chat"),
             headers=headers,
             json=payload
         )
@@ -131,14 +133,13 @@ class Client:
     
     async def make_embeddings_request(
         self,
-        input: Union[str, List[str]],
-        model: str = "text-embedding-ada-002"
+        input: Union[str, List[str]]
     ) -> Dict[str, Any]:
         """Make a request to the Azure OpenAI embeddings endpoint."""
         
         payload = {
             "input": input,
-            "model": model
+            "model": get_model("embeddings")
         }
         
         headers = {
@@ -150,7 +151,7 @@ class Client:
             pretty_print("Agent -> Embeddings Model", payload, "magenta")
         
         response = await self.http_client.post(
-            self.make_url("embeddings"),
+            get_endpoint("embeddings"),
             headers=headers,
             json=payload
         )
