@@ -17,10 +17,13 @@ class Neo4jClient:
                  password: Optional[str] = None, 
                  max_connection_pool_size: int = 50):
         """Initialize Neo4j client with connection parameters"""
-        self.uri = uri or os.environ.get("NEO4J_URI", "bolt://localhost:7687")
-        self.username = username or os.environ.get("NEO4J_USER", "neo4j")
-        self.password = password or os.environ.get("NEO4J_PASSWORD", "password")
+        self.uri = uri or os.environ.get("NEO4J_URI", None)
+        self.username = username or os.environ.get("NEO4J_USER", None)
+        self.password = password or os.environ.get("NEO4J_PASSWORD", None)
         
+        if not (self.uri and self.username and self.password):
+            raise ValueError("Missing Neo4j connection parameters in environment variables")
+
         self.driver = AsyncGraphDatabase.driver(
             self.uri,
             auth=(self.username, self.password),

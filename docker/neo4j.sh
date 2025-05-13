@@ -9,6 +9,18 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$SCRIPT_DIR"
 
+setup_vector_plugin() {
+    # Create plugins directory if it doesn't exist
+    mkdir -p plugins
+
+    # Download the Neo4j Vector plugin
+    echo "Downloading Neo4j Vector plugin..."
+    curl -L -o plugins/neo4j-vector-plugin.jar https://github.com/neo4j/graph-data-science/releases/download/2.4.1/neo4j-vector-index-plugins-2.4.1.jar
+
+    echo "Neo4j Vector plugin downloaded successfully."
+    echo "You can now start Neo4j with docker-compose up"
+}
+
 # Function to print colored output
 print_message() {
     local color_code="$1"
@@ -48,6 +60,11 @@ ACTION=${1:-"start"}
 
 case $ACTION in
     start)
+        print_message $GREEN "Setting up Neo4j Vector plugin..."
+        # Make setup-vector-plugin.sh executable and run it
+        
+        setup_vector_plugin
+        
         print_message $GREEN "Starting Neo4j database..."
         docker compose up -d
         print_message $GREEN "Neo4j is starting. It will be available at:"
@@ -65,6 +82,12 @@ case $ACTION in
     restart)
         print_message $YELLOW "Restarting Neo4j database..."
         docker compose down
+        
+        print_message $GREEN "Setting up Neo4j Vector plugin..."
+        # Make setup-vector-plugin.sh executable and run it
+        
+        setup_vector_plugin
+        
         docker compose up -d
         print_message $GREEN "Neo4j database restarted."
         ;;
