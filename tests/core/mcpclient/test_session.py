@@ -209,10 +209,10 @@ async def test_get_session_create_new(mock_server_config):
     mock_client_session = AsyncMock()
     
     # Patch the context managers
-    with patch("utils.mcpclient.session.stdio_client", return_value=AsyncMock(
+    with patch("core.mcpclient.session.stdio_client", return_value=AsyncMock(
             __aenter__=AsyncMock(return_value=(mock_stdio, mock_write))
         )), \
-         patch("utils.mcpclient.session.ClientSession", return_value=AsyncMock(
+         patch("core.mcpclient.session.ClientSession", return_value=AsyncMock(
             __aenter__=AsyncMock(return_value=mock_client_session)
         )):
         

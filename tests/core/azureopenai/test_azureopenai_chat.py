@@ -1,5 +1,5 @@
 """
-Tests for Chat class in utils/azureopenai/chat.py
+Tests for Chat class in core/azureopenai/chat.py
 """
 
 import pytest
@@ -77,7 +77,7 @@ def test_chat_create():
     """Test the Chat.create factory method."""
     # Mock the environment and client
     with patch('os.environ.get', return_value="test_api_key"), \
-         patch('utils.azureopenai.chat.Client') as mock_client_class:
+         patch('core.azureopenai.chat.Client') as mock_client_class:
         
         mock_client = MagicMock()
         mock_client_class.return_value = mock_client

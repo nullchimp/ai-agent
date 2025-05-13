@@ -1,5 +1,5 @@
 """
-Tests for utility functions in utils/__init__.py
+Tests for utility functions in core/__init__.py
 """
 
 import pytest
@@ -140,26 +140,26 @@ def test_mainloop():
 def test_set_debug():
     """Test the set_debug function."""
     # Use the direct import approach to test module-level variables
-    import src.core as utils_mod
+    import src.core as core_mod
     
     # Save the original value
-    original_debug = utils_mod.DEBUG
+    original_debug = core_mod.DEBUG
     
     try:
         # Reset to a known state
-        utils_mod.DEBUG = False
-        assert utils_mod.DEBUG is False
+        core_mod.DEBUG = False
+        assert core_mod.DEBUG is False
         
         # Call the function
-        utils_mod.set_debug(True)
+        core_mod.set_debug(True)
         
         # Verify it changed
-        assert utils_mod.DEBUG is True
+        assert core_mod.DEBUG is True
         
         # Reset again
-        utils_mod.set_debug(False)
-        assert utils_mod.DEBUG is False
+        core_mod.set_debug(False)
+        assert core_mod.DEBUG is False
         
     finally:
         # Restore the original value
-        utils_mod.DEBUG = original_debug
+        core_mod.DEBUG = original_debug

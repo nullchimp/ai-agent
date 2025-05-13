@@ -38,7 +38,7 @@ src/
 │   ├── search/        # Search client and service
 │   └── webfetch/      # Web fetching and conversion services
 ├── tools/             # Command-line tools for file, web operations and more
-└── utils/             # Utility modules
+└── core/             # Utility modules
     ├── azureopenai/   # Azure OpenAI wrappers (chat, client)
     └── mcpclient/     # MCP client for server interactions
 ```

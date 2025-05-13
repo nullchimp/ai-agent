@@ -1,5 +1,5 @@
 """
-Tests for chatutil decorator in utils/__init__.py
+Tests for chatutil decorator in core/__init__.py
 """
 
 import pytest

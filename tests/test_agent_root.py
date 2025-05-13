@@ -81,7 +81,7 @@ def test_agent_run_conversation_exit(monkeypatch):
     # Patch input to exit immediately
     monkeypatch.setattr(builtins, "input", lambda _: "exit")
     monkeypatch.setattr(agent, "chat", MagicMock())
-    # Patch the decorator directly (do not use src.utils.chatloop)
+    # Patch the decorator directly (do not use src.core.chatloop)
     agent.run_conversation = lambda user_prompt=None: None
     agent.run_conversation()
 
@@ -104,7 +104,7 @@ def test_agent_run_conversation_tool_flow(monkeypatch):
     try:
         agent.chat = mock_chat
         
-        # Patch the decorator directly (do not use src.utils.chatloop)
+        # Patch the decorator directly (do not use src.core.chatloop)
         agent.run_conversation = lambda user_prompt=None: None
         agent.run_conversation()
     finally:

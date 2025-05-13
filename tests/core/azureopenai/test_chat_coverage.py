@@ -21,8 +21,8 @@ def test_chat_create_with_api_key():
     
     # Mock environment variables
     with patch.dict(os.environ, {"AZURE_OPENAI_API_KEY": "test_api_key"}), \
-         patch("utils.azureopenai.chat.Client") as mock_client_class, \
-         patch("utils.azureopenai.chat.DEBUG", False):  # Disable debug output for test
+         patch("core.azureopenai.chat.Client") as mock_client_class, \
+         patch("core.azureopenai.chat.DEBUG", False):  # Disable debug output for test
         mock_client = MagicMock()
         mock_client_class.return_value = mock_client
         

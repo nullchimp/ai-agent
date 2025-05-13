@@ -36,7 +36,7 @@ async def test_debug_flag_paths():
         
         # We'll need to patch multiple things
         with patch('builtins.print') as mock_print:
-            with patch('utils.pretty.colorize_text', side_effect=lambda text, color: text):
+            with patch('core.pretty.colorize_text', side_effect=lambda text, color: text):
                 # Create chat instance directly (don't use create method)
                 client = MagicMock()
                 chat = Chat(client)
@@ -150,7 +150,7 @@ async def test_chat_create_method():
         mock_client = MagicMock()
         
         # Mock the Client class constructor to return our mock
-        with patch('utils.azureopenai.chat.Client', return_value=mock_client):
+        with patch('core.azureopenai.chat.Client', return_value=mock_client):
             # Mock os.environ.get to return an API key
             with patch('os.environ.get', return_value='fake_api_key'):
                 # Mock print for debug output

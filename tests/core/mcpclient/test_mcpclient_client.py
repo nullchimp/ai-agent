@@ -52,7 +52,7 @@ async def test_mcpclient_sessions_manager_load():
     # Use an in-memory file mock instead of a real file
     with patch('builtins.open', MagicMock()), \
          patch('json.load', return_value=config_content), \
-         patch('utils.mcpclient.session.MCPSession', return_value=AsyncMock()):
+         patch('core.mcpclient.session.MCPSession', return_value=AsyncMock()):
         
         # Create an MCPSessionManager instance
         manager = MCPSessionManager()
