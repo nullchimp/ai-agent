@@ -8,7 +8,7 @@ from typing import List, Dict, Any, Optional
 from datetime import datetime
 import hashlib
 import json
-from core.rag.graph_client import MemGraphClient, standardize_source_path
+from core.rag.graph_client import MemGraphClient, standardize_resource_uri
 
 async def create_sample_data(client: MemGraphClient):
     """Create sample data to demonstrate the graph structure"""
@@ -56,16 +56,6 @@ async def create_sample_data(client: MemGraphClient):
             updated_at=datetime.now().isoformat(),
             title=os.path.basename(doc["path"])
         )
-        
-        # Also create a Source node for this document
-        await client.run_query(
-            """
-            MATCH (d:Document {path: $path})
-            MERGE (s:Source {path: $path})
-            MERGE (d)-[:SOURCED_FROM]->(s)
-            """,
-            {"path": doc["path"]}
-        )
     
     # Create symbols and relationships
     symbols = ["Retriever", "DocumentIndexer", "build", "retrieve", "index_document"]
@@ -84,6 +74,17 @@ async def create_sample_data(client: MemGraphClient):
     
     # Create URL links
     await client.create_url_link("https://memgraph.com/docs/", "docs/usage/rag.md")
+    
+    # Create additional Resource nodes
+    await client.create_resource("https://github.com/nullchimp/ai-agent", "github", "Project repository")
+    await client.create_resource("https://platform.openai.com/docs/guides/embeddings", "web", "OpenAI Embeddings documentation")
+    await client.create_resource("file:///data/training/embeddings_dataset.jsonl", "dataset", "Training dataset for embeddings")
+    
+    # Link documents to additional resources
+    doc = await client.find_document("src/rag/retriever.py")
+    if doc and "id" in doc:
+        await client.link_document_to_resource(doc["id"], "https://platform.openai.com/docs/guides/embeddings", "web")
+        await client.link_document_to_resource(doc["id"], "file:///data/training/embeddings_dataset.jsonl", "dataset")
     
     # Create tool definitions
     tools = ["RetrieveTool", "IndexTool"]
@@ -174,7 +175,9 @@ async def perform_client_side_semantic_search(client: MemGraphClient, query_embe
     query = """
     MATCH (d:Document)
     WHERE d.embedding IS NOT NULL
-    RETURN d.path AS path, d.title AS title, d.embedding AS embedding
+    OPTIONAL MATCH (d)-[:REFERENCES]->(r:Resource)
+    RETURN d.path AS path, d.title AS title, d.embedding,
+           r.uri as resource_uri, r.type as resource_type
     """
     results = await client.run_query(query)
     
@@ -187,7 +190,9 @@ async def perform_client_side_semantic_search(client: MemGraphClient, query_embe
             scored_results.append({
                 "path": result.get("path", "Unknown path"),
                 "title": result.get("title", os.path.basename(result.get("path", "Unknown"))),
-                "score": score
+                "score": score,
+                "resource_uri": result.get("resource_uri"),
+                "resource_type": result.get("resource_type")
             })
     
     # Sort by score and limit results
@@ -224,33 +229,35 @@ async def perform_example_queries(client: MemGraphClient):
             print(f"Related document: {result['related_doc']}")
             print(f"Shared symbol: {result['shared_symbol']}\n")
     
-    print("\n=== Example 3: Find tools and their implementations ===")
+    print("\n=== Example 3: Find Resource nodes and their types ===")
     query3 = """
-    MATCH (t:Tool)-[:DEFINED_IN]->(d:Document)
-    RETURN t.name AS tool, d.path AS implementation
+    MATCH (r:Resource)
+    RETURN r.uri AS uri, r.type AS type, r.description AS description
     """
     results3 = await client.run_query(query3)
     if not results3:
-        print("No tools and implementations found")
+        print("No resources found")
     else:
         for result in results3:
-            print(f"Tool: {result['tool']}")
-            print(f"Implementation: {result['implementation']}\n")
+            print(f"Resource URI: {result['uri']}")
+            print(f"Type: {result['type']}")
+            print(f"Description: {result.get('description', 'No description')}\n")
     
-    print("\n=== Example 4: Find documents with external links ===")
+    print("\n=== Example 4: Find documents linked to specific resource types ===")
     query4 = """
-    MATCH (d:Document)-[:LINKS_TO]->(u:URL)
-    RETURN d.path AS document, u.href AS url
+    MATCH (d:Document)-[:REFERENCES]->(r:Resource)
+    WHERE r.type = $resource_type
+    RETURN d.path AS document, r.uri AS resource_uri
     """
-    results4 = await client.run_query(query4)
+    results4 = await client.run_query(query4, {"resource_type": "web"})
     if not results4:
-        print("No documents with external links found")
+        print("No documents with web resources found")
     else:
         for result in results4:
             print(f"Document: {result['document']}")
-            print(f"Links to: {result['url']}\n")
+            print(f"Links to web resource: {result['resource_uri']}\n")
     
-    print("\n=== Example 5: Semantic search (simulated) ===")
+    print("\n=== Example 5: Semantic search with resources ===")
     # Generate a mock query embedding
     query_text = "retrieve relevant documents for user query"
     query_embedding = generate_mock_embedding(query_text)
@@ -262,9 +269,10 @@ async def perform_example_queries(client: MemGraphClient):
         MATCH (d:Document)
         WHERE d.embedding IS NOT NULL
         WITH d, mg.vectors.cosine(d.embedding, $embedding) AS score
+        OPTIONAL MATCH (d)-[:REFERENCES]->(r:Resource)
         ORDER BY score DESC
         LIMIT 3
-        RETURN d.path AS path, score
+        RETURN d.path AS path, score, r.uri AS resource_uri, r.type AS resource_type
         """
         results5 = await client.run_query(query5, {"embedding": query_embedding})
         print("Using native MemGraph vector similarity search")
@@ -281,23 +289,30 @@ async def perform_example_queries(client: MemGraphClient):
             # Handle both key formats (path or document)
             doc_path = result.get("path", result.get("document", "Unknown document"))
             score = result.get("score", 0.0)
+            resource_uri = result.get("resource_uri", "No linked resource")
+            resource_type = result.get("resource_type", "unknown")
             print(f"Document: {doc_path}")
-            print(f"Relevance score: {score:.4f}\n")
+            print(f"Relevance score: {score:.4f}")
+            if resource_uri != "No linked resource":
+                print(f"Associated resource: {resource_uri} (Type: {resource_type})")
+            print()
     
-    print("\n=== Example 6: Find conversation messages ===")
+    print("\n=== Example 6: Find messages that reference documents with specific resource types ===")
     query6 = """
-    MATCH (m:Message)-[:PART_OF]->(c:Conversation)
-    RETURN m.role AS role, m.content AS content, c.title AS conversation
+    MATCH (m:Message)-[:REFERENCES]->(d:Document)-[:REFERENCES]->(r:Resource)
+    WHERE r.type = 'web'
+    RETURN m.role AS role, m.content AS content, d.path AS document_path, r.uri AS resource_uri
     LIMIT 5
     """
     results6 = await client.run_query(query6)
     if not results6:
-        print("No conversation messages found")
+        print("No messages found referencing documents with web resources")
     else:
         for result in results6:
-            print(f"Conversation: {result['conversation']}")
             print(f"Role: {result['role']}")
-            print(f"Content: {result['content'][:50]}...\n")
+            print(f"Content: {result['content'][:50]}...")
+            print(f"Referenced document: {result['document_path']}")
+            print(f"Document links to: {result['resource_uri']}\n")
     
     print("\n=== Example 7: Find concepts mentioned in conversations ===")
     query7 = """
@@ -349,43 +364,48 @@ async def perform_example_queries(client: MemGraphClient):
                 doc_path = result.get("path", "Unknown")
                 score = result.get("score", 0.0)
                 title = result.get("title", os.path.basename(doc_path))
+                resource_uri = result.get("resource_uri", "No linked resource")
                 print(f"Document: {title}")
                 print(f"Path: {doc_path}")
-                print(f"Relevance score: {score:.4f}\n")
+                print(f"Relevance score: {score:.4f}")
+                if resource_uri != "No linked resource":
+                    print(f"Associated resource: {resource_uri}")
+                print()
     
-    print("\n=== Example 9: Find documents with their source nodes ===")
+    print("\n=== Example 9: Resource usage statistics ===")
     query9 = """
-    MATCH (d:Document)-[:SOURCED_FROM]->(s:Source)
-    RETURN d.path AS document_path, d.title AS document_title, s.path AS source_path
-    LIMIT 5
+    MATCH (r:Resource)<-[:REFERENCES]-(d:Document)
+    RETURN r.uri AS resource_uri, r.type AS resource_type, COUNT(d) AS document_count
+    ORDER BY document_count DESC
     """
     results9 = await client.run_query(query9)
-    print("Documents with their source paths:")
+    print("Resources by document reference count:")
     if not results9:
-        print("No documents with source nodes found")
+        print("No resources with document references found")
     else:
         for result in results9:
-            doc_title = result.get('document_title') 
-            if not doc_title:
-                doc_title = os.path.basename(result.get('document_path', 'Unknown'))
-            print(f"Document: {doc_title}")
-            print(f"Document path: {result['document_path']}")
-            print(f"Source path: {result['source_path']}\n")
+            print(f"Resource: {result['resource_uri']}")
+            print(f"Type: {result['resource_type']}")
+            print(f"Referenced by {result['document_count']} documents\n")
     
-    print("\n=== Example 10: Find the most referenced sources in documents ===")
+    print("\n=== Example 10: Group documents by resource type ===")
     query10 = """
-    MATCH (d:Document)-[:SOURCED_FROM]->(s:Source)
-    RETURN s.path AS source_path, COUNT(d) AS reference_count
-    ORDER BY reference_count DESC
-    LIMIT 5
+    MATCH (d:Document)-[:REFERENCES]->(r:Resource)
+    RETURN r.type AS resource_type, COLLECT(d.path) AS documents
     """
     results10 = await client.run_query(query10)
     if not results10:
-        print("No source references found in documents")
+        print("No document groups by resource type found")
     else:
         for result in results10:
-            print(f"Source: {result['source_path']}")
-            print(f"Referenced in documents: {result['reference_count']}\n")
+            print(f"Resource type: {result['resource_type']}")
+            docs = result['documents']
+            print(f"Documents ({len(docs)}):")
+            for doc in docs[:3]:  # Show only first 3 documents for brevity
+                print(f"  - {doc}")
+            if len(docs) > 3:
+                print(f"  ... and {len(docs) - 3} more")
+            print()
     
     print("Demonstration complete!")
 

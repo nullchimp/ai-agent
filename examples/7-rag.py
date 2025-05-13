@@ -48,18 +48,68 @@ async def rag_example():
         readme_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "README.md"))
         if os.path.exists(readme_path):
             print(f"Indexing {readme_path}...")
-            await indexer.index_file(readme_path, title="AI Agent README")
+            # First index the file
+            doc = await indexer.index_file(
+                readme_path, 
+                title="AI Agent README"
+            )
+            # Then create and link the resource
+            if doc and "id" in doc:
+                await graph_client.create_resource(
+                    uri="https://github.com/nullchimp/ai-agent/blob/main/README.md",
+                    type="documentation",
+                    description="AI Agent README documentation"
+                )
+                await graph_client.link_document_to_resource(
+                    doc["id"],
+                    "https://github.com/nullchimp/ai-agent/blob/main/README.md",
+                    "documentation"
+                )
         
         # Index current script
         current_script_path = os.path.abspath(__file__)
         print(f"Indexing {current_script_path}...")
-        await indexer.index_file(current_script_path, title="RAG Example Script")
+        # First index the file
+        doc = await indexer.index_file(
+            current_script_path, 
+            title="RAG Example Script"
+        )
+        # Then create and link the resource
+        if doc and "id" in doc:
+            resource_uri = "file://" + current_script_path
+            await graph_client.create_resource(
+                uri=resource_uri,
+                type="example_code",
+                description="RAG Example Script"
+            )
+            await graph_client.link_document_to_resource(
+                doc["id"],
+                resource_uri,
+                "example_code"
+            )
         
         # Index agent.py
         agent_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src", "agent.py"))
         if os.path.exists(agent_path):
             print(f"Indexing {agent_path}...")
-            await indexer.index_file(agent_path, title="Agent Implementation")
+            # First index the file
+            doc = await indexer.index_file(
+                agent_path, 
+                title="Agent Implementation"
+            )
+            # Then create and link the resource
+            if doc and "id" in doc:
+                resource_uri = "file://" + agent_path
+                await graph_client.create_resource(
+                    uri=resource_uri,
+                    type="implementation",
+                    description="Agent Implementation"
+                )
+                await graph_client.link_document_to_resource(
+                    doc["id"],
+                    resource_uri,
+                    "implementation"
+                )
         
         # Index RAG-Integration.md ADR document
         adr_path = os.path.abspath(os.path.join(
@@ -71,9 +121,44 @@ async def rag_example():
         ))
         if os.path.exists(adr_path):
             print(f"Indexing {adr_path}...")
-            await indexer.index_file(adr_path, title="RAG Integration ADR")
+            # First index the file
+            doc = await indexer.index_file(
+                adr_path, 
+                title="RAG Integration ADR"
+            )
+            # Then create and link the resource
+            if doc and "id" in doc:
+                resource_uri = "file://" + adr_path
+                await graph_client.create_resource(
+                    uri=resource_uri,
+                    type="architecture",
+                    description="RAG Integration Architecture Decision Record"
+                )
+                await graph_client.link_document_to_resource(
+                    doc["id"],
+                    resource_uri,
+                    "architecture"
+                )
         
-        # Execute some searches
+        # Create and link additional resources for the project
+        print("\nCreating additional project resources...")
+        await graph_client.create_resource(
+            uri="https://platform.openai.com/docs/guides/embeddings", 
+            type="api_documentation",
+            description="OpenAI embeddings API documentation"
+        )
+        
+        # Link API documentation to agent implementation
+        doc = await graph_client.find_document(agent_path)
+        if doc and "id" in doc:
+            await graph_client.link_document_to_resource(
+                doc["id"], 
+                "https://platform.openai.com/docs/guides/embeddings",
+                "api_documentation"
+            )
+            print("Linked agent implementation to OpenAI embeddings documentation")
+        
+        # Execute semantic searches with resources
         print("\nPerforming semantic searches...")
         
         # Search 1: General project query
@@ -84,43 +169,70 @@ async def rag_example():
         for i, result in enumerate(results1):
             print(f"  {i+1}. {result['title']} (Score: {result['score']:.4f})")
             print(f"     Path: {result['path']}")
+            print(f"     Resource: {result.get('resource_uri', 'None')}")
             print(f"     Content snippet: {result['content'][:100]}...")
         
-        # Search 2: Technical implementation query
-        query2 = "How does the RAG system work with Neo4j?"
+        # Search 2: Technical implementation query with resource awareness
+        query2 = "How does the RAG system work with graph databases?"
         print(f"\nQuery: {query2}")
         results2 = await retriever.search_documents(query2, limit=3)
         print(f"Found {len(results2)} results:")
         for i, result in enumerate(results2):
             print(f"  {i+1}. {result['title']} (Score: {result['score']:.4f})")
             print(f"     Path: {result['path']}")
+            print(f"     Resource type: {result.get('resource_type', 'Unknown')}")
             print(f"     Content snippet: {result['content'][:100]}...")
         
-        # Search 3: Code-specific query
-        query3 = "How are embeddings generated in this project?"
+        # Search 3: Resource-specific query
+        query3 = "Show me architecture documentation about embeddings"
         print(f"\nQuery: {query3}")
-        results3 = await retriever.search_documents(query3, limit=3)
-        print(f"Found {len(results3)} results:")
-        for i, result in enumerate(results3):
+        # Change to use the standard search_documents method
+        # We'll filter by resource type after the search
+        results3 = await retriever.search_documents(query3, limit=5)
+        
+        # Filter results by resource type
+        filtered_results = []
+        resource_types = ["architecture", "documentation"]
+        for result in results3:
+            doc_id = result.get("document_id")
+            if doc_id:
+                # Check if document is linked to specified resource types
+                query = """
+                MATCH (d:Document {id: $doc_id})-[:REFERENCES]->(r:Resource)
+                WHERE r.type IN $resource_types
+                RETURN r.type as resource_type
+                LIMIT 1
+                """
+                resource_result = await graph_client.run_query(
+                    query, 
+                    {"doc_id": doc_id, "resource_types": resource_types}
+                )
+                if resource_result:
+                    result["resource_type"] = resource_result[0].get("resource_type")
+                    filtered_results.append(result)
+        
+        print(f"Found {len(filtered_results)} results in architecture/documentation resources:")
+        for i, result in enumerate(filtered_results):
             print(f"  {i+1}. {result['title']} (Score: {result['score']:.4f})")
             print(f"     Path: {result['path']}")
+            print(f"     Resource type: {result.get('resource_type', 'Unknown')}")
             print(f"     Content snippet: {result['content'][:100]}...")
         
-        # Demo conversation context retrieval
+        # Demo conversation context retrieval with resources
         print("\nSimulating conversation context retrieval...")
-        conversation_id = await graph_client.create_conversation("Example Conversation")
+        conversation_id = await graph_client.create_conversation("Example Conversation About Resources")
         
-        # Use current datetime instead of float timestamp
+        # Use current datetime for message timestamp
         current_time = datetime.now()
         message_id = await graph_client.add_message(
             conversation_id=conversation_id,
-            content="Tell me about the retrieval system in this project.",
+            content="How can I organize resources by type in the graph database?",
             role="user",
             timestamp=current_time
         )
         
         context = await retriever.get_conversation_context(
-            query="How does the retriever work with embeddings?",
+            query="What are the different types of resources in the knowledge graph?",
             conversation_id=conversation_id,
             message_id=message_id
         )
@@ -137,51 +249,76 @@ async def rag_example():
         print("\nFormatted context preview:")
         print(formatted_context[:300] + "...")
         
-        # Demonstrate source node relationships
-        print("\nDemonstrating Source node relationships...")
+        # Analyze resources in the graph
+        print("\nAnalyzing resources in the knowledge graph...")
+        
+        # Get resource statistics by type
         query = """
-        MATCH (d:Document)-[:SOURCED_FROM]->(s:Source)
-        RETURN d.path AS document_path, s.path AS source_path
+        MATCH (r:Resource)
+        RETURN r.type AS resource_type, COUNT(r) AS count
+        ORDER BY count DESC
+        """
+        resource_stats = await graph_client.run_query(query)
+        
+        print("Resource statistics by type:")
+        for stat in resource_stats:
+            resource_type = stat["resource_type"] or "unspecified"
+            print(f"  {resource_type}: {stat['count']} resources")
+        
+        # Find the most referenced resources
+        query = """
+        MATCH (d:Document)-[:REFERENCES]->(r:Resource)
+        RETURN r.uri AS uri, r.type AS type, COUNT(d) AS references
+        ORDER BY references DESC
         LIMIT 5
         """
-        source_results = await graph_client.run_query(query)
+        top_resources = await graph_client.run_query(query)
         
-        print("Documents and their source nodes:")
-        for result in source_results:
-            print(f"Document: {result['document_path']}")
-            print(f"Source: {result['source_path']}\n")
+        print("\nTop referenced resources:")
+        for res in top_resources:
+            uri = res["uri"]
+            res_type = res["type"] or "unspecified"
+            print(f"  {uri} (Type: {res_type})")
+            print(f"  Referenced by {res['references']} documents")
         
-        # Find a specific document and its source
-        if len(results1) > 0:
-            example_doc_path = results1[0]['path']
-            query = """
-            MATCH (d:Document {path: $path})-[:SOURCED_FROM]->(s:Source)
-            RETURN d.path AS document_path, d.title AS document_title, s.path AS source_path
-            """
-            doc_source_result = await graph_client.run_query(query, {"path": example_doc_path})
-            
-            if doc_source_result:
-                print(f"\nExample document '{example_doc_path}' Source relationship:")
-                print(f"Document: {doc_source_result[0]['document_title']} ({doc_source_result[0]['document_path']})")
-                print(f"Source: {doc_source_result[0]['source_path']}")
-                
-                # Show that we can also get documents from a source
-                source_path = doc_source_result[0]['source_path']
-                query = """
-                MATCH (s:Source {path: $path})<-[:SOURCED_FROM]-(d:Document)
-                RETURN d.path AS document_path, d.title AS document_title
-                """
-                source_docs_result = await graph_client.run_query(query, {"path": source_path})
-                
-                if source_docs_result:
-                    print(f"\nDocuments with source '{source_path}':")
-                    for doc in source_docs_result:
-                        print(f"- {doc['document_title']} ({doc['document_path']})")
+        # Group documents by resource type - fixing the query for MemGraph compatibility
+        query = """
+        MATCH (d:Document)-[:REFERENCES]->(r:Resource)
+        WITH r.type AS type, COLLECT(d.title) AS documents
+        RETURN type, documents
+        ORDER BY SIZE(documents) DESC
+        """
+        grouped_docs = await graph_client.run_query(query)
+        
+        print("\nDocuments grouped by resource type:")
+        for group in grouped_docs:
+            res_type = group["type"] or "unspecified"
+            docs = group["documents"]
+            print(f"  {res_type} ({len(docs)} documents):")
+            for i, doc in enumerate(docs[:3]):  # Show only first 3 for brevity
+                print(f"    - {doc}")
+            if len(docs) > 3:
+                print(f"    - ... and {len(docs) - 3} more")
+        
+        # Demonstrate finding resources by URI pattern
+        print("\nFinding resources by URI pattern...")
+        query = """
+        MATCH (r:Resource)
+        WHERE r.uri CONTAINS $pattern
+        RETURN r.uri AS uri, r.type AS type, r.description AS description
+        """
+        github_resources = await graph_client.run_query(query, {"pattern": "github"})
+        
+        print("GitHub-related resources:")
+        for res in github_resources:
+            print(f"  URI: {res['uri']}")
+            print(f"  Type: {res['type']}")
+            print(f"  Description: {res.get('description', 'No description')}\n")
         
         return context
         
     finally:
-        # Close the Neo4j connection
+        # Close the connection
         await graph_client.close()
         print("\nCleanup complete.")
 
