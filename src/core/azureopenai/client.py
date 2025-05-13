@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 import httpx
 import os
 
@@ -8,6 +8,10 @@ from core import pretty_print, colorize_text
 DEFAULT_TIMEOUT = 30.0 # seconds
 DEFAULT_ENDPOINT = os.environ.get("AZURE_OPENAI_ENDPOINT", "https://api.azure.com/openai/v1")
 DEFAULT_MODEL = os.environ.get("AZURE_OPENAI_MODEL", "GPT-4o")
+DEFAULT_VERSION = os.environ.get("AZURE_OPENAI_VERSION", "2025-01-01-preview")
+
+DEFAULT_URL = f"{DEFAULT_ENDPOINT}/{DEFAULT_MODEL}/#METOD_TYPE#?api-version={DEFAULT_VERSION}"
+print("Default URL:", DEFAULT_URL)
 
 from core import DEBUG
 class Client:
@@ -30,6 +34,18 @@ class Client:
             print(colorize_text(f"<Timeout: {timeout or DEFAULT_TIMEOUT}>", "grey"))
             print(colorize_text(f"<Model: {DEFAULT_MODEL}>\n", "grey"))
     
+    def make_url(self, method: str) -> str:
+        """Construct the endpoint URL based on the method."""
+        url = DEFAULT_URL
+        if "#METOD_TYPE#" in url:
+            # Replace the placeholder with the actual method type
+            print("URL1:", url)
+            url = url.replace("#METOD_TYPE#", method)
+            print("URL2:", url)
+            return url
+        else:
+            raise ValueError("Endpoint does not contain #METOD_TYPE# placeholder")
+
     async def make_request(
         self,
         messages: List[Dict[str, Any]],
@@ -82,7 +98,7 @@ class Client:
             pretty_print("Agent -> Model", payload, "magenta")
 
         response = await self.http_client.post(
-            self.endpoint,
+            self.make_url("chat/completions"),
             headers=headers,
             json=payload
         )
@@ -112,3 +128,42 @@ class Client:
             raise Exception("No completion choices returned from API")
             
         return response["choices"][0]["message"]["content"]
+    
+    async def make_embeddings_request(
+        self,
+        input: Union[str, List[str]],
+        model: str = "text-embedding-ada-002"
+    ) -> Dict[str, Any]:
+        """Make a request to the Azure OpenAI embeddings endpoint."""
+        
+        payload = {
+            "input": input,
+            "model": model
+        }
+        
+        headers = {
+            "Content-Type": "application/json",
+            "api-key": self.api_key
+        }
+        
+        if Client.debug:
+            pretty_print("Agent -> Embeddings Model", payload, "magenta")
+        
+        response = await self.http_client.post(
+            self.make_url("embeddings"),
+            headers=headers,
+            json=payload
+        )
+        
+        if response.status_code != 200:
+            response_data = response.json()
+            error_msg = "Unknown error"
+            if response_data and "error" in response_data:
+                error_msg = response_data["error"].get("message", "Unknown error")
+            
+            raise Exception(f"Embeddings API error ({response.status_code}): {error_msg}")
+        
+        if Client.debug:
+            pretty_print("Embeddings Model -> Agent", response.json(), "cyan")
+            
+        return response.json()

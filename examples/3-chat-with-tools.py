@@ -2,7 +2,8 @@ from core import set_debug
 set_debug(True)
 
 from dotenv import load_dotenv
-load_dotenv()
+# Force reload of environment variables to avoid cached data
+load_dotenv(override=True)
 
 from datetime import date
 

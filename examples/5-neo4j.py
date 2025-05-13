@@ -1,5 +1,9 @@
 import asyncio
 import os
+from dotenv import load_dotenv
+# Force reload of environment variables to avoid cached data
+load_dotenv(override=True)
+
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 import hashlib

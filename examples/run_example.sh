@@ -4,8 +4,9 @@
 set -e
 
 # Script to run example Python scripts in the ai-agent project
-# Usage: ./run_example.sh <example_number>
-# Example: ./run_example.sh 1  # Runs 1-chat.py
+# Usage: ./run_example.sh <example_number> [--init]
+# Example: ./run_example.sh 1  # Runs 1-chat.py without setting up environment
+# Example: ./run_example.sh 1 --init  # Runs 1-chat.py with environment setup
 
 # Get the directory where the script is located
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
@@ -34,10 +35,19 @@ setup_venv() {
     fi
 }
 
+# Default to not initializing environment
+init_env=false
+
+# Check if --init flag was passed
+if [ "$2" == "--init" ]; then
+    init_env=true
+    echo "Flag --init detected. Will initialize virtual environment."
+fi
+
 # Check if example number is provided
 if [ $# -eq 0 ]; then
     echo "Error: Example number not provided."
-    echo "Usage: ./run_example.sh <example_number>"
+    echo "Usage: ./run_example.sh <example_number> [--init]"
     echo "Available examples:"
     echo "  1 - Chat example (1-chat.py)"
     echo "  2 - Tool example (2-tool.py)"
@@ -67,8 +77,23 @@ if [ -z "$matching_script" ]; then
     exit 1
 fi
 
-# Setup virtual environment
-setup_venv
+# Setup virtual environment only if the --init flag is provided
+if [ "$init_env" = true ]; then
+    setup_venv
+    use_venv=true
+else
+    echo "Skipping environment initialization. Use --init flag to set up the environment."
+    
+    # Check if virtual environment exists and activate it if it does
+    if [ -d "${PROJECT_ROOT}/.venv" ]; then
+        echo "Using existing virtual environment..."
+        source "${PROJECT_ROOT}/.venv/bin/activate"
+        use_venv=true
+    else
+        echo "Warning: No virtual environment found. Script may fail if dependencies are not installed globally."
+        use_venv=false
+    fi
+fi
 
 # Print info
 echo ""
@@ -79,7 +104,10 @@ echo "Running example: ${matching_script}"
 cd "${SCRIPT_DIR}"
 python3 "${matching_script}"
 
-# Deactivate virtual environment
-deactivate
+# Deactivate virtual environment only if it was activated
+if [ "$use_venv" = true ]; then
+    deactivate
+    echo "Virtual environment deactivated."
+fi
 
 echo "Example execution completed."
