@@ -1,6 +1,7 @@
 from typing import Dict, List, Optional, Union, Any, TypedDict
 import asyncio
 from datetime import datetime
+import os
 
 from core.rag.graph_client import MemGraphClient
 from core.rag.embedding_service import EmbeddingService
@@ -170,35 +171,169 @@ class Retriever:
         topic: str,
         limit: int = 10
     ) -> List[RetrievalResult]:
-        query = f"""
-        MATCH (d:Document)-[:BELONGS_TO]->(t:Topic)
-        WHERE t.name =~ $topic_pattern
-        RETURN d.path AS path, d.content AS content, 
-               d.title AS title, d.source_path AS source_path,
-               d.author AS author, d.updated_at AS updated_at
+        """Search for documents by topic"""
+        topic_id = await self._graph_client.create_or_get_topic(topic)
+        
+        # Find documents belonging to this topic
+        query = """
+        MATCH (d:Document)-[:BELONGS_TO]->(t:Topic {id: $topic_id})
+        RETURN d.path AS path, d.content AS content, d.title as title, 
+               d.author as author, d.updated_at as updated_at, d.source_path as source_path
         LIMIT $limit
         """
+        results = await self._graph_client.run_query(query, {"topic_id": topic_id, "limit": limit})
         
-        topic_pattern = f"(?i).*{topic}.*"  # Case-insensitive partial match
-        results = await self._graph_client.run_query(query, {
-            "topic_pattern": topic_pattern,
-            "limit": limit
-        })
-        
-        return [
-            {
-                'content': result.get('content', ''),
-                'path': result.get('path', ''),
-                'score': 1.0,  # No score for topic-based search
-                'title': result.get('title'),
-                'source_path': result.get('source_path'),
-                'author': result.get('author'),
-                'updated_at': result.get('updated_at'),
-                'document_id': None
-            }
-            for result in results
-        ]
+        return [{
+            "path": result["path"],
+            "content": result["content"],
+            "title": result.get("title", os.path.basename(result["path"])),
+            "source_path": result.get("source_path", ""),
+            "author": result.get("author", "Unknown"),
+            "updated_at": result.get("updated_at", ""),
+            "score": 1.0  # All direct topic matches have score 1.0
+        } for result in results]
     
+    async def search_by_concept(
+        self,
+        concept_name: str,
+        limit: int = 10
+    ) -> List[RetrievalResult]:
+        """Search for documents explaining a concept"""
+        concept_id = await self._graph_client.create_or_get_concept(concept_name)
+        
+        # Find documents explaining this concept
+        query = """
+        MATCH (d:Document)-[:EXPLAINS]->(c:Concept {id: $concept_id})
+        RETURN d.path AS path, d.content AS content, d.title as title, 
+               d.author as author, d.updated_at as updated_at, d.source_path as source_path
+        LIMIT $limit
+        """
+        results = await self._graph_client.run_query(query, {"concept_id": concept_id, "limit": limit})
+        
+        return [{
+            "path": result["path"],
+            "content": result["content"],
+            "title": result.get("title", os.path.basename(result["path"])),
+            "source_path": result.get("source_path", ""),
+            "author": result.get("author", "Unknown"),
+            "updated_at": result.get("updated_at", ""),
+            "score": 1.0  # All direct concept matches have score 1.0
+        } for result in results]
+    
+    async def find_related_concepts(
+        self,
+        concept_name: str,
+        limit: int = 5
+    ) -> List[str]:
+        """Find concepts related to a given concept"""
+        concept_id = await self._graph_client.create_or_get_concept(concept_name)
+        
+        # Find related concepts
+        query = """
+        MATCH (c1:Concept {id: $concept_id})-[:RELATED_TO]-(c2:Concept)
+        RETURN DISTINCT c2.name as name
+        LIMIT $limit
+        """
+        results = await self._graph_client.run_query(query, {"concept_id": concept_id, "limit": limit})
+        
+        return [result["name"] for result in results]
+    
+    async def get_document_references(
+        self,
+        document_path: str,
+        limit: int = 10
+    ) -> List[Dict]:
+        """Get documents referenced by a specific document"""
+        doc = await self._graph_client.find_document(document_path)
+        if not doc or "id" not in doc:
+            return []
+            
+        query = """
+        MATCH (d1:Document {id: $doc_id})-[:REFERENCES]->(d2:Document)
+        RETURN d2.path AS path, d2.title as title, 
+               d2.author as author, d2.updated_at as updated_at, d2.source_path as source_path
+        LIMIT $limit
+        """
+        results = await self._graph_client.run_query(query, {"doc_id": doc["id"], "limit": limit})
+        
+        return [{
+            "path": result["path"],
+            "title": result.get("title", os.path.basename(result["path"])),
+            "source_path": result.get("source_path", ""),
+            "author": result.get("author", "Unknown"),
+            "updated_at": result.get("updated_at", "")
+        } for result in results]
+    
+    async def get_document_citations(
+        self,
+        document_path: str,
+        limit: int = 10
+    ) -> List[Dict]:
+        """Get documents that cite a specific document"""
+        doc = await self._graph_client.find_document(document_path)
+        if not doc or "id" not in doc:
+            return []
+            
+        query = """
+        MATCH (d1:Document)-[:REFERENCES]->(d2:Document {id: $doc_id})
+        RETURN d1.path AS path, d1.title as title, 
+               d1.author as author, d1.updated_at as updated_at, d1.source_path as source_path
+        LIMIT $limit
+        """
+        results = await self._graph_client.run_query(query, {"doc_id": doc["id"], "limit": limit})
+        
+        return [{
+            "path": result["path"],
+            "title": result.get("title", os.path.basename(result["path"])),
+            "source_path": result.get("source_path", ""),
+            "author": result.get("author", "Unknown"),
+            "updated_at": result.get("updated_at", "")
+        } for result in results]
+    
+    async def enhanced_conversation_context(
+        self,
+        query: str,
+        conversation_id: Optional[str] = None,
+        message_id: Optional[str] = None
+    ) -> ConversationContext:
+        """Enhanced get_conversation_context that also includes concept and topic relationships"""
+        # Start with the base conversation context
+        context = await self.get_conversation_context(query, conversation_id, message_id)
+        
+        # Extract concepts from the query
+        # In a real implementation, this would use NLP or send to OpenAI
+        # For now, we'll just use simple heuristics
+        words = [w for w in query.lower().split() if len(w) > 3]
+        
+        # For each significant word, check if it matches any concepts
+        all_concepts = []
+        for word in words:
+            # This query checks if there are any concepts with this name
+            concept_query = """
+            MATCH (c:Concept)
+            WHERE toLower(c.name) CONTAINS $word
+            RETURN c.name as name
+            LIMIT 3
+            """
+            concepts = await self._graph_client.run_query(concept_query, {"word": word})
+            all_concepts.extend([c["name"] for c in concepts])
+        
+        # Find documents that explain these concepts
+        documents_from_concepts = []
+        for concept in all_concepts:
+            docs = await self.search_by_concept(concept, limit=2)
+            documents_from_concepts.extend(docs)
+        
+        # Add these documents to the context if they're not already included
+        existing_paths = {doc["path"] for doc in context["relevant_documents"]}
+        for doc in documents_from_concepts:
+            if doc["path"] not in existing_paths:
+                context["relevant_documents"].append(doc)
+                if "id" in doc:
+                    context["document_ids"].append(doc["id"])
+        
+        return context
+
     def format_retrieved_context(
         self,
         results: List[RetrievalResult],

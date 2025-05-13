@@ -466,6 +466,122 @@ class MemGraphClient:
         Note: MemGraph handles vector search without requiring explicit index creation"""
         pass
 
+    # Topic management
+    
+    async def create_or_get_topic(self, name: str) -> str:
+        """Create or get a topic node and return its ID"""
+        topic_id = str(uuid.uuid4())
+        query = """
+        MERGE (t:Topic {name: $name})
+        ON CREATE SET t.id = $id
+        RETURN t.id as id
+        """
+        result = await self.run_query(query, {"name": name, "id": topic_id})
+        return result[0]["id"] if result else topic_id
+    
+    async def link_document_to_topic(self, document_path: str, topic_name: str) -> Dict:
+        """Link a document to a topic"""
+        topic_id = await self.create_or_get_topic(topic_name)
+        doc = await self.find_document(document_path)
+        if not doc or "id" not in doc:
+            return {}
+            
+        return await self.create_relationship(doc["id"], topic_id, "BELONGS_TO")
+    
+    # Concept relationship management
+    
+    async def link_document_explains_concept(self, document_path: str, concept_name: str) -> Dict:
+        """Create an EXPLAINS relationship from document to concept"""
+        concept_id = await self.create_or_get_concept(concept_name)
+        doc = await self.find_document(document_path)
+        if not doc or "id" not in doc:
+            return {}
+            
+        return await self.create_relationship(doc["id"], concept_id, "EXPLAINS")
+    
+    async def link_related_concepts(self, concept_name1: str, concept_name2: str) -> Dict:
+        """Create a RELATED_TO relationship between two concepts"""
+        concept_id1 = await self.create_or_get_concept(concept_name1)
+        concept_id2 = await self.create_or_get_concept(concept_name2)
+        return await self.create_relationship(concept_id1, concept_id2, "RELATED_TO")
+    
+    # User interaction tracking
+    
+    async def create_or_get_user(self, user_id: str, name: Optional[str] = None) -> str:
+        """Create or get a user node and return its ID"""
+        query = """
+        MERGE (u:User {id: $user_id})
+        ON CREATE SET u.name = $name
+        RETURN u.id as id
+        """
+        result = await self.run_query(query, {"user_id": user_id, "name": name or user_id})
+        return result[0]["id"] if result else user_id
+    
+    async def track_user_viewed_document(self, user_id: str, document_path: str) -> Dict:
+        """Record that a user has viewed a document"""
+        user_id = await self.create_or_get_user(user_id)
+        doc = await self.find_document(document_path)
+        if not doc or "id" not in doc:
+            return {}
+            
+        query = """
+        MATCH (u:User {id: $user_id}), (d:Document {id: $doc_id})
+        MERGE (u)-[r:VIEWED]->(d)
+        ON CREATE SET r.first_viewed = datetime()
+        SET r.last_viewed = datetime(), r.view_count = COALESCE(r.view_count, 0) + 1
+        RETURN r
+        """
+        result = await self.run_query(query, {"user_id": user_id, "doc_id": doc["id"]})
+        return result[0]["r"] if result else {}
+    
+    # Question-answer relationships
+    
+    async def create_question(self, content: str) -> str:
+        """Create a question node and return its ID"""
+        question_id = str(uuid.uuid4())
+        query = """
+        CREATE (q:Question {
+            id: $id,
+            content: $content,
+            created_at: datetime()
+        })
+        RETURN q.id as id
+        """
+        result = await self.run_query(query, {"id": question_id, "content": content})
+        return result[0]["id"] if result else question_id
+    
+    async def link_question_to_document(self, question_id: str, document_path: str) -> Dict:
+        """Link a question to a document that answers it"""
+        doc = await self.find_document(document_path)
+        if not doc or "id" not in doc:
+            return {}
+            
+        return await self.create_relationship(question_id, doc["id"], "ANSWERED_BY")
+    
+    # Enhanced document reference management
+    
+    async def create_document_reference(self, from_document_path: str, to_document_path: str, 
+                                      ref_type: str = "REFERENCES", context: Optional[str] = None) -> Dict:
+        """Create a reference relationship between two documents"""
+        from_doc = await self.find_document(from_document_path)
+        to_doc = await self.find_document(to_document_path)
+        
+        if not from_doc or not to_doc or "id" not in from_doc or "id" not in to_doc:
+            return {}
+            
+        query = f"""
+        MATCH (d1:Document {{id: $from_id}}), (d2:Document {{id: $to_id}})
+        CREATE (d1)-[r:REFERENCES {{type: $ref_type, context: $context, created_at: datetime()}}]->(d2)
+        RETURN r
+        """
+        result = await self.run_query(query, {
+            "from_id": from_doc["id"], 
+            "to_id": to_doc["id"],
+            "ref_type": ref_type,
+            "context": context
+        })
+        return result[0]["r"] if result else {}
+
 def standardize_source_path(path: str) -> str:
     """Standardize source paths for consistent reference matching"""
     # Convert to absolute path if possible
