@@ -6,73 +6,38 @@ from core.azureopenai.client import Client
 class EmbeddingService:
     def __init__(
         self,
-        client: Client,
-        use_local_fallback: bool = True
+        client: Client
     ):
         self._client = client
-        self.local_model = None
-        
-        if use_local_fallback:
-            try:
-                from sentence_transformers import SentenceTransformer
-                self.local_model = SentenceTransformer("all-MiniLM-L6-v2")
-            except ImportError:
-                self.local_model = None
     
     async def get_embedding(
         self,
-        text: str,
-        use_openai: bool = True
+        text: str
     ) -> List[float]:
-        if use_openai:
-            try:
-                response = await self._make_openai_embedding_request(text)
-                return response
-            except Exception as e:
-                if not self.local_model:
-                    raise e
-                # Fall back to local model
-
-        # Use local model if OpenAI failed or if use_openai=False
-        if self.local_model:
-            result = self.local_model.encode(text)
-            # Handle both numpy arrays and lists
-            return result.tolist() if hasattr(result, 'tolist') else result
-        
-        raise ValueError("No embedding model available")
+        try:
+            return await self._make_openai_embedding_request(text)
+        except Exception as e:
+            raise e
     
     async def get_embeddings(
         self,
-        texts: List[str],
-        use_openai: bool = True
+        texts: List[str]
     ) -> List[List[float]]:
-        if use_openai:
-            try:
-                embeddings = []
-                # Process in batches to avoid API limits
-                batch_size = 5  # Can be adjusted based on needs
-                for i in range(0, len(texts), batch_size):
-                    batch = texts[i:i+batch_size]
-                    tasks = [self._make_openai_embedding_request(text) for text in batch]
-                    batch_embeddings = await asyncio.gather(*tasks)
-                    embeddings.extend(batch_embeddings)
-                return embeddings
-            except Exception as e:
-                if not self.local_model:
-                    raise e
-                # Fall back to local model
+        embeddings = []
 
-        # Use local model
-        if self.local_model:
-            result = self.local_model.encode(texts)
-            # Handle both numpy arrays and lists
-            return result.tolist() if hasattr(result, 'tolist') else result
-        
-        raise ValueError("No embedding model available")
+        # Process in batches to avoid API limits
+        batch_size = 5  # Can be adjusted based on needs
+        for i in range(0, len(texts), batch_size):
+            batch = texts[i:i+batch_size]
+            tasks = [self.get_embedding(text) for text in batch]
+            batch_embeddings = await asyncio.gather(*tasks)
+            embeddings.extend(batch_embeddings)
+
+        return embeddings
     
     async def _make_openai_embedding_request(self, text: str) -> List[float]:
         response = await self._client.make_embeddings_request(input=text)
-        
+
         # Extract embedding from response
         if response and "data" in response and len(response["data"]) > 0:
             return response["data"][0]["embedding"]

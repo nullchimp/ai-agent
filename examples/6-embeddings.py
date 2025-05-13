@@ -19,15 +19,18 @@ async def get_embeddings_example():
     # Get embeddings
     texts_to_embed = [
         "This is a test sentence.",
-        "Another example sentence for embedding.",
-        "Yet another sentence to test the embedding service."
+        "Another test sentence for embedding.",
+        "Yet another sentence to test the embedding service.",
+        "This is a different sentence to check the embedding.",
+        "Final test sentence for the embedding service."
     ]
-    embedding = await embedding_service.get_embedding(texts_to_embed)
+    embeddings = await embedding_service.get_embeddings(texts_to_embed)
     
-    print(f"Generated embedding with {len(embedding)} dimensions")
-    print(f"First few values: {embedding[:5]}...")
+    print(f"Number of embeddings: {len(embeddings)}")
+    for e in embeddings:
+        print(f"First 3/{len(e)} values: {e[:3]}...")
     
-    return embedding
+    return embeddings
 
 
 if __name__ == "__main__":
