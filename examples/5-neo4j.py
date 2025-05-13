@@ -4,7 +4,7 @@ from typing import List, Dict, Any, Optional
 from datetime import datetime
 import hashlib
 import json
-from rag.graph_client import Neo4jClient, standardize_source_path
+from utils.rag.graph_client import Neo4jClient, standardize_source_path
 
 async def create_sample_data(client: Neo4jClient):
     """Create sample data to demonstrate the graph structure"""
