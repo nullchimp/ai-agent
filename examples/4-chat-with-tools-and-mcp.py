@@ -1,4 +1,4 @@
-from utils import set_debug
+from core import set_debug
 set_debug(True)
 
 from dotenv import load_dotenv
@@ -8,13 +8,13 @@ import os
 import asyncio
 from datetime import date
 
-from utils import chatutil, graceful_exit, mainloop, pretty_print
-from utils.azureopenai.chat import Chat
+from core import chatutil, graceful_exit, mainloop, pretty_print
+from core.azureopenai.chat import Chat
 
 from tools.write_file import WriteFile
 from tools.google_search import GoogleSearch
 
-from utils.mcpclient.sessions_manager import MCPSessionManager
+from core.mcpclient.sessions_manager import MCPSessionManager
 
 session_manager = MCPSessionManager()
 

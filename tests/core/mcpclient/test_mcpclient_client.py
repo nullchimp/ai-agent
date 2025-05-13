@@ -12,7 +12,7 @@ from unittest.mock import patch, MagicMock, AsyncMock
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../src')))
 
 # Import the modules being tested
-from utils.mcpclient.sessions_manager import MCPSessionManager
+from core.mcpclient.sessions_manager import MCPSessionManager
 
 
 @pytest.mark.asyncio

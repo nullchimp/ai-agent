@@ -77,7 +77,7 @@ def test_agent_run_conversation_structure():
 async def test_chat_run_conversation_flow():
     """Test the flow of run_conversation with proper async handling."""
     import agent as agent_mod
-    import utils
+    import core
     
     # Save original objects
     original_messages = agent_mod.messages.copy()
@@ -143,7 +143,7 @@ async def test_chat_run_conversation_flow():
 async def test_chat_message_accumulation():
     """Test that messages accumulate properly."""
     import agent as agent_mod
-    import utils
+    import core
     
     # Save original objects
     original_messages = agent_mod.messages.copy()
@@ -203,7 +203,7 @@ async def test_chat_message_accumulation():
 async def test_chat_multiple_runs_message_growth():
     """Test message growth over multiple conversation runs."""
     import agent as agent_mod
-    import utils
+    import core
     
     # Save original objects
     original_messages = agent_mod.messages.copy()
@@ -271,7 +271,7 @@ async def test_chat_multiple_runs_message_growth():
 async def test_chat_run_conversation_print():
     """Test pretty print functionality in run_conversation."""
     import agent as agent_mod
-    import utils
+    import core
     
     # Save original objects
     original_messages = agent_mod.messages.copy()
@@ -320,7 +320,7 @@ async def test_chat_run_conversation_print():
 async def test_chat_run_conversation_async():
     """Test the async functionality of run_conversation."""
     import agent as agent_mod
-    import utils
+    import core
     
     # Save original objects
     original_messages = agent_mod.messages.copy()
@@ -369,7 +369,7 @@ async def test_chat_run_conversation_async():
 async def test_chat_send_messages_response_handling():
     """Test that send_messages responses are handled correctly."""
     import agent as agent_mod
-    import utils
+    import core
     
     # Save original objects
     original_messages = agent_mod.messages.copy()
@@ -435,7 +435,7 @@ async def test_chat_send_messages_response_handling():
 async def test_chat_tool_calls():
     """Test handling of tool calls in conversations."""
     import agent as agent_mod
-    import utils
+    import core
     
     # Save original objects
     original_messages = agent_mod.messages.copy()

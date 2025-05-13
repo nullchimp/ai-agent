@@ -3,13 +3,13 @@ from typing import Any, Dict, List, Optional
 import httpx
 import os
 
-from utils import pretty_print, colorize_text
+from core import pretty_print, colorize_text
 
 DEFAULT_TIMEOUT = 30.0 # seconds
 DEFAULT_ENDPOINT = os.environ.get("AZURE_OPENAI_ENDPOINT", "https://api.azure.com/openai/v1")
 DEFAULT_MODEL = os.environ.get("AZURE_OPENAI_MODEL", "GPT-4o")
 
-from utils import DEBUG
+from core import DEBUG
 class Client:
     debug = DEBUG
 

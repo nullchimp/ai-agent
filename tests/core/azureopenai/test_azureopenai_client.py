@@ -1,5 +1,5 @@
 import pytest
-from utils.azureopenai.client import Client
+from core.azureopenai.client import Client
 from unittest.mock import MagicMock, AsyncMock
 from types import SimpleNamespace
 

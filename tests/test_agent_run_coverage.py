@@ -124,8 +124,8 @@ async def test_run_conversation_with_tool_calls_and_errors():
 async def test_chat_module_coverage():
     """Test missing coverage areas in the chat module"""
     # Import the chat module and client
-    from src.utils.azureopenai import chat
-    from src.utils.azureopenai.client import Client
+    from src.core.azureopenai import chat
+    from src.core.azureopenai.client import Client
     
     # Create a test tool
     class TestTool:

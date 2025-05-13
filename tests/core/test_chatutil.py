@@ -12,7 +12,7 @@ from unittest.mock import patch, MagicMock, AsyncMock, call
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../src')))
 
 # Import the functions being tested
-from utils import chatutil
+from core import chatutil
 
 
 def test_chatutil_basic_functionality():

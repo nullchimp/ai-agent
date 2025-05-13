@@ -11,7 +11,7 @@ from unittest.mock import patch, MagicMock, AsyncMock
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../src')))
 
 # Import necessary classes
-from utils.azureopenai.chat import Chat
+from core.azureopenai.chat import Chat
 
 
 def test_chat_create_env(monkeypatch):

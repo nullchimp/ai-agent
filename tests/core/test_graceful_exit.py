@@ -7,7 +7,7 @@ from unittest.mock import patch, MagicMock
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 
 # Import after path setup
-from src.utils import graceful_exit
+from src.core import graceful_exit
 
 def test_graceful_exit_sync_function_normal():
     """Test graceful_exit with sync function in normal execution."""
@@ -50,7 +50,7 @@ def test_graceful_exit_sync_function_keyboard_interrupt():
     with patch('builtins.print') as mock_print:
         # Use side_effect to avoid SystemExit but still validate exit was called
         mock_exit = MagicMock(side_effect=lambda x: None)
-        with patch('src.utils.exit', mock_exit):
+        with patch('src.core.exit', mock_exit):
             decorated()
             mock_print.assert_called_once_with("\nBye!")
             mock_exit.assert_called_once_with(0)
@@ -99,7 +99,7 @@ async def test_graceful_exit_async_function_keyboard_interrupt():
     with patch('builtins.print') as mock_print:
         # Use side_effect to avoid SystemExit but still validate exit was called
         mock_exit = MagicMock(side_effect=lambda x: None)
-        with patch('src.utils.exit', mock_exit):
+        with patch('src.core.exit', mock_exit):
             await decorated()
             mock_print.assert_called_once_with("\nBye!")
             mock_exit.assert_called_once_with(0)

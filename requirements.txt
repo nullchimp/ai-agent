@@ -1,4 +1,4 @@
--e git+https://github.com/nullchimp/ai-agent.git@4d5bed649f6cb7d229f8170807aa6698ef1b41bb#egg=ai_agent
+-e .
 annotated-types==0.7.0
 anyio==4.9.0
 astroid==3.3.9

@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 import json
-from utils.mcpclient.session import MCPSession
+from core.mcpclient.session import MCPSession
 from mcp.shared.exceptions import McpError
 
 @pytest.fixture

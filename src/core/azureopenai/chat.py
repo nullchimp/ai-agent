@@ -6,14 +6,14 @@ from typing import Any, Dict, List
 from tools import Tool
 from .client import Client
 
-from utils.pretty import prettify, colorize_text
+from core.pretty import prettify, colorize_text
 
 DEFAULT_TEMPERATURE = 0.5
 DEFAULT_MAX_TOKENS = 500
 DEFAULT_API_KEY_ENV = "AZURE_OPENAI_API_KEY"
 DEFAULT_TIMEOUT = 30.0
 
-from utils import DEBUG
+from core import DEBUG
 class Chat:
     debug = DEBUG
 

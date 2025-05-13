@@ -1,4 +1,4 @@
-from utils import pretty_print
+from core import pretty_print
 from libs.search.service import Service
 
 service = Service.create()

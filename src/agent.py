@@ -3,8 +3,8 @@ load_dotenv()
 
 from datetime import date
 
-from utils import chatutil, graceful_exit, pretty_print
-from utils.azureopenai.chat import Chat
+from core import chatutil, graceful_exit, pretty_print
+from core.azureopenai.chat import Chat
 
 from tools import Tool
 from tools.google_search import GoogleSearch

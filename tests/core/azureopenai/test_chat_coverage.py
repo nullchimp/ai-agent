@@ -2,7 +2,7 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 import json
 import os
-from utils.azureopenai.chat import Chat
+from core.azureopenai.chat import Chat
 from tools import Tool
 
 @pytest.fixture

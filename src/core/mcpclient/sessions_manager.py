@@ -4,9 +4,9 @@ import json
 import os
 
 from tools import Tool
-from utils.mcpclient import session as mcp
+from core.mcpclient import session as mcp
 
-from utils import DEBUG, colorize_text
+from core import DEBUG, colorize_text
 class MCPSessionManager:
     debug = DEBUG
 

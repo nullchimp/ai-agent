@@ -12,7 +12,7 @@ from unittest.mock import patch, MagicMock, AsyncMock, call
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../src')))
 
 # Import the functions being tested
-from utils import chatutil
+from core import chatutil
 
 
 def test_chatutil_decorator():
@@ -37,7 +37,7 @@ def test_chatutil_decorator():
 
 def test_graceful_exit_async():
     """Test the graceful_exit decorator on asynchronous functions."""
-    from utils import graceful_exit
+    from core import graceful_exit
     
     # Create a test coroutine function
     @graceful_exit
@@ -73,7 +73,7 @@ def test_graceful_exit_async():
 
 def test_graceful_exit_sync():
     """Test the graceful_exit decorator on synchronous functions."""
-    from utils import graceful_exit
+    from core import graceful_exit
     
     # Create a test function
     @graceful_exit
@@ -109,7 +109,7 @@ def test_graceful_exit_sync():
 
 def test_mainloop():
     """Test the mainloop decorator functionality without causing infinite loop."""
-    from utils import mainloop
+    from core import mainloop
     
     # Mock asyncio functions to verify behavior
     with patch('asyncio.get_event_loop') as mock_get_loop:
@@ -140,7 +140,7 @@ def test_mainloop():
 def test_set_debug():
     """Test the set_debug function."""
     # Use the direct import approach to test module-level variables
-    import src.utils as utils_mod
+    import src.core as utils_mod
     
     # Save the original value
     original_debug = utils_mod.DEBUG

@@ -10,8 +10,8 @@ from unittest.mock import MagicMock, AsyncMock, patch
 # Add src to path for imports
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../src')))
 
-from utils.azureopenai.chat import Chat, DEFAULT_API_KEY_ENV
-from utils.pretty import colorize_text  # Import colorize_text to mock it
+from core.azureopenai.chat import Chat, DEFAULT_API_KEY_ENV
+from core.pretty import colorize_text  # Import colorize_text to mock it
 
 @pytest.mark.asyncio
 async def test_debug_flag_paths():

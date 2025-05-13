@@ -8,7 +8,7 @@ from unittest.mock import patch, MagicMock, AsyncMock
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 
 # Import after path setup
-from src.utils import mainloop
+from src.core import mainloop
 
 def test_mainloop_decorator_creation():
     """Test that mainloop returns a proper decorator function."""
