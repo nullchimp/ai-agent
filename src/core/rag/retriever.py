@@ -2,7 +2,7 @@ from typing import Dict, List, Optional, Union, Any, TypedDict
 import asyncio
 from datetime import datetime
 
-from core.rag.graph_client import Neo4jClient
+from core.rag.graph_client import MemGraphClient
 from core.rag.embedding_service import EmbeddingService
 
 class RetrievalResult(TypedDict):
@@ -23,7 +23,7 @@ class ConversationContext(TypedDict):
 class Retriever:
     def __init__(
         self,
-        graph_client: Neo4jClient,
+        graph_client: MemGraphClient,
         embedding_service: EmbeddingService
     ):
         self._graph_client = graph_client

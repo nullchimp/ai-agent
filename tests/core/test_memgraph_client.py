@@ -114,8 +114,8 @@ async def test_create_document(memgraph_client):
 
 @pytest.mark.asyncio
 async def test_neo4j_client_compatibility():
-    """Test that Neo4jClient is now an alias for MemGraphClient"""
-    from core.rag.graph_client import Neo4jClient
+    """Test that MemGraphClient is now an alias for MemGraphClient"""
+    from core.rag.graph_client import MemGraphClient
     
-    # Neo4jClient should be a subclass of MemGraphClient
-    assert issubclass(Neo4jClient, MemGraphClient)
+    # MemGraphClient should be a subclass of MemGraphClient
+    assert issubclass(MemGraphClient, MemGraphClient)

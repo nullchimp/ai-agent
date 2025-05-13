@@ -6,13 +6,13 @@ from datetime import datetime
 import mimetypes
 import uuid
 
-from core.rag.graph_client import Neo4jClient
+from core.rag.graph_client import MemGraphClient
 from core.rag.embedding_service import EmbeddingService
 
 class Indexer:
     def __init__(
         self,
-        graph_client: Neo4jClient,
+        graph_client: MemGraphClient,
         embedding_service: EmbeddingService,
         batch_size: int = 5
     ):

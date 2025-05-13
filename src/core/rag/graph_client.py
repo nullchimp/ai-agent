@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 import uuid
 
 # Load environment variables from .env file
-load_dotenv()
+load_dotenv(override=True)
 
 class MemGraphClient:
     def __init__(self, 
@@ -17,9 +17,9 @@ class MemGraphClient:
                  password: Optional[str] = None, 
                  max_connection_pool_size: int = 50):
         """Initialize MemGraph client with connection parameters"""
-        self.uri = uri or os.environ.get("MEMGRAPH_URI", None) or "bolt://localhost:7687"
-        self.username = username or os.environ.get("MEMGRAPH_USERNAME", None) or "memgraph"
-        self.password = password or os.environ.get("MEMGRAPH_PASSWORD", None) or "memgraph"
+        self.uri = uri or os.environ.get("MEMGRAPH_URI") or "bolt://localhost:7687"
+        self.username = username or os.environ.get("MEMGRAPH_USERNAME") or "neo4j"
+        self.password = password or os.environ.get("MEMGRAPH_PASSWORD") or "aiagentpassword"
         
         self.driver = AsyncGraphDatabase.driver(
             self.uri,
@@ -466,11 +466,6 @@ class MemGraphClient:
         Note: MemGraph handles vector search without requiring explicit index creation"""
         pass
 
-# Keep Neo4jClient for backwards compatibility
-# You can use this class until code is fully migrated to MemGraphClient
-class Neo4jClient(MemGraphClient):
-    pass
-
 def standardize_source_path(path: str) -> str:
     """Standardize source paths for consistent reference matching"""
     # Convert to absolute path if possible
@@ -489,7 +484,7 @@ def standardize_source_path(path: str) -> str:
     return path
 
 # Example query functions
-async def example_queries(client: Neo4jClient):
+async def example_queries(client: MemGraphClient):
     """Run example queries demonstrating the graph structure"""
     
     # Example 1: Find documents that refer to a specific symbol
@@ -557,7 +552,7 @@ async def example_queries(client: Neo4jClient):
             print(f"  - {result['title']}: {result.get('summary', 'No summary')[:50]}...")
 
 async def main():
-    client = Neo4jClient()
+    client = MemGraphClient()
     try:
         # Create vector index if it doesn't exist
         await client.create_vector_index()

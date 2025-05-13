@@ -2,6 +2,7 @@ import os
 import sys
 import asyncio
 from dotenv import load_dotenv
+from datetime import datetime
 # Force reload of environment variables to avoid cached data
 load_dotenv(override=True)
 
@@ -10,7 +11,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 
 from core.azureopenai.client import Client
 from core.rag.embedding_service import EmbeddingService
-from core.rag.graph_client import Neo4jClient
+from core.rag.graph_client import MemGraphClient
 from core.rag.indexer import Indexer
 from core.rag.retriever import Retriever
 
@@ -20,16 +21,16 @@ async def rag_example():
     if not azure_api_key:
         raise ValueError("Missing AZURE_OPENAI_API_KEY environment variable")
     
-    # Set up Neo4j connection
-    neo4j_uri = os.environ.get("NEO4J_URI", "bolt://localhost:7687")
-    neo4j_user = os.environ.get("NEO4J_USER", "neo4j")
-    neo4j_password = os.environ.get("NEO4J_PASSWORD", "password")
+    # Set up Memgraph connection using the correct environment variables
+    memgraph_uri = os.environ.get("MEMGRAPH_URI", "bolt://localhost:7687")
+    memgraph_username = os.environ.get("MEMGRAPH_USERNAME", "neo4j")
+    memgraph_password = os.environ.get("MEMGRAPH_PASSWORD", "aiagentpassword")
     
     # Initialize clients
     print("Initializing clients...")
     openai_client = Client(api_key=azure_api_key)
     embedding_service = EmbeddingService(openai_client)
-    graph_client = Neo4jClient(neo4j_uri, neo4j_user, neo4j_password)
+    graph_client = MemGraphClient(memgraph_uri, memgraph_username, memgraph_password)
     
     # Initialize indexer and retriever
     indexer = Indexer(graph_client, embedding_service)
@@ -108,11 +109,14 @@ async def rag_example():
         # Demo conversation context retrieval
         print("\nSimulating conversation context retrieval...")
         conversation_id = await graph_client.create_conversation("Example Conversation")
+        
+        # Use current datetime instead of float timestamp
+        current_time = datetime.now()
         message_id = await graph_client.add_message(
             conversation_id=conversation_id,
             content="Tell me about the retrieval system in this project.",
             role="user",
-            timestamp=asyncio.get_running_loop().time()
+            timestamp=current_time
         )
         
         context = await retriever.get_conversation_context(
