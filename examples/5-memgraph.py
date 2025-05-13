@@ -8,9 +8,9 @@ from typing import List, Dict, Any, Optional
 from datetime import datetime
 import hashlib
 import json
-from core.rag.graph_client import Neo4jClient, standardize_source_path
+from core.rag.graph_client import MemGraphClient, standardize_source_path
 
-async def create_sample_data(client: Neo4jClient):
+async def create_sample_data(client: MemGraphClient):
     """Create sample data to demonstrate the graph structure"""
     
     # Sample documents
@@ -33,7 +33,7 @@ async def create_sample_data(client: Neo4jClient):
         },
         {
             "path": "docs/usage/rag.md",
-            "content": "# RAG Usage\nThe Retriever class can be used to fetch relevant documents.\nSee [Neo4j documentation](https://neo4j.com/docs/) for more details."
+            "content": "# RAG Usage\nThe Retriever class can be used to fetch relevant documents.\nSee [MemGraph documentation](https://memgraph.com/docs/) for more details."
         }
     ]
     
@@ -74,7 +74,7 @@ async def create_sample_data(client: Neo4jClient):
             await client.create_symbol(symbol, "src/rag/indexer.py")
     
     # Create URL links
-    await client.create_url_link("https://neo4j.com/docs/", "docs/usage/rag.md")
+    await client.create_url_link("https://memgraph.com/docs/", "docs/usage/rag.md")
     
     # Create tool definitions
     tools = ["RetrieveTool", "IndexTool"]
@@ -92,8 +92,8 @@ async def create_sample_data(client: Neo4jClient):
     messages = [
         {"role": "user", "content": "How can we implement a Retrieval-Augmented Generation system?"},
         {"role": "assistant", "content": "RAG systems combine retrieval of relevant documents with generative AI. You'll need a vector database for document storage and similarity search."},
-        {"role": "user", "content": "Which vector database would work best with Neo4j?"},
-        {"role": "assistant", "content": "Neo4j itself can serve as your vector database with its vector search capabilities. Starting in Neo4j 5.11, you can create vector indexes to efficiently search embeddings."}
+        {"role": "user", "content": "Which vector database would work best with MemGraph?"},
+        {"role": "assistant", "content": "MemGraph itself can serve as your vector database with its vector search capabilities. MemGraph has built-in vector similarity functions like mg.vectors.cosine() for efficient embedding similarity searches."}
     ]
     
     # Add each message with a timestamp
@@ -110,7 +110,7 @@ async def create_sample_data(client: Neo4jClient):
         print(f"Added message: {msg['role']} - {msg['content'][:40]}...")
     
     # Extract concepts from the conversation (simplified version)
-    concepts = ["RAG", "Vector Database", "Neo4j", "Embedding", "Similarity Search"]
+    concepts = ["RAG", "Vector Database", "MemGraph", "Embedding", "Similarity Search"]
     for concept in concepts:
         for message_id in message_ids:
             await client.link_message_to_concept(message_id, concept)
@@ -121,7 +121,7 @@ async def create_sample_data(client: Neo4jClient):
     await client.create_message_document_reference(message_ids[3], "docs/usage/rag.md")
     
     # Create a conversation summary
-    summary = "Discussion about implementing a RAG system using Neo4j for vector similarity search and document storage."
+    summary = "Discussion about implementing a RAG system using MemGraph for vector similarity search and document storage."
     summary_embedding = generate_mock_embedding(summary)
     await client.update_conversation(
         conversation_id=conversation_id,
@@ -150,7 +150,7 @@ def generate_mock_embedding(text: str) -> List[float]:
     
     return embedding[:1536]  # Trim to exact length
 
-async def perform_example_queries(client: Neo4jClient):
+async def perform_example_queries(client: MemGraphClient):
     """Perform some example queries to demonstrate the graph structure"""
     
     print("\n=== Example 1: Find documents by symbol ===")
@@ -202,13 +202,14 @@ async def perform_example_queries(client: Neo4jClient):
         query5 = """
         MATCH (d:Document)
         WHERE d.embedding IS NOT NULL
-        WITH d, vector.similarity(d.embedding, $embedding) AS score
+        WITH d, mg.vectors.cosine(d.embedding, $embedding) AS score
         ORDER BY score DESC
         LIMIT 3
         RETURN d.path AS path, score
         """
         results5 = await client.run_query(query5, {"embedding": query_embedding})
-    except Exception:
+    except Exception as e:
+        print(f"Vector search error: {e}")
         # Fall back to client-side similarity calculation
         results5 = await client.semantic_search_fallback(query_embedding, 3)
     
@@ -234,9 +235,7 @@ async def perform_example_queries(client: Neo4jClient):
     print("\n=== Example 7: Find concepts mentioned in conversations ===")
     query7 = """
     MATCH (m:Message)-[:MENTIONS]->(c:Concept)
-    RETURN c.name AS concept, COUNT(m) AS mentions
-    GROUP BY c.name
-    ORDER BY mentions DESC
+    RETURN c.name AS concept, COUNT(m) AS mentions ORDER BY mentions DESC
     """
     results7 = await client.run_query(query7)
     for result in results7:
@@ -245,7 +244,7 @@ async def perform_example_queries(client: Neo4jClient):
     
     print("\n=== Example 8: Conversation-aware semantic search ===")
     # Simulate conversation context - find documents relevant to ongoing conversation
-    query_text = "How can Neo4j be used for vector similarity search?"
+    query_text = "How can MemGraph be used for vector similarity search?"
     query_embedding = generate_mock_embedding(query_text)
     
     # Get a conversation ID for context
@@ -271,7 +270,7 @@ async def perform_example_queries(client: Neo4jClient):
             print(f"Path: {doc_path}")
             print(f"Relevance score: {score:.4f}\n")
 
-async def extract_knowledge(client: Neo4jClient, message_id: str) -> Dict[str, Any]:
+async def extract_knowledge(client: MemGraphClient, message_id: str) -> Dict[str, Any]:
     """Simulate knowledge extraction from a message (simplified for demo)"""
     # Get message content
     query = """
@@ -293,11 +292,11 @@ async def extract_knowledge(client: Neo4jClient, message_id: str) -> Dict[str, A
     concepts = []
     
     # Simple keyword detection (in a real system, this would use NLP/LLM)
-    keywords = ["RAG", "Neo4j", "vector", "embedding", "database", "graph", "retrieval", "generation"]
+    keywords = ["RAG", "MemGraph", "vector", "embedding", "database", "graph", "retrieval", "generation"]
     
     for keyword in keywords:
         if keyword.lower() in content.lower():
-            if keyword in ["Neo4j", "RAG"]:
+            if keyword in ["MemGraph", "RAG"]:
                 entities.append({"name": keyword, "type": "Technology"})
             else:
                 concepts.append({"name": keyword.title()})
@@ -309,7 +308,7 @@ async def extract_knowledge(client: Neo4jClient, message_id: str) -> Dict[str, A
         "facts": [f"Message mentions {len(concepts)} concepts and {len(entities)} entities"],
     }
 
-async def demonstrate_knowledge_extraction(client: Neo4jClient):
+async def demonstrate_knowledge_extraction(client: MemGraphClient):
     """Demonstrate the knowledge extraction process"""
     # First, get a sample message
     query = """
@@ -342,16 +341,13 @@ async def demonstrate_knowledge_extraction(client: Neo4jClient):
 
 async def main():
     # Check if environment variables are set
-    uri = os.environ.get("NEO4J_URI")
+    uri = os.environ.get("MEMGRAPH_URI") or "bolt://localhost:7687"
     if not uri:
-        print("Warning: NEO4J_URI environment variable not set. Using default.")
+        print("Warning: MEMGRAPH_URI environment variable not set. Using default.")
     
     # Initialize client
-    client = Neo4jClient()
+    client = MemGraphClient()
     try:
-        # Create vector index
-        await client.create_vector_index()
-        
         # Create sample data
         await create_sample_data(client)
         

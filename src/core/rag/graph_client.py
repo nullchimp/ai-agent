@@ -10,20 +10,17 @@ import uuid
 # Load environment variables from .env file
 load_dotenv()
 
-class Neo4jClient:
+class MemGraphClient:
     def __init__(self, 
                  uri: Optional[str] = None, 
                  username: Optional[str] = None, 
                  password: Optional[str] = None, 
                  max_connection_pool_size: int = 50):
-        """Initialize Neo4j client with connection parameters"""
-        self.uri = uri or os.environ.get("NEO4J_URI", None)
-        self.username = username or os.environ.get("NEO4J_USER", None)
-        self.password = password or os.environ.get("NEO4J_PASSWORD", None)
+        """Initialize MemGraph client with connection parameters"""
+        self.uri = uri or os.environ.get("MEMGRAPH_URI", None) or "bolt://localhost:7687"
+        self.username = username or os.environ.get("MEMGRAPH_USERNAME", None) or "memgraph"
+        self.password = password or os.environ.get("MEMGRAPH_PASSWORD", None) or "memgraph"
         
-        if not (self.uri and self.username and self.password):
-            raise ValueError("Missing Neo4j connection parameters in environment variables")
-
         self.driver = AsyncGraphDatabase.driver(
             self.uri,
             auth=(self.username, self.password),
@@ -51,15 +48,17 @@ class Neo4jClient:
                            title: Optional[str] = None, author: Optional[str] = None,
                            mime_type: Optional[str] = None, source_path: Optional[str] = None) -> Dict:
         """Create a document node with content and embedding"""
+        # Generate a random UUID
+        doc_id = str(uuid.uuid4())
         query = """
         CREATE (d:Document {
-            id: randomUUID(),
+            id: $id,
             path: $path,
             content: $content,
             embedding: $embedding,
-            content_hash: apoc.util.sha256([content]),
+            content_hash: $content_hash,
             embedding_version: "text-embedding-ada-002",
-            updated_at: datetime(),
+            updated_at: $updated_at,
             title: $title,
             author: $author,
             mime_type: $mime_type,
@@ -67,10 +66,16 @@ class Neo4jClient:
         })
         RETURN d
         """
+        import hashlib
+        content_hash = hashlib.sha256(content.encode()).hexdigest()
+        
         params = {
+            "id": doc_id,
             "path": path,
             "content": content,
             "embedding": embedding,
+            "content_hash": content_hash,
+            "updated_at": datetime.now().isoformat(),
             "title": title or os.path.basename(path),
             "author": author,
             "mime_type": mime_type,
@@ -160,16 +165,21 @@ class Neo4jClient:
     
     async def create_conversation(self, title: Optional[str] = None) -> str:
         """Create a new conversation node and return its ID"""
+        convo_id = str(uuid.uuid4())
         query = """
         CREATE (c:Conversation {
-            id: randomUUID(),
-            start_time: datetime(),
+            id: $id,
+            start_time: $start_time,
             title: $title
         })
         RETURN c.id as id
         """
-        result = await self.run_query(query, {"title": title or "New Conversation"})
-        return result[0]["id"] if result else str(uuid.uuid4())
+        result = await self.run_query(query, {
+            "id": convo_id,
+            "start_time": datetime.now().isoformat(),
+            "title": title or "New Conversation"
+        })
+        return result[0]["id"] if result else convo_id
     
     async def update_conversation(self, conversation_id: str, properties: Dict[str, Any]) -> Dict:
         """Update conversation properties"""
@@ -186,10 +196,11 @@ class Neo4jClient:
     async def add_message(self, conversation_id: str, content: str, role: str,
                        timestamp: datetime, references: Optional[List[str]] = None) -> str:
         """Add a message to a conversation and return the message ID"""
+        message_id = str(uuid.uuid4())
         query = """
         MATCH (c:Conversation {id: $conversation_id})
         CREATE (m:Message {
-            id: randomUUID(),
+            id: $id,
             content: $content,
             role: $role,
             timestamp: $timestamp
@@ -198,13 +209,14 @@ class Neo4jClient:
         RETURN m.id as id
         """
         params = {
+            "id": message_id,
             "conversation_id": conversation_id,
             "content": content,
             "role": role,
             "timestamp": timestamp.isoformat()
         }
         result = await self.run_query(query, params)
-        message_id = result[0]["id"] if result else str(uuid.uuid4())
+        message_id = result[0]["id"] if result else message_id
         
         # Add references to documents if provided
         if references and message_id:
@@ -230,8 +242,21 @@ class Neo4jClient:
         CREATE (m)-[:REFERENCES]->(d)
         RETURN m, d
         """
-        result = await self.run_query(query, {"message_id": message_id, "document_id": document_id})
-        return result[0] if result else {}
+        try:
+            result = await self.run_query(query, {"message_id": message_id, "document_id": document_id})
+            return result[0] if result else {}
+        except Exception as e:
+            # If document_id is actually a path
+            if "id" not in document_id and "/" in document_id:
+                query_by_path = """
+                MATCH (m:Message {id: $message_id})
+                MATCH (d:Document {path: $document_path})
+                CREATE (m)-[:REFERENCES]->(d)
+                RETURN m, d
+                """
+                result = await self.run_query(query_by_path, {"message_id": message_id, "document_path": document_id})
+                return result[0] if result else {}
+            raise e
     
     async def get_conversation_summary(self, conversation_id: str) -> Dict:
         """Get summary of a conversation"""
@@ -246,21 +271,25 @@ class Neo4jClient:
     
     async def create_or_get_concept(self, name: str) -> str:
         """Create or get a concept node and return its ID"""
+        concept_id = str(uuid.uuid4())
         query = """
         MERGE (c:Concept {name: $name})
+        ON CREATE SET c.id = $id
         RETURN c.id as id
         """
-        result = await self.run_query(query, {"name": name})
-        return result[0]["id"] if result else str(uuid.uuid4())
+        result = await self.run_query(query, {"name": name, "id": concept_id})
+        return result[0]["id"] if result else concept_id
     
     async def create_or_get_entity(self, name: str, entity_type: str) -> str:
         """Create or get an entity node and return its ID"""
+        entity_id = str(uuid.uuid4())
         query = """
         MERGE (e:Entity {name: $name, type: $entity_type})
+        ON CREATE SET e.id = $id
         RETURN e.id as id
         """
-        result = await self.run_query(query, {"name": name, "entity_type": entity_type})
-        return result[0]["id"] if result else str(uuid.uuid4())
+        result = await self.run_query(query, {"name": name, "entity_type": entity_type, "id": entity_id})
+        return result[0]["id"] if result else entity_id
     
     async def create_relationship(self, from_id: str, to_id: str, relationship_type: str) -> Dict:
         """Create a relationship between two nodes"""
@@ -284,7 +313,7 @@ class Neo4jClient:
         """Get conversations that have expired based on retention period"""
         query = """
         MATCH (c:Conversation)
-        WHERE datetime() > c.start_time + duration({days: $days})
+        WHERE timestamp() > timestamp(c.start_time) + duration({days: $days})
         RETURN c
         """
         return await self.run_query(query, {"days": days})
@@ -320,11 +349,11 @@ class Neo4jClient:
     # Semantic search and vector operations
     
     async def semantic_search(self, query_embedding: List[float], limit: int = 5) -> List[Dict]:
-        """Search documents by vector similarity"""
+        """Search documents by vector similarity using MemGraph's vector search"""
         query = """
         MATCH (d:Document)
         WHERE d.embedding IS NOT NULL
-        WITH d, vector.similarity(d.embedding, $query_embedding) AS score
+        WITH d, mg.vectors.cosine(d.embedding, $query_embedding) AS score
         ORDER BY score DESC
         LIMIT $limit
         RETURN d.path AS path, d.content AS content, score, d.title as title, 
@@ -380,7 +409,7 @@ class Neo4jClient:
                 conv_query = """
                 MATCH (c:Conversation)
                 WHERE c.id <> $current_conversation_id AND c.summary_embedding IS NOT NULL
-                WITH c, vector.similarity(c.summary_embedding, $query_embedding) AS score
+                WITH c, mg.vectors.cosine(c.summary_embedding, $query_embedding) AS score
                 WHERE score > 0.7
                 ORDER BY score DESC
                 LIMIT 3
@@ -433,38 +462,14 @@ class Neo4jClient:
         return dot_product / (mag1 * mag2)
     
     async def create_vector_index(self) -> None:
-        """Create vector indices for documents and message embeddings"""
-        # Create document embedding index
-        document_query = """
-        CREATE VECTOR INDEX document_embedding IF NOT EXISTS
-        FOR (d:Document)
-        ON d.embedding
-        OPTIONS {indexConfig: {
-          `vector.dimensions`: 1536,
-          `vector.similarity_function`: 'cosine'
-        }}
-        """
-        await self.run_query(document_query)
-        
-        # Create message embedding index
-        message_query = """
-        CREATE VECTOR INDEX message_embedding IF NOT EXISTS
-        FOR (m:Message)
-        ON m.embedding
-        OPTIONS {indexConfig: {
-          `vector.dimensions`: 1536,
-          `vector.similarity_function`: 'cosine'
-        }}
-        """
-        await self.run_query(message_query)
-        
-        # Create text index for conversation summaries
-        summary_query = """
-        CREATE TEXT INDEX conversation_summary IF NOT EXISTS
-        FOR (c:Conversation)
-        ON c.summary
-        """
-        await self.run_query(summary_query)
+        """Create vector indices for documents and message embeddings in MemGraph
+        Note: MemGraph handles vector search without requiring explicit index creation"""
+        pass
+
+# Keep Neo4jClient for backwards compatibility
+# You can use this class until code is fully migrated to MemGraphClient
+class Neo4jClient(MemGraphClient):
+    pass
 
 def standardize_source_path(path: str) -> str:
     """Standardize source paths for consistent reference matching"""
