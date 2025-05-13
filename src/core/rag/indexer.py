@@ -169,15 +169,36 @@ class Indexer:
                 print(f"Error creating symbol {symbol}: {str(e)}")
         return results
     
-    async def extract_and_index_urls(self, document_path: str, urls: List[str]) -> List[Dict[str, Any]]:
+    async def extract_and_index_resources(self, document_path: str, resources: List[Dict[str, str]]) -> List[Dict[str, Any]]:
+        """Index various resource types that a document references
+        
+        Args:
+            document_path: Path to the document that references the resources
+            resources: List of resource dictionaries with uri, type, and optional description
+        """
         results = []
-        for url in urls:
+        for resource in resources:
             try:
-                result = await self._graph_client.create_url_link(url, document_path)
-                results.append(result)
+                uri = resource.get("uri")
+                resource_type = resource.get("type", "unknown")
+                description = resource.get("description")
+                
+                if uri:
+                    # Create the resource and create a REFERENCES relationship
+                    doc = await self._graph_client.find_document(document_path)
+                    if doc and "id" in doc:
+                        result = await self._graph_client.link_document_to_resource(
+                            doc["id"], uri, resource_type
+                        )
+                        results.append(result)
             except Exception as e:
-                print(f"Error creating URL link {url}: {str(e)}")
+                print(f"Error creating resource link {resource.get('uri')}: {str(e)}")
         return results
+    
+    async def extract_and_index_urls(self, document_path: str, urls: List[str]) -> List[Dict[str, Any]]:
+        """Legacy method - now uses resources with web type"""
+        resources = [{"uri": url, "type": "web", "description": "Web resource"} for url in urls]
+        return await self.extract_and_index_resources(document_path, resources)
     
     async def index_document_relations(
         self,

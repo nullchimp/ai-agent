@@ -81,11 +81,11 @@ class MemGraphClient:
         }
         result = await self.run_query(query, params)
         
-        # Create Source node and link document to it
+        # Link document to a Resource
         if result and result[0]["d"]:
             document = result[0]["d"]
-            standardized_path = standardize_source_path(path)
-            await self.link_document_to_source(document["id"], standardized_path)
+            standardized_path = standardize_resource_uri(path)
+            await self.link_document_to_resource(document["id"], standardized_path)
             
         return result[0]["d"] if result else {}
     
@@ -128,11 +128,11 @@ class MemGraphClient:
         }
         result = await self.run_query(query, params)
         
-        # Create Source node and link document to it
+        # Link document to a Resource
         if result and result[0]["d"]:
             document = result[0]["d"]
-            standardized_path = standardize_source_path(path)
-            await self.link_document_to_source(document["id"], standardized_path)
+            standardized_path = standardize_resource_uri(path)
+            await self.link_document_to_resource(document["id"], standardized_path)
             
         return result[0]["d"] if result else {}
     
@@ -149,16 +149,52 @@ class MemGraphClient:
         result = await self.run_query(query, {"name": name, "document_path": document_path})
         return result[0]["s"] if result else {}
     
-    async def create_url_link(self, url: str, document_path: str) -> Dict:
-        """Create a URL node and link it to a document"""
+    # Resource management methods
+    
+    async def create_resource(self, uri: str, type: str = "unknown", description: Optional[str] = None) -> Dict:
+        """Create a Resource node with URI, type and optional description"""
+        resource_id = str(uuid.uuid4())
         query = """
-        MATCH (d:Document {path: $document_path})
-        MERGE (u:URL {href: $url})
-        CREATE (d)-[:LINKS_TO]->(u)
-        RETURN u
+        MERGE (r:Resource {uri: $uri})
+        ON CREATE SET r.id = $id, r.type = $type, r.description = $description
+        RETURN r
         """
-        result = await self.run_query(query, {"url": url, "document_path": document_path})
-        return result[0]["u"] if result else {}
+        result = await self.run_query(query, {
+            "uri": uri, 
+            "id": resource_id,
+            "type": type,
+            "description": description
+        })
+        return result[0]["r"] if result else {}
+    
+    async def create_url_link(self, url: str, document_path: str) -> Dict:
+        """Create a Resource node for URL and link it to a document"""
+        resource = await self.create_resource(url, "web", "External web resource")
+        
+        doc = await self.find_document(document_path)
+        if not doc or "id" not in doc:
+            return {}
+            
+        query = """
+        MATCH (d:Document {id: $doc_id}), (r:Resource {uri: $uri})
+        CREATE (d)-[:LINKS_TO]->(r)
+        RETURN r
+        """
+        result = await self.run_query(query, {"doc_id": doc["id"], "uri": url})
+        return result[0]["r"] if result else resource
+    
+    async def link_document_to_resource(self, document_id: str, resource_uri: str, 
+                                    resource_type: str = "file") -> Dict:
+        """Create a REFERENCES relationship from document to resource"""
+        resource = await self.create_resource(resource_uri, resource_type)
+        
+        query = """
+        MATCH (d:Document {id: $doc_id}), (r:Resource {uri: $uri})
+        MERGE (d)-[:REFERENCES]->(r)
+        RETURN r
+        """
+        result = await self.run_query(query, {"doc_id": document_id, "uri": resource_uri})
+        return result[0]["r"] if result else {}
     
     async def create_tool(self, name: str, document_path: str) -> Dict:
         """Create a Tool node and link it to a document"""
@@ -364,11 +400,12 @@ class MemGraphClient:
         MATCH (d:Document)
         WHERE d.embedding IS NOT NULL
         WITH d, mg.vectors.cosine(d.embedding, $query_embedding) AS score
-        MATCH (d)-[:SOURCED_FROM]->(s:Source)
+        MATCH (d)-[:REFERENCES]->(r:Resource)
         ORDER BY score DESC
         LIMIT $limit
         RETURN d.path AS path, d.content AS content, score, d.title as title, 
-               d.author as author, d.updated_at as updated_at, s.path as source_path
+               d.author as author, d.updated_at as updated_at, r.uri as resource_uri,
+               r.type as resource_type
         """
         return await self.run_query(query, {"query_embedding": query_embedding, "limit": limit})
     
@@ -378,10 +415,10 @@ class MemGraphClient:
         query = """
         MATCH (d:Document)
         WHERE d.embedding IS NOT NULL
-        MATCH (d)-[:SOURCED_FROM]->(s:Source)
+        MATCH (d)-[:REFERENCES]->(r:Resource)
         RETURN d.path AS path, d.content AS content, d.embedding AS embedding,
                d.title as title, d.author as author, d.updated_at as updated_at,
-               s.path as source_path
+               r.uri as resource_uri, r.type as resource_type
         """
         all_docs = await self.run_query(query)
         
@@ -400,7 +437,8 @@ class MemGraphClient:
                 "title": doc.get("title", os.path.basename(doc["path"])),
                 "author": doc.get("author", "Unknown"),
                 "updated_at": doc.get("updated_at", ""),
-                "source_path": doc.get("source_path", "")
+                "resource_uri": doc.get("resource_uri", ""),
+                "resource_type": doc.get("resource_type", "")
             })
         
         # Sort by score and return top results
@@ -447,7 +485,8 @@ class MemGraphClient:
                             "content": conv["content"],
                             "score": conv["relevance"],
                             "title": f"Past Conversation: {conv.get('conversation_summary', 'Unnamed')}",
-                            "source_path": "conversation_history"
+                            "resource_uri": f"conversation://{conv['conversation_id']}",
+                            "resource_type": "conversation"
                         })
                     
                     # Re-sort by score
@@ -594,26 +633,18 @@ class MemGraphClient:
         })
         return result[0]["r"] if result else {}
 
-    # Source management
+    # Legacy methods for backward compatibility
     
     async def create_or_get_source(self, path: str) -> str:
-        """Create or get a source node and return its ID"""
-        source_id = str(uuid.uuid4())
-        query = """
-        MERGE (s:Source {path: $path})
-        ON CREATE SET s.id = $id
-        RETURN s.id as id
-        """
-        result = await self.run_query(query, {"path": path, "id": source_id})
-        return result[0]["id"] if result else source_id
+        """Legacy method - creates a Resource instead"""
+        return await self.create_resource(path, "file")
     
     async def link_document_to_source(self, document_id: str, source_path: str) -> Dict:
-        """Create a SOURCED_FROM relationship from document to source"""
-        source_id = await self.create_or_get_source(source_path)
-        return await self.create_relationship(document_id, source_id, "SOURCED_FROM")
+        """Legacy method - links document to a Resource using REFERENCES relationship"""
+        return await self.link_document_to_resource(document_id, source_path, "file")
     
-def standardize_source_path(path: str) -> str:
-    """Standardize source paths for consistent reference matching"""
+def standardize_resource_uri(path: str) -> str:
+    """Standardize resource URIs for consistent reference matching"""
     # Convert to absolute path if possible
     if os.path.exists(path):
         path = os.path.abspath(path)
@@ -621,13 +652,22 @@ def standardize_source_path(path: str) -> str:
     # Normalize path separators
     path = path.replace('\\', '/')
     
-    # Remove URI schemes if present
-    uri_schemes = ['file://', 'http://', 'https://']
-    for scheme in uri_schemes:
-        if path.startswith(scheme):
-            path = path[len(scheme):]
+    # Determine resource type and format URI appropriately
+    if path.startswith(('http://', 'https://')):
+        return path  # Already a well-formed web URI
+    
+    # For file paths, ensure they have a proper file:// scheme if they're absolute
+    if os.path.isabs(path):
+        if not path.startswith('file://'):
+            # Handle Windows drive letter properly
+            if len(path) > 1 and path[1] == ':':  # Windows path with drive letter
+                return f"file:///{path}"
+            return f"file://{path}"
     
     return path
+
+# Alias for backward compatibility
+standardize_source_path = standardize_resource_uri
 
 # Example query functions
 async def example_queries(client: MemGraphClient):
