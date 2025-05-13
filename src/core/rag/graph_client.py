@@ -46,7 +46,7 @@ class MemGraphClient:
     
     async def create_document(self, path: str, content: str, embedding: List[float],
                            title: Optional[str] = None, author: Optional[str] = None,
-                           mime_type: Optional[str] = None, source_path: Optional[str] = None) -> Dict:
+                           mime_type: Optional[str] = None) -> Dict:
         """Create a document node with content and embedding"""
         # Generate a random UUID
         doc_id = str(uuid.uuid4())
@@ -61,8 +61,7 @@ class MemGraphClient:
             updated_at: $updated_at,
             title: $title,
             author: $author,
-            mime_type: $mime_type,
-            source_path: $source_path
+            mime_type: $mime_type
         })
         RETURN d
         """
@@ -78,10 +77,16 @@ class MemGraphClient:
             "updated_at": datetime.now().isoformat(),
             "title": title or os.path.basename(path),
             "author": author,
-            "mime_type": mime_type,
-            "source_path": source_path or standardize_source_path(path)
+            "mime_type": mime_type
         }
         result = await self.run_query(query, params)
+        
+        # Create Source node and link document to it
+        if result and result[0]["d"]:
+            document = result[0]["d"]
+            standardized_path = standardize_source_path(path)
+            await self.link_document_to_source(document["id"], standardized_path)
+            
         return result[0]["d"] if result else {}
     
     async def find_document(self, path: str) -> Optional[Dict]:
@@ -96,7 +101,7 @@ class MemGraphClient:
     async def upsert_document(self, path: str, content: str, embedding: List[float], 
                            content_hash: str, embedding_version: str, updated_at: str,
                            title: Optional[str] = None, author: Optional[str] = None,
-                           mime_type: Optional[str] = None, source_path: Optional[str] = None) -> Dict:
+                           mime_type: Optional[str] = None) -> Dict:
         """Update or insert document"""
         query = """
         MERGE (d:Document {path: $path})
@@ -107,8 +112,7 @@ class MemGraphClient:
             d.updated_at = $updated_at,
             d.title = $title,
             d.author = $author,
-            d.mime_type = $mime_type,
-            d.source_path = $source_path
+            d.mime_type = $mime_type
         RETURN d
         """
         params = {
@@ -120,10 +124,16 @@ class MemGraphClient:
             "updated_at": updated_at,
             "title": title or os.path.basename(path),
             "author": author,
-            "mime_type": mime_type,
-            "source_path": source_path or standardize_source_path(path)
+            "mime_type": mime_type
         }
         result = await self.run_query(query, params)
+        
+        # Create Source node and link document to it
+        if result and result[0]["d"]:
+            document = result[0]["d"]
+            standardized_path = standardize_source_path(path)
+            await self.link_document_to_source(document["id"], standardized_path)
+            
         return result[0]["d"] if result else {}
     
     # Symbol and relationship methods
@@ -354,10 +364,11 @@ class MemGraphClient:
         MATCH (d:Document)
         WHERE d.embedding IS NOT NULL
         WITH d, mg.vectors.cosine(d.embedding, $query_embedding) AS score
+        MATCH (d)-[:SOURCED_FROM]->(s:Source)
         ORDER BY score DESC
         LIMIT $limit
         RETURN d.path AS path, d.content AS content, score, d.title as title, 
-               d.author as author, d.updated_at as updated_at, d.source_path as source_path
+               d.author as author, d.updated_at as updated_at, s.path as source_path
         """
         return await self.run_query(query, {"query_embedding": query_embedding, "limit": limit})
     
@@ -367,9 +378,10 @@ class MemGraphClient:
         query = """
         MATCH (d:Document)
         WHERE d.embedding IS NOT NULL
+        MATCH (d)-[:SOURCED_FROM]->(s:Source)
         RETURN d.path AS path, d.content AS content, d.embedding AS embedding,
-               d.title as title, d.author as author, d.updated_at as updated_at, 
-               d.source_path as source_path
+               d.title as title, d.author as author, d.updated_at as updated_at,
+               s.path as source_path
         """
         all_docs = await self.run_query(query)
         
@@ -582,6 +594,24 @@ class MemGraphClient:
         })
         return result[0]["r"] if result else {}
 
+    # Source management
+    
+    async def create_or_get_source(self, path: str) -> str:
+        """Create or get a source node and return its ID"""
+        source_id = str(uuid.uuid4())
+        query = """
+        MERGE (s:Source {path: $path})
+        ON CREATE SET s.id = $id
+        RETURN s.id as id
+        """
+        result = await self.run_query(query, {"path": path, "id": source_id})
+        return result[0]["id"] if result else source_id
+    
+    async def link_document_to_source(self, document_id: str, source_path: str) -> Dict:
+        """Create a SOURCED_FROM relationship from document to source"""
+        source_id = await self.create_or_get_source(source_path)
+        return await self.create_relationship(document_id, source_id, "SOURCED_FROM")
+    
 def standardize_source_path(path: str) -> str:
     """Standardize source paths for consistent reference matching"""
     # Convert to absolute path if possible

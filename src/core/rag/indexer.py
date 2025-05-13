@@ -26,8 +26,7 @@ class Indexer:
         content: str,
         title: Optional[str] = None,
         author: Optional[str] = None,
-        mime_type: Optional[str] = None,
-        source_path: Optional[str] = None
+        mime_type: Optional[str] = None
     ) -> Dict[str, Any]:
         try:
             # Generate content hash
@@ -55,8 +54,7 @@ class Indexer:
                 updated_at=datetime.now().isoformat(),
                 title=title,
                 author=author,
-                mime_type=mime_type,
-                source_path=source_path
+                mime_type=mime_type
             )
             
             return result
@@ -80,8 +78,7 @@ class Indexer:
                     content=doc["content"],
                     title=doc.get("title"),
                     author=doc.get("author"),
-                    mime_type=doc.get("mime_type"),
-                    source_path=doc.get("source_path")
+                    mime_type=doc.get("mime_type")
                 )
                 batch_tasks.append(task)
             
@@ -120,8 +117,7 @@ class Indexer:
             content=content,
             title=title or os.path.basename(file_path),
             author=author,
-            mime_type=mime_type,
-            source_path=file_path
+            mime_type=mime_type
         )
     
     async def index_directory(

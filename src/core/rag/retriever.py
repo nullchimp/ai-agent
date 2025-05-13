@@ -11,7 +11,7 @@ class RetrievalResult(TypedDict):
     path: str
     score: float
     title: Optional[str]
-    source_path: Optional[str]
+    source_path: Optional[str]  # Keep for backward compatibility
     author: Optional[str]
     updated_at: Optional[str]
     document_id: Optional[str]
@@ -55,7 +55,7 @@ class Retriever:
                     'path': result.get('path', ''),
                     'score': result.get('score', 0.0),
                     'title': result.get('title'),
-                    'source_path': result.get('source_path'),
+                    'source_path': result.get('source_path'),  # Now coming from Source node
                     'author': result.get('author'),
                     'updated_at': result.get('updated_at'),
                     'document_id': result.get('id')
@@ -76,7 +76,7 @@ class Retriever:
                         'path': result.get('path', ''),
                         'score': result.get('score', 0.0),
                         'title': result.get('title'),
-                        'source_path': result.get('source_path'),
+                        'source_path': result.get('source_path'),  # Now coming from Source node
                         'author': result.get('author'),
                         'updated_at': result.get('updated_at'),
                         'document_id': result.get('id')
@@ -128,7 +128,7 @@ class Retriever:
                     'path': result.get('path', ''),
                     'score': result.get('score', 0.0),
                     'title': result.get('title'),
-                    'source_path': result.get('source_path'),
+                    'source_path': result.get('source_path'),  # Now coming from Source node
                     'author': result.get('author'),
                     'updated_at': result.get('updated_at'),
                     'document_id': result.get('id')
@@ -177,8 +177,9 @@ class Retriever:
         # Find documents belonging to this topic
         query = """
         MATCH (d:Document)-[:BELONGS_TO]->(t:Topic {id: $topic_id})
+        MATCH (d)-[:SOURCED_FROM]->(s:Source)
         RETURN d.path AS path, d.content AS content, d.title as title, 
-               d.author as author, d.updated_at as updated_at, d.source_path as source_path
+               d.author as author, d.updated_at as updated_at, s.path as source_path
         LIMIT $limit
         """
         results = await self._graph_client.run_query(query, {"topic_id": topic_id, "limit": limit})
@@ -204,8 +205,9 @@ class Retriever:
         # Find documents explaining this concept
         query = """
         MATCH (d:Document)-[:EXPLAINS]->(c:Concept {id: $concept_id})
+        MATCH (d)-[:SOURCED_FROM]->(s:Source)
         RETURN d.path AS path, d.content AS content, d.title as title, 
-               d.author as author, d.updated_at as updated_at, d.source_path as source_path
+               d.author as author, d.updated_at as updated_at, s.path as source_path
         LIMIT $limit
         """
         results = await self._graph_client.run_query(query, {"concept_id": concept_id, "limit": limit})
@@ -250,8 +252,9 @@ class Retriever:
             
         query = """
         MATCH (d1:Document {id: $doc_id})-[:REFERENCES]->(d2:Document)
+        MATCH (d2)-[:SOURCED_FROM]->(s:Source)
         RETURN d2.path AS path, d2.title as title, 
-               d2.author as author, d2.updated_at as updated_at, d2.source_path as source_path
+               d2.author as author, d2.updated_at as updated_at, s.path as source_path
         LIMIT $limit
         """
         results = await self._graph_client.run_query(query, {"doc_id": doc["id"], "limit": limit})
@@ -276,8 +279,9 @@ class Retriever:
             
         query = """
         MATCH (d1:Document)-[:REFERENCES]->(d2:Document {id: $doc_id})
+        MATCH (d1)-[:SOURCED_FROM]->(s:Source)
         RETURN d1.path AS path, d1.title as title, 
-               d1.author as author, d1.updated_at as updated_at, d1.source_path as source_path
+               d1.author as author, d1.updated_at as updated_at, s.path as source_path
         LIMIT $limit
         """
         results = await self._graph_client.run_query(query, {"doc_id": doc["id"], "limit": limit})

@@ -54,8 +54,7 @@ async def create_sample_data(client: MemGraphClient):
             content_hash=content_hash,
             embedding_version="text-embedding-ada-002",
             updated_at=datetime.now().isoformat(),
-            title=os.path.basename(doc["path"]),
-            source_path=standardize_source_path(doc["path"])
+            title=os.path.basename(doc["path"])
         )
     
     # Create symbols and relationships
