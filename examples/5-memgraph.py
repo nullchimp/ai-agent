@@ -56,6 +56,16 @@ async def create_sample_data(client: MemGraphClient):
             updated_at=datetime.now().isoformat(),
             title=os.path.basename(doc["path"])
         )
+        
+        # Also create a Source node for this document
+        await client.run_query(
+            """
+            MATCH (d:Document {path: $path})
+            MERGE (s:Source {path: $path})
+            MERGE (d)-[:SOURCED_FROM]->(s)
+            """,
+            {"path": doc["path"]}
+        )
     
     # Create symbols and relationships
     symbols = ["Retriever", "DocumentIndexer", "build", "retrieve", "index_document"]
@@ -149,8 +159,43 @@ def generate_mock_embedding(text: str) -> List[float]:
     
     return embedding[:1536]  # Trim to exact length
 
+def cosine_similarity(vec1: List[float], vec2: List[float]) -> float:
+    """Calculate cosine similarity between two vectors"""
+    dot_product = sum(a * b for a, b in zip(vec1, vec2))
+    magnitude1 = sum(a * a for a in vec1) ** 0.5
+    magnitude2 = sum(b * b for b in vec2) ** 0.5
+    if magnitude1 * magnitude2 == 0:
+        return 0
+    return dot_product / (magnitude1 * magnitude2)
+
+async def perform_client_side_semantic_search(client: MemGraphClient, query_embedding: List[float], limit: int = 3) -> List[Dict[str, Any]]:
+    """Perform semantic search on the client side when vector functions aren't available in MemGraph"""
+    # Get all documents with embeddings
+    query = """
+    MATCH (d:Document)
+    WHERE d.embedding IS NOT NULL
+    RETURN d.path AS path, d.title AS title, d.embedding AS embedding
+    """
+    results = await client.run_query(query)
+    
+    # Calculate similarity scores
+    scored_results = []
+    for result in results:
+        doc_embedding = result.get("embedding", [])
+        if doc_embedding:
+            score = cosine_similarity(query_embedding, doc_embedding)
+            scored_results.append({
+                "path": result.get("path", "Unknown path"),
+                "title": result.get("title", os.path.basename(result.get("path", "Unknown"))),
+                "score": score
+            })
+    
+    # Sort by score and limit results
+    scored_results.sort(key=lambda x: x["score"], reverse=True)
+    return scored_results[:limit]
+
 async def perform_example_queries(client: MemGraphClient):
-    """Perform some example queries to demonstrate the graph structure"""
+    """Perform key example queries to demonstrate the graph structure"""
     
     print("\n=== Example 1: Find documents by symbol ===")
     query1 = """
@@ -158,9 +203,12 @@ async def perform_example_queries(client: MemGraphClient):
     RETURN d.path AS path, d.content AS content
     """
     results1 = await client.run_query(query1, {"symbol": "Retriever"})
-    for result in results1:
-        print(f"Document path: {result['path']}")
-        print(f"Content snippet: {result['content'][:50]}...\n")
+    if not results1:
+        print("No results found for documents with symbol 'Retriever'")
+    else:
+        for result in results1:
+            print(f"Document path: {result['path']}")
+            print(f"Content snippet: {result['content'][:50]}...\n")
     
     print("\n=== Example 2: Find related documents through shared symbols ===")
     query2 = """
@@ -169,9 +217,12 @@ async def perform_example_queries(client: MemGraphClient):
     RETURN d2.path AS related_doc, s.name AS shared_symbol
     """
     results2 = await client.run_query(query2, {"path": "src/rag/retriever.py"})
-    for result in results2:
-        print(f"Related document: {result['related_doc']}")
-        print(f"Shared symbol: {result['shared_symbol']}\n")
+    if not results2:
+        print("No related documents found through shared symbols")
+    else:
+        for result in results2:
+            print(f"Related document: {result['related_doc']}")
+            print(f"Shared symbol: {result['shared_symbol']}\n")
     
     print("\n=== Example 3: Find tools and their implementations ===")
     query3 = """
@@ -179,9 +230,12 @@ async def perform_example_queries(client: MemGraphClient):
     RETURN t.name AS tool, d.path AS implementation
     """
     results3 = await client.run_query(query3)
-    for result in results3:
-        print(f"Tool: {result['tool']}")
-        print(f"Implementation: {result['implementation']}\n")
+    if not results3:
+        print("No tools and implementations found")
+    else:
+        for result in results3:
+            print(f"Tool: {result['tool']}")
+            print(f"Implementation: {result['implementation']}\n")
     
     print("\n=== Example 4: Find documents with external links ===")
     query4 = """
@@ -189,15 +243,21 @@ async def perform_example_queries(client: MemGraphClient):
     RETURN d.path AS document, u.href AS url
     """
     results4 = await client.run_query(query4)
-    for result in results4:
-        print(f"Document: {result['document']}")
-        print(f"Links to: {result['url']}\n")
+    if not results4:
+        print("No documents with external links found")
+    else:
+        for result in results4:
+            print(f"Document: {result['document']}")
+            print(f"Links to: {result['url']}\n")
     
     print("\n=== Example 5: Semantic search (simulated) ===")
     # Generate a mock query embedding
-    query_embedding = generate_mock_embedding("retrieve relevant documents for user query")
+    query_text = "retrieve relevant documents for user query"
+    query_embedding = generate_mock_embedding(query_text)
+    print(f"Searching for: '{query_text}'")
+    
     try:
-        # First try using vector similarity if available
+        # First try using vector similarity if available in MemGraph
         query5 = """
         MATCH (d:Document)
         WHERE d.embedding IS NOT NULL
@@ -207,17 +267,22 @@ async def perform_example_queries(client: MemGraphClient):
         RETURN d.path AS path, score
         """
         results5 = await client.run_query(query5, {"embedding": query_embedding})
+        print("Using native MemGraph vector similarity search")
     except Exception as e:
         print(f"Vector search error: {e}")
-        # Fall back to client-side similarity calculation
-        results5 = await client.semantic_search_fallback(query_embedding, 3)
+        print("Falling back to client-side similarity calculation")
+        # Perform client-side similarity calculation as fallback
+        results5 = await perform_client_side_semantic_search(client, query_embedding)
     
-    for result in results5:
-        # Handle both key formats (path or document)
-        doc_path = result.get("path", result.get("document", "Unknown document"))
-        score = result.get("score", 0.0)
-        print(f"Document: {doc_path}")
-        print(f"Relevance score: {score:.4f}\n")
+    if not results5:
+        print("No semantic search results found")
+    else:
+        for result in results5:
+            # Handle both key formats (path or document)
+            doc_path = result.get("path", result.get("document", "Unknown document"))
+            score = result.get("score", 0.0)
+            print(f"Document: {doc_path}")
+            print(f"Relevance score: {score:.4f}\n")
     
     print("\n=== Example 6: Find conversation messages ===")
     query6 = """
@@ -226,10 +291,13 @@ async def perform_example_queries(client: MemGraphClient):
     LIMIT 5
     """
     results6 = await client.run_query(query6)
-    for result in results6:
-        print(f"Conversation: {result['conversation']}")
-        print(f"Role: {result['role']}")
-        print(f"Content: {result['content'][:50]}...\n")
+    if not results6:
+        print("No conversation messages found")
+    else:
+        for result in results6:
+            print(f"Conversation: {result['conversation']}")
+            print(f"Role: {result['role']}")
+            print(f"Content: {result['content'][:50]}...\n")
     
     print("\n=== Example 7: Find concepts mentioned in conversations ===")
     query7 = """
@@ -237,106 +305,89 @@ async def perform_example_queries(client: MemGraphClient):
     RETURN c.name AS concept, COUNT(m) AS mentions ORDER BY mentions DESC
     """
     results7 = await client.run_query(query7)
-    for result in results7:
-        print(f"Concept: {result['concept']}")
-        print(f"Mentioned in {result['mentions']} messages\n")
+    if not results7:
+        print("No concepts found in conversations")
+    else:
+        for result in results7:
+            print(f"Concept: {result['concept']}")
+            print(f"Mentioned in {result['mentions']} messages\n")
     
     print("\n=== Example 8: Conversation-aware semantic search ===")
     # Simulate conversation context - find documents relevant to ongoing conversation
     query_text = "How can MemGraph be used for vector similarity search?"
     query_embedding = generate_mock_embedding(query_text)
+    print(f"Searching for documents relevant to: '{query_text}'")
     
     # Get a conversation ID for context
     conversation_query = "MATCH (c:Conversation) RETURN c.id AS id LIMIT 1"
     conversation_result = await client.run_query(conversation_query)
-    if conversation_result:
+    
+    if not conversation_result:
+        print("No conversations found for context-aware search")
+    else:
         conversation_id = conversation_result[0]["id"]
         print(f"Using conversation context: {conversation_id}")
         
-        # Search using conversation context
-        results8 = await client.conversation_aware_search(
-            query_embedding=query_embedding,
-            conversation_id=conversation_id,
-            limit=3
-        )
+        try:
+            # Try to use client's conversation-aware search
+            results8 = await client.conversation_aware_search(
+                query_embedding=query_embedding,
+                conversation_id=conversation_id,
+                limit=3
+            )
+        except Exception as e:
+            print(f"Conversation-aware search error: {e}")
+            print("Falling back to standard semantic search")
+            # Fallback to perform semantic search without conversation context
+            results8 = await perform_client_side_semantic_search(client, query_embedding)
         
-        print("Results with conversation context:")
-        for result in results8:
-            doc_path = result.get("path", "Unknown")
-            score = result.get("score", 0.0)
-            title = result.get("title", os.path.basename(doc_path))
-            print(f"Document: {title}")
-            print(f"Path: {doc_path}")
-            print(f"Relevance score: {score:.4f}\n")
-
-async def extract_knowledge(client: MemGraphClient, message_id: str) -> Dict[str, Any]:
-    """Simulate knowledge extraction from a message (simplified for demo)"""
-    # Get message content
-    query = """
-    MATCH (m:Message {id: $message_id})
-    RETURN m.content as content
+        if not results8:
+            print("No documents found relevant to the conversation")
+        else:
+            print("Results with conversation context:")
+            for result in results8:
+                doc_path = result.get("path", "Unknown")
+                score = result.get("score", 0.0)
+                title = result.get("title", os.path.basename(doc_path))
+                print(f"Document: {title}")
+                print(f"Path: {doc_path}")
+                print(f"Relevance score: {score:.4f}\n")
+    
+    print("\n=== Example 9: Find documents with their source nodes ===")
+    query9 = """
+    MATCH (d:Document)-[:SOURCED_FROM]->(s:Source)
+    RETURN d.path AS document_path, d.title AS document_title, s.path AS source_path
+    LIMIT 5
     """
-    result = await client.run_query(query, {"message_id": message_id})
+    results9 = await client.run_query(query9)
+    print("Documents with their source paths:")
+    if not results9:
+        print("No documents with source nodes found")
+    else:
+        for result in results9:
+            doc_title = result.get('document_title') 
+            if not doc_title:
+                doc_title = os.path.basename(result.get('document_path', 'Unknown'))
+            print(f"Document: {doc_title}")
+            print(f"Document path: {result['document_path']}")
+            print(f"Source path: {result['source_path']}\n")
     
-    if not result:
-        return {"error": "Message not found"}
-    
-    content = result[0]["content"]
-    
-    # In a real system, we would use LLM to extract entities and concepts
-    # Here we'll use a simple rule-based approach for demonstration
-    
-    # Simplified extraction logic
-    entities = []
-    concepts = []
-    
-    # Simple keyword detection (in a real system, this would use NLP/LLM)
-    keywords = ["RAG", "MemGraph", "vector", "embedding", "database", "graph", "retrieval", "generation"]
-    
-    for keyword in keywords:
-        if keyword.lower() in content.lower():
-            if keyword in ["MemGraph", "RAG"]:
-                entities.append({"name": keyword, "type": "Technology"})
-            else:
-                concepts.append({"name": keyword.title()})
-    
-    # Return the extracted knowledge
-    return {
-        "concepts": concepts,
-        "entities": entities,
-        "facts": [f"Message mentions {len(concepts)} concepts and {len(entities)} entities"],
-    }
-
-async def demonstrate_knowledge_extraction(client: MemGraphClient):
-    """Demonstrate the knowledge extraction process"""
-    # First, get a sample message
-    query = """
-    MATCH (m:Message)
-    RETURN m.id as id, m.content as content
-    LIMIT 1
+    print("\n=== Example 10: Find the most referenced sources in documents ===")
+    query10 = """
+    MATCH (d:Document)-[:SOURCED_FROM]->(s:Source)
+    RETURN s.path AS source_path, COUNT(d) AS reference_count
+    ORDER BY reference_count DESC
+    LIMIT 5
     """
-    result = await client.run_query(query)
+    results10 = await client.run_query(query10)
+    if not results10:
+        print("No source references found in documents")
+    else:
+        for result in results10:
+            print(f"Source: {result['source_path']}")
+            print(f"Referenced in documents: {result['reference_count']}\n")
     
-    if not result:
-        print("No messages found to demonstrate knowledge extraction")
-        return
-    
-    message = result[0]
-    message_id = message["id"]
-    print(f"\n=== Example 9: Knowledge Extraction ===")
-    print(f"Message content: {message['content'][:80]}...")
-    
-    # Extract knowledge from message
-    knowledge = await extract_knowledge(client, message_id)
-    
-    print("\nExtracted knowledge:")
-    print(f"Concepts: {[c['name'] for c in knowledge.get('concepts', [])]}")
-    print(f"Entities: {[f'{e['name']} ({e['type']})' for e in knowledge.get('entities', [])]}")
-    
-    # Link extracted concepts to the message
-    for concept in knowledge.get("concepts", []):
-        await client.link_message_to_concept(message_id, concept["name"])
-        print(f"Linked concept '{concept['name']}' to message")
+    print("Demonstration complete!")
 
 async def main():
     # Check if environment variables are set
@@ -352,9 +403,6 @@ async def main():
         
         # Perform example queries
         await perform_example_queries(client)
-        
-        # Demonstrate knowledge extraction
-        await demonstrate_knowledge_extraction(client)
         
     except Exception as e:
         print(f"Error: {e}")

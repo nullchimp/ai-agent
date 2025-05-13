@@ -137,6 +137,47 @@ async def rag_example():
         print("\nFormatted context preview:")
         print(formatted_context[:300] + "...")
         
+        # Demonstrate source node relationships
+        print("\nDemonstrating Source node relationships...")
+        query = """
+        MATCH (d:Document)-[:SOURCED_FROM]->(s:Source)
+        RETURN d.path AS document_path, s.path AS source_path
+        LIMIT 5
+        """
+        source_results = await graph_client.run_query(query)
+        
+        print("Documents and their source nodes:")
+        for result in source_results:
+            print(f"Document: {result['document_path']}")
+            print(f"Source: {result['source_path']}\n")
+        
+        # Find a specific document and its source
+        if len(results1) > 0:
+            example_doc_path = results1[0]['path']
+            query = """
+            MATCH (d:Document {path: $path})-[:SOURCED_FROM]->(s:Source)
+            RETURN d.path AS document_path, d.title AS document_title, s.path AS source_path
+            """
+            doc_source_result = await graph_client.run_query(query, {"path": example_doc_path})
+            
+            if doc_source_result:
+                print(f"\nExample document '{example_doc_path}' Source relationship:")
+                print(f"Document: {doc_source_result[0]['document_title']} ({doc_source_result[0]['document_path']})")
+                print(f"Source: {doc_source_result[0]['source_path']}")
+                
+                # Show that we can also get documents from a source
+                source_path = doc_source_result[0]['source_path']
+                query = """
+                MATCH (s:Source {path: $path})<-[:SOURCED_FROM]-(d:Document)
+                RETURN d.path AS document_path, d.title AS document_title
+                """
+                source_docs_result = await graph_client.run_query(query, {"path": source_path})
+                
+                if source_docs_result:
+                    print(f"\nDocuments with source '{source_path}':")
+                    for doc in source_docs_result:
+                        print(f"- {doc['document_title']} ({doc['document_path']})")
+        
         return context
         
     finally:
