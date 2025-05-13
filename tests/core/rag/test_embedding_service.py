@@ -27,8 +27,7 @@ async def test_get_embedding_with_openai():
     # Verify the client was called correctly
     mock_client.make_embeddings_request.assert_called_once_with(
         input="test text",
-        model="text-embedding-ada-002",
-        endpoint_type="embeddings"
+        model="text-embedding-ada-002"
     )
 
 
