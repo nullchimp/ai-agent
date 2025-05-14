@@ -22,7 +22,9 @@ A **graph database** (e.g. Neo4j, Memgraph) is preferred over a vector store alo
 ```
 src/core/rag/
 ├── graph_client.py      # core wrapper around Neo4j/Memgraph driver
-├── indexer.py           # ingests artifacts, messages, and conversations
+├── document_loader.py   # handles ingestion of various document formats
+├── text_splitter.py     # splits documents into overlapping chunks
+├── _indexer.py          # ingests artifacts, messages, and conversations
 ├── retriever.py         # conversation-aware knowledge retrieval
 └── memory.py            # manages long-term conversation history
 ```
@@ -35,6 +37,7 @@ src/core/rag/
 (:Message)-[:REFERENCES]->(:Document)
 (:Message)-[:MENTIONS]->(:Concept)
 (:Document {id, path, content, embedding, content_hash, embedding_version, updated_at, source_path, title, author, mime_type})
+(:DocumentChunk {id, path, content, embedding, content_hash, embedding_version, chunk_index, parent_document_id, updated_at})-[:CHUNK_OF]->(:Document)
 (:Resource {uri, type, description})
 (:User {id, name})-[:VIEWED]->(:Document)
 (:Concept {id, name})
@@ -49,6 +52,7 @@ src/core/rag/
 ```
 (:Document)-[:REFERS_TO]->(:Symbol)
 (:Document)-[:LINKS_TO]->(:Resource)
+(:DocumentChunk)-[:CHUNK_OF]->(:Document)
 (:Message)-[:PART_OF]->(:Conversation)
 (:Message)-[:REFERENCES]->(:Document)
 (:Message)-[:MENTIONS]->(:Concept)
@@ -162,8 +166,20 @@ await graph_client.add_message(
    * `create_document()` - Create document nodes with content and embeddings
    * `upsert_document()` - Update or create documents
    * `find_document()` - Retrieve documents by path
+   * `create_document_chunk()` - Create document chunk nodes for fine-grained retrieval
+   * `get_document_chunks()` - Retrieve all chunks belonging to a document
 
-2. **Resource Management**
+2. **Document Processing Pipeline**
+   * `DocumentLoader` - Loads various document formats using llama-index readers
+   * `TextSplitter` - Splits documents into chunks with configurable overlap
+   * `Indexer` - Processes documents, splits into chunks, and stores in graph database
+
+3. **Chunk-Based Search and Retrieval**
+   * `semantic_search_chunks()` - Vector-based chunk retrieval
+   * `conversation_aware_search_chunks()` - Context-aware chunk retrieval
+   * `semantic_search_chunks_fallback()` - Fallback chunk search when vector functions unavailable
+
+4. **Resource Management**
    * `create_resource()` - Create unified resource nodes for external references
    * `link_document_to_resource()` - Connect documents to resources they reference
    * Resource schema:
@@ -175,22 +191,22 @@ await graph_client.add_message(
      })
      ```
 
-3. **Relationship Management**
+5. **Relationship Management**
    * `create_symbol()` - Create code symbols from documents
    * `create_url_link()` - Create web resource links (now using Resource nodes)
    * `create_tool()` - Track agent tool definitions
 
-4. **Conversation Management**
+6. **Conversation Management**
    * `create_conversation()` - Start new conversation threads
    * `add_message()` - Record user and assistant messages
    * `get_conversation_messages()` - Retrieve conversation history
 
-5. **Knowledge Organization**
+7. **Knowledge Organization**
    * `create_or_get_concept()` - Manage domain concepts
    * `create_or_get_topic()` - Organize documents by topic
    * `link_related_concepts()` - Create concept relationships
 
-6. **Search and Retrieval**
+8. **Search and Retrieval**
    * `semantic_search()` - Vector-based document retrieval
    * `conversation_aware_search()` - Context-aware knowledge retrieval
    * `_cosine_similarity()` - Vector similarity computation
@@ -239,6 +255,42 @@ def standardize_resource_uri(path: str) -> str:
     return path
 ```
 
+### Enhanced Document Processing
+
+1. **Document Chunking Strategy**
+```python
+class TextSplitter:
+    def __init__(
+        self,
+        chunk_size: int = 1024,
+        chunk_overlap: int = 200,
+        separator: str = "\n"
+    ):
+        self.chunk_size = chunk_size
+        self.chunk_overlap = chunk_overlap
+        self.separator = separator
+```
+
+2. **Document Chunk Structure**
+```python
+class ChunkMetadata(DocumentMetadata):
+    chunk_index: int
+    chunk_count: int
+    parent_document_id: str
+    parent_document_path: str
+    is_chunk: bool
+
+class DocumentChunk(Document):
+    metadata: ChunkMetadata
+```
+
+3. **Multi-Format Document Loading**
+   * PDF document loader
+   * DOCX document loader
+   * Markdown document loader
+   * Plain text document loader
+   * HTML document loader
+
 ### Future Enhancements
 
 1. **Automated Knowledge Extraction**
@@ -252,3 +304,8 @@ def standardize_resource_uri(path: str) -> str:
 3. **Advanced Privacy Controls**
    * Implement conversation anonymization
    * Add user-controlled privacy settings
+
+4. **Semantic Chunk-Based Retrieval**
+   * Implement hierarchical retrieval (find relevant chunks, then expand to context)
+   * Add chunk relationship awareness for improved context retrieval
+   * Develop chunk reranking strategies based on conversational context

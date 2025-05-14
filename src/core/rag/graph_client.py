@@ -643,6 +643,174 @@ class MemGraphClient:
         """Legacy method - links document to a Resource using REFERENCES relationship"""
         return await self.link_document_to_resource(document_id, source_path, "file")
     
+    # Document chunk methods
+    
+    async def create_document_chunk(self, parent_doc_id: str, chunk_index: int, content: str, embedding: List[float],
+                                 path: str, content_hash: str, metadata: Optional[Dict] = None) -> Dict:
+        """Create a document chunk node with content and embedding"""
+        # Generate a random UUID
+        chunk_id = f"{parent_doc_id}_chunk_{chunk_index}"
+        query = """
+        CREATE (c:DocumentChunk {
+            id: $id,
+            path: $path,
+            content: $content,
+            embedding: $embedding,
+            content_hash: $content_hash,
+            embedding_version: "text-embedding-ada-002",
+            chunk_index: $chunk_index,
+            parent_document_id: $parent_doc_id,
+            updated_at: $updated_at
+        })
+        RETURN c
+        """
+        
+        params = {
+            "id": chunk_id,
+            "path": path,
+            "content": content,
+            "embedding": embedding,
+            "content_hash": content_hash,
+            "chunk_index": chunk_index,
+            "parent_document_id": parent_doc_id,
+            "updated_at": datetime.now().isoformat()
+        }
+        
+        # Add any additional metadata
+        if metadata:
+            for key, value in metadata.items():
+                if key not in params:
+                    params[f"c.{key}"] = value
+                    
+        result = await self.run_query(query, params)
+        
+        # Create CHUNK_OF relationship
+        if result and result[0]["c"]:
+            chunk = result[0]["c"]
+            await self.create_relationship(chunk["id"], parent_doc_id, "CHUNK_OF")
+            
+        return result[0]["c"] if result else {}
+    
+    async def get_document_chunks(self, parent_doc_id: str) -> List[Dict]:
+        """Get all chunks of a document"""
+        query = """
+        MATCH (c:DocumentChunk)-[:CHUNK_OF]->(d:Document {id: $parent_doc_id})
+        RETURN c
+        ORDER BY c.chunk_index
+        """
+        result = await self.run_query(query, {"parent_doc_id": parent_doc_id})
+        return [r["c"] for r in result] if result else []
+    
+    async def semantic_search_chunks(self, query_embedding: List[float], limit: int = 10) -> List[Dict]:
+        """Search document chunks by vector similarity"""
+        query = """
+        MATCH (c:DocumentChunk)
+        WHERE c.embedding IS NOT NULL
+        WITH c, mg.vectors.cosine(c.embedding, $query_embedding) AS score
+        MATCH (c)-[:CHUNK_OF]->(d:Document)
+        ORDER BY score DESC
+        LIMIT $limit
+        RETURN c.path AS path, c.content AS content, score, 
+               c.chunk_index as chunk_index, d.path as parent_path, 
+               d.title as parent_title
+        """
+        return await self.run_query(query, {"query_embedding": query_embedding, "limit": limit})
+    
+    async def semantic_search_chunks_fallback(self, query_embedding: List[float], limit: int = 10) -> List[Dict]:
+        """Fallback chunk search method when vector functions are not available"""
+        query = """
+        MATCH (c:DocumentChunk)
+        WHERE c.embedding IS NOT NULL
+        MATCH (c)-[:CHUNK_OF]->(d:Document)
+        RETURN c.path AS path, c.content AS content, c.embedding AS embedding,
+               c.chunk_index as chunk_index, d.path as parent_path,
+               d.title as parent_title
+        """
+        all_chunks = await self.run_query(query)
+        
+        # Calculate similarity scores on the client side
+        scored_chunks = []
+        for chunk in all_chunks:
+            if "embedding" not in chunk or not chunk["embedding"]:
+                continue
+                
+            # Calculate cosine similarity
+            score = self._cosine_similarity(chunk["embedding"], query_embedding)
+            chunk_result = {
+                "path": chunk["path"],
+                "content": chunk["content"],
+                "score": score,
+                "chunk_index": chunk.get("chunk_index", 0),
+                "parent_path": chunk.get("parent_path", ""),
+                "parent_title": chunk.get("parent_title", "")
+            }
+            scored_chunks.append(chunk_result)
+        
+        # Sort by score and return top results
+        scored_chunks.sort(key=lambda x: x["score"], reverse=True)
+        return scored_chunks[:limit]
+    
+    async def find_document_chunk(self, path: str) -> Optional[Dict]:
+        """Find document chunk by path"""
+        query = """
+        MATCH (c:DocumentChunk {path: $path})
+        RETURN c
+        """
+        result = await self.run_query(query, {"path": path})
+        return result[0]["c"] if result else None
+    
+    async def conversation_aware_search_chunks(self, 
+                                           query_embedding: List[float], 
+                                           conversation_id: Optional[str] = None, 
+                                           limit: int = 10) -> List[Dict]:
+        """Search document chunks and past conversations based on query relevance"""
+        try:
+            # First try to find relevant document chunks
+            chunks = await self.semantic_search_chunks(query_embedding, limit)
+            
+            # If a conversation ID is provided, also find related conversations
+            if conversation_id:
+                conv_query = """
+                MATCH (c:Conversation)
+                WHERE c.id <> $current_conversation_id AND c.summary_embedding IS NOT NULL
+                WITH c, mg.vectors.cosine(c.summary_embedding, $query_embedding) AS score
+                WHERE score > 0.7
+                ORDER BY score DESC
+                LIMIT 3
+                
+                // Get messages from those conversations
+                MATCH (m:Message)-[:PART_OF]->(c)
+                RETURN m.content as content, c.summary as conversation_summary, 
+                       score as relevance, c.id as conversation_id
+                ORDER BY c.start_time, m.timestamp
+                LIMIT 5
+                """
+                conv_results = await self.run_query(conv_query, {
+                    "current_conversation_id": conversation_id,
+                    "query_embedding": query_embedding
+                })
+                
+                # Combine document results with conversation results
+                if conv_results:
+                    # Format conversation results to match chunk format
+                    for i, conv in enumerate(conv_results):
+                        chunks.append({
+                            "path": f"conversation/{conv['conversation_id']}",
+                            "content": conv["content"],
+                            "score": conv["relevance"],
+                            "parent_title": f"Past Conversation: {conv.get('conversation_summary', 'Unnamed')}",
+                            "parent_path": f"conversation://{conv['conversation_id']}"
+                        })
+                    
+                    # Re-sort by score
+                    chunks.sort(key=lambda x: x.get("score", 0), reverse=True)
+                    chunks = chunks[:limit]
+            
+            return chunks
+        except Exception:
+            # Fallback to standard semantic search
+            return await self.semantic_search_chunks_fallback(query_embedding, limit)
+    
 def standardize_resource_uri(path: str) -> str:
     """Standardize resource URIs for consistent reference matching"""
     # Convert to absolute path if possible

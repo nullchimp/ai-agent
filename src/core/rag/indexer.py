@@ -5,6 +5,8 @@ from datetime import datetime
 
 from core.rag.graph_client import MemGraphClient
 from core.rag.embedding_service import EmbeddingService
+from core.rag.document_loader import DocumentLoader
+from core.rag.text_splitter import TextSplitter
 
 class DocumentMetadata(TypedDict, total=False):
     title: Optional[str]
@@ -21,23 +23,70 @@ class Document(TypedDict):
     content: str
     metadata: DocumentMetadata
 
+class ChunkMetadata(DocumentMetadata):
+    chunk_index: int
+    chunk_count: int
+    parent_document_id: str
+    parent_document_path: str
+    is_chunk: bool
+
+class DocumentChunk(Document):
+    metadata: ChunkMetadata
+
 class Indexer:
     def __init__(
         self,
         graph_client: MemGraphClient,
         embedding_service: EmbeddingService,
-        batch_size: int = 5
+        batch_size: int = 5,
+        chunk_size: int = 1024,
+        chunk_overlap: int = 200
     ):
         self._graph_client = graph_client
         self._embedding_service = embedding_service
         self._batch_size = batch_size
+        self._document_loader = DocumentLoader()
+        self._text_splitter = TextSplitter(
+            chunk_size=chunk_size,
+            chunk_overlap=chunk_overlap
+        )
     
-    async def index_document(
+    async def load_and_index_document(self, path: str) -> List[Dict[str, Any]]:
+        """Load a document from a file path and index it with chunking"""
+        # Load the document
+        document = self._document_loader.load_document(path)
+        
+        # Index the document and its chunks
+        return await self.index_document_with_chunks(
+            path=document["path"],
+            content=document["content"],
+            metadata=document.get("metadata")
+        )
+    
+    async def load_and_index_documents(self, paths: List[str]) -> List[Dict[str, Any]]:
+        """Load documents from file paths and index them with chunking"""
+        # Load the documents
+        documents = self._document_loader.load_documents(paths)
+        
+        # Index the documents and their chunks
+        results = []
+        for doc in documents:
+            doc_results = await self.index_document_with_chunks(
+                path=doc["path"],
+                content=doc["content"],
+                metadata=doc.get("metadata")
+            )
+            results.extend(doc_results)
+            
+        return results
+    
+    async def index_document_with_chunks(
         self,
         path: str,
         content: str,
         metadata: Optional[DocumentMetadata] = None
-    ) -> Dict[str, Any]:
+    ) -> List[Dict[str, Any]]:
+        """Index a document by first creating a parent document, then chunking and indexing chunks"""
         try:
             # Generate content hash
             content_hash = hashlib.sha256(content.encode()).hexdigest()
@@ -45,7 +94,55 @@ class Indexer:
             # Check if document already exists and has the same hash
             existing_doc = await self._graph_client.find_document(path)
             if existing_doc and existing_doc.get("content_hash") == content_hash:
-                return existing_doc
+                return [existing_doc]  # Return existing document if unchanged
+            
+            # Create the parent document first
+            parent_doc = await self.index_document(
+                path=path,
+                content=content,
+                metadata=metadata,
+                is_chunk=False
+            )
+            
+            # Split the document into chunks
+            document = {
+                "id": parent_doc.get("id"),
+                "path": path,
+                "content": content,
+                "metadata": metadata or {}
+            }
+            
+            chunk_documents = self._text_splitter.split_document(document)
+            
+            # Index each chunk
+            chunk_results = []
+            for chunk_doc in chunk_documents:
+                chunk_result = await self.index_document(
+                    path=chunk_doc["path"],
+                    content=chunk_doc["content"],
+                    metadata=chunk_doc["metadata"],
+                    is_chunk=True,
+                    parent_id=parent_doc.get("id")
+                )
+                chunk_results.append(chunk_result)
+            
+            # Return parent and all chunks
+            return [parent_doc] + chunk_results
+            
+        except Exception as e:
+            raise ValueError(f"Failed to index document {path} with chunks: {str(e)}")
+    
+    async def index_document(
+        self,
+        path: str,
+        content: str,
+        metadata: Optional[DocumentMetadata] = None,
+        is_chunk: bool = False,
+        parent_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        try:
+            # Generate content hash
+            content_hash = hashlib.sha256(content.encode()).hexdigest()
             
             # Generate embedding for the document content
             embedding = await self._embedding_service.get_embedding(content)
@@ -53,7 +150,7 @@ class Indexer:
             # Prepare metadata
             metadata = metadata or {}
             
-            # Store the document
+            # Store the document or chunk
             result = await self._graph_client.upsert_document(
                 path=path,
                 content=content,
@@ -65,6 +162,14 @@ class Indexer:
                 author=metadata.get("author"),
                 mime_type=metadata.get("mime_type")
             )
+            
+            # If this is a chunk, create a relationship to the parent document
+            if is_chunk and parent_id:
+                await self._graph_client.create_relationship(
+                    from_id=result.get("id"),
+                    to_id=parent_id,
+                    relationship_type="CHUNK_OF"
+                )
             
             return result
         except Exception as e:
@@ -87,7 +192,7 @@ class Indexer:
                 content = doc["content"]
                 metadata = doc.get("metadata", {})
                 
-                task = self.index_document(
+                task = self.index_document_with_chunks(
                     path=path,
                     content=content,
                     metadata=metadata
@@ -100,7 +205,7 @@ class Indexer:
                     # Log error but continue processing
                     print(f"Error during batch indexing: {str(result)}")
                 else:
-                    results.append(result)
+                    results.extend(result)
         
         return results
     
