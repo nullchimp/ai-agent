@@ -156,7 +156,7 @@ class Indexer:
                 content=content,
                 embedding=embedding,
                 content_hash=content_hash,
-                embedding_version="text-embedding-ada-002",
+                embedding_version="text-embedding-3-small",
                 updated_at=metadata.get("updated_at", datetime.now().isoformat()),
                 title=metadata.get("title"),
                 author=metadata.get("author"),

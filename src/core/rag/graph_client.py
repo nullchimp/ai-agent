@@ -57,7 +57,7 @@ class MemGraphClient:
             content: $content,
             embedding: $embedding,
             content_hash: $content_hash,
-            embedding_version: "text-embedding-ada-002",
+            embedding_version: "text-embedding-3-small",
             updated_at: $updated_at,
             title: $title,
             author: $author,
@@ -657,7 +657,7 @@ class MemGraphClient:
             content: $content,
             embedding: $embedding,
             content_hash: $content_hash,
-            embedding_version: "text-embedding-ada-002",
+            embedding_version: "text-embedding-3-small",
             chunk_index: $chunk_index,
             parent_document_id: $parent_doc_id,
             updated_at: $updated_at

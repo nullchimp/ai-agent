@@ -13,7 +13,7 @@ async def test_make_embeddings_request_success():
     mock_response.status_code = 200
     mock_response.json.return_value = {
         "data": [{"embedding": [0.1, 0.2, 0.3]}],
-        "model": "text-embedding-ada-002"
+        "model": "text-embedding-3-small"
     }
     
     client.http_client.post = AsyncMock(return_value=mock_response)
@@ -24,7 +24,7 @@ async def test_make_embeddings_request_success():
     # Call the method
     result = await client.make_embeddings_request(
         input="test text",
-        model="text-embedding-ada-002"
+        model="text-embedding-3-small"
     )
     
     # Verify the result
@@ -35,7 +35,7 @@ async def test_make_embeddings_request_success():
     # Verify the HTTP client was called correctly
     client.http_client.post.assert_called_once()
     args = client.http_client.post.call_args
-    assert "text-embedding-ada-002" in args[1]["json"]["model"]
+    assert "text-embedding-3-small" in args[1]["json"]["model"]
 
 
 @pytest.mark.asyncio
@@ -125,7 +125,7 @@ async def test_make_embeddings_request_batch():
     # Call the method with a list of inputs
     result = await client.make_embeddings_request(
         input=["text1", "text2"],
-        model="text-embedding-ada-002"
+        model="text-embedding-3-small"
     )
     
     # Verify the result

@@ -1,0 +1,13 @@
+name,category,instances,features,task_type,source,year_published,description
+MNIST,Computer Vision,70000,784,Classification,LeCun et al.,1998,"Handwritten digits dataset with 60k training and 10k test images of size 28x28"
+ImageNet,Computer Vision,14197122,150528,Classification,Stanford University,2009,"Large-scale hierarchical image database with over 14 million images across 20k+ categories"
+CIFAR-10,Computer Vision,60000,3072,Classification,University of Toronto,2009,"60k 32x32 color images across 10 classes with 6k images per class"
+CIFAR-100,Computer Vision,60000,3072,Classification,University of Toronto,2009,"Similar to CIFAR-10 but with 100 classes containing 600 images each"
+Boston Housing,Regression,506,13,Regression,UCI Machine Learning Repository,1978,"Dataset for predicting median housing prices in Boston suburbs"
+Iris,Classification,150,4,Classification,Fisher,1936,"Classic dataset with 3 classes of 50 instances each representing different iris flower species"
+Adult/Census Income,Classification,48842,14,Classification,UCI Machine Learning Repository,1996,"Dataset to predict whether income exceeds $50K per year based on census data"
+Wine Quality,Regression,4898,11,Regression,UCI Machine Learning Repository,2009,"Dataset with red and white wine samples for quality prediction"
+IMDb Reviews,NLP,50000,N/A,Sentiment Analysis,Stanford University,2011,"Movie reviews dataset for binary sentiment classification"
+Yelp Reviews,NLP,5200000,N/A,Sentiment Analysis,Yelp,2015,"Business reviews dataset with star ratings for sentiment analysis"
+Reuters-21578,NLP,21578,N/A,Text Classification,Lewis,1987,"News articles organized into categories for document classification tasks"
+Fashion-MNIST,Computer Vision,70000,784,Classification,Zalando Research,2017,"Drop-in replacement for MNIST with clothing items instead of digits"

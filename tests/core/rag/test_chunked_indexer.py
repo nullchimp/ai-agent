@@ -143,7 +143,7 @@ class TestChunkedIndexer(unittest.TestCase):
                 content="This is the test document content",
                 embedding=test_embedding,
                 content_hash=unittest.mock.ANY,
-                embedding_version="text-embedding-ada-002",
+                embedding_version="text-embedding-3-small",
                 updated_at=unittest.mock.ANY,
                 title="Test Doc",
                 author=None,

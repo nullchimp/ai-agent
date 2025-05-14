@@ -1,0 +1,62 @@
+{
+  "mlFrameworks": [
+    {
+      "name": "TensorFlow",
+      "developer": "Google Brain",
+      "initialRelease": "2015",
+      "language": "Python, C++, CUDA",
+      "description": "An end-to-end open source platform for machine learning. It has a comprehensive ecosystem of tools, libraries and community resources.",
+      "useCases": ["Deep Learning", "Neural Networks", "Computer Vision", "NLP"],
+      "advantages": ["Robust production deployment options", "TensorBoard visualization", "Large community support"]
+    },
+    {
+      "name": "PyTorch",
+      "developer": "Facebook's AI Research lab",
+      "initialRelease": "2016",
+      "language": "Python, C++, CUDA",
+      "description": "An open source machine learning framework based on the Torch library, used for applications such as computer vision and natural language processing.",
+      "useCases": ["Deep Learning Research", "Computer Vision", "NLP"],
+      "advantages": ["Dynamic computational graph", "Pythonic interface", "Easy debugging"]
+    },
+    {
+      "name": "scikit-learn",
+      "developer": "Community-driven",
+      "initialRelease": "2007",
+      "language": "Python",
+      "description": "A free software machine learning library for Python. It features various classification, regression and clustering algorithms.",
+      "useCases": ["Data Mining", "Data Analysis", "General ML algorithms"],
+      "advantages": ["Simple API", "Good documentation", "Wide variety of algorithms"]
+    },
+    {
+      "name": "Keras",
+      "developer": "François Chollet",
+      "initialRelease": "2015",
+      "language": "Python",
+      "description": "An open-source neural-network library written in Python. It is capable of running on top of TensorFlow, Microsoft Cognitive Toolkit, Theano, or PlaidML.",
+      "useCases": ["Rapid Prototyping", "Deep Learning", "Neural Networks"],
+      "advantages": ["User-friendly", "Modular", "Extensible"]
+    },
+    {
+      "name": "XGBoost",
+      "developer": "DMLC",
+      "initialRelease": "2014",
+      "language": "C++, Python, R, Java, Scala",
+      "description": "An optimized distributed gradient boosting library designed to be highly efficient, flexible and portable.",
+      "useCases": ["Structured/Tabular Data", "Ranking Problems", "Kaggle Competitions"],
+      "advantages": ["Performance", "Regularization", "Handling missing values"]
+    }
+  ],
+  "comparisonMetrics": {
+    "ease_of_use": ["Keras", "scikit-learn", "PyTorch", "TensorFlow", "XGBoost"],
+    "performance": ["XGBoost", "TensorFlow", "PyTorch", "Keras", "scikit-learn"],
+    "community_support": ["TensorFlow", "PyTorch", "scikit-learn", "Keras", "XGBoost"],
+    "deployment_options": ["TensorFlow", "PyTorch", "XGBoost", "Keras", "scikit-learn"]
+  },
+  "references": [
+    "https://www.tensorflow.org/",
+    "https://pytorch.org/",
+    "https://scikit-learn.org/",
+    "https://keras.io/",
+    "https://xgboost.ai/"
+  ]
+}

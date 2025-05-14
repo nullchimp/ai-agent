@@ -52,7 +52,7 @@ async def create_sample_data(client: MemGraphClient):
             content=doc["content"],
             embedding=mock_embedding,
             content_hash=content_hash,
-            embedding_version="text-embedding-ada-002",
+            embedding_version="text-embedding-3-small",
             updated_at=datetime.now().isoformat(),
             title=os.path.basename(doc["path"])
         )
