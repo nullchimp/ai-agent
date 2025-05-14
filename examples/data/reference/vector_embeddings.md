@@ -4,6 +4,11 @@
 
 Vector embeddings are numerical representations of data (text, images, audio) in high-dimensional space, where semantic relationships are preserved through vector operations. This reference describes key embedding types, creation methods, and applications in AI systems.
 
+> **Related resources:**
+> - For practical implementation examples, see our [Neural Networks Explained](/examples/data/tutorials/neural_networks_explained.html) tutorial
+> - Learn about graph-based approaches in our [Graph Databases](/examples/data/reference/graph_databases.md) reference
+> - For model deployment strategies, see [Model Deployment](/examples/data/reference/model_deployment.json)
+
 ## Types of Embeddings
 
 ### Text Embeddings

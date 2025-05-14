@@ -15,6 +15,10 @@ Some approaches to address bias include:
 - Transparent documentation of dataset limitations
 - Algorithmic fairness techniques
 
+> **Related resources:**
+> - For technical implementation details, see our [ML Datasets Reference](/examples/data/reference/ml_datasets.csv)
+> - Learn about data processing in our [Data Preprocessing Tutorial](/examples/data/tutorials/data_preprocessing.txt)
+
 ## Privacy Concerns
 
 AI systems often require vast amounts of data, raising significant privacy concerns:

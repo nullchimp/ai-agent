@@ -4,6 +4,11 @@
 
 Graph databases are specialized database systems designed to store and query data whose relationships are as important as the data itself. Unlike traditional relational databases that store data in tables with predefined relationships, graph databases represent data through nodes (entities) connected by edges (relationships).
 
+> **Related resources:**
+> - Learn about [Vector Embeddings](/examples/data/reference/vector_embeddings.md) for node representation in graphs
+> - See practical applications in our [NLP Advancements](/examples/data/blogs/nlp_advancements.md) blog
+> - For implementation details, check our [Model Deployment](/examples/data/reference/model_deployment.json) reference
+
 ## Core Concepts
 
 ### Nodes

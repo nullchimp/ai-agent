@@ -15,6 +15,10 @@ Reinforcement learning (RL) is a machine learning paradigm focused on how agents
 - **Value Function**: Prediction of future reward
 - **Model**: Agent's representation of the environment
 
+> **Related resources:**
+> - See our [Introduction to ML](/examples/data/docs/introduction_to_ml.md) for foundational concepts
+> - Check out our tutorial on [Neural Networks Explained](/examples/data/tutorials/neural_networks_explained.html) for deep RL implementations
+
 ## The RL Process
 
 1. The agent observes the current state of the environment
