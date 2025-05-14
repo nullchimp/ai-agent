@@ -1,0 +1,552 @@
+{
+  "nodes": {
+    "documents": [
+      {
+        "id": "doc-001",
+        "path": "src/core/rag/retriever.py",
+        "content": "class Retriever:\n    def retrieve(self, query: str):\n        # Get query embedding\n        # Find similar documents\n        return documents",
+        "embedding": [0.1, 0.2, 0.3, 0.4, 0.5],
+        "content_hash": "3a2c508f60e6e775f6866f0feb560c579c92215937e48d80c3a37413a5070683",
+        "embedding_version": "text-embedding-ada-002",
+        "updated_at": "2025-05-12T10:15:30.123456",
+        "title": "Retriever Implementation",
+        "author": "AI Agent Team",
+        "mime_type": "text/x-python"
+      },
+      {
+        "id": "doc-002",
+        "path": "src/core/rag/indexer.py",
+        "content": "class DocumentIndexer:\n    def index_document(self, path, content):\n        # Calculate hash\n        # Generate embedding\n        # Store in database",
+        "embedding": [0.2, 0.3, 0.4, 0.5, 0.6],
+        "content_hash": "4b3c619f71e7e885f7977f1feb670d680d03326048e59d91c4b48513b6081794",
+        "embedding_version": "text-embedding-ada-002",
+        "updated_at": "2025-05-12T11:20:45.987654",
+        "title": "Document Indexer",
+        "author": "AI Agent Team",
+        "mime_type": "text/x-python"
+      },
+      {
+        "id": "doc-003",
+        "path": "docs/usage/rag.md",
+        "content": "# RAG Usage\nThe Retriever class can be used to fetch relevant documents.\nSee [MemGraph documentation](https://memgraph.com/docs/) for more details.",
+        "embedding": [0.3, 0.4, 0.5, 0.6, 0.7],
+        "content_hash": "5c4d72a082f8f996f8088f2fec780e791e14437159f6ae02d5c59624c7092805",
+        "embedding_version": "text-embedding-ada-002",
+        "updated_at": "2025-05-13T09:30:15.246801",
+        "title": "RAG Usage Documentation",
+        "author": "Documentation Team",
+        "mime_type": "text/markdown"
+      },
+      {
+        "id": "doc-004",
+        "path": "tests/core/rag/test_retriever.py",
+        "content": "def test_retriever():\n    retriever = Retriever()\n    docs = retriever.retrieve('test query')\n    assert len(docs) > 0",
+        "embedding": [0.4, 0.5, 0.6, 0.7, 0.8],
+        "content_hash": "6d5e83b193f9fa97f9199f3fec890f8a2f25548260f7be13e6d6a735d8103916",
+        "embedding_version": "text-embedding-ada-002",
+        "updated_at": "2025-05-13T14:45:22.987123",
+        "title": "Retriever Tests",
+        "author": "Test Team",
+        "mime_type": "text/x-python"
+      },
+      {
+        "id": "doc-005",
+        "path": "src/core/rag/graph_client.py",
+        "content": "class MemGraphClient:\n    def semantic_search(self, query_embedding):\n        # Search for similar documents\n        # Return results",
+        "embedding": [0.5, 0.6, 0.7, 0.8, 0.9],
+        "content_hash": "7e6f94c2a4f0fb98f0290f4fec9a0f9b3f36659371f8cf24f7e7b846e9114a27",
+        "embedding_version": "text-embedding-ada-002",
+        "updated_at": "2025-05-14T08:12:33.654321",
+        "title": "MemGraph Client",
+        "author": "Database Team",
+        "mime_type": "text/x-python"
+      }
+    ],
+    "symbols": [
+      {
+        "name": "Retriever"
+      },
+      {
+        "name": "DocumentIndexer"
+      },
+      {
+        "name": "semantic_search"
+      },
+      {
+        "name": "MemGraphClient"
+      },
+      {
+        "name": "index_document"
+      }
+    ],
+    "resources": [
+      {
+        "uri": "https://memgraph.com/docs/",
+        "type": "web",
+        "description": "MemGraph official documentation"
+      },
+      {
+        "uri": "https://platform.openai.com/docs/guides/embeddings",
+        "type": "web",
+        "description": "OpenAI Embeddings documentation"
+      },
+      {
+        "uri": "file:///data/training/embeddings_dataset.jsonl",
+        "type": "dataset",
+        "description": "Training dataset for embeddings"
+      },
+      {
+        "uri": "file:///Users/nullchimp/Projects/ai-agent/src/core/rag/graph_client.py",
+        "type": "file",
+        "description": "MemGraph client implementation file"
+      }
+    ],
+    "conversations": [
+      {
+        "id": "conv-001",
+        "start_time": "2025-05-10T13:45:20.123456",
+        "title": "RAG Implementation Discussion",
+        "summary": "Discussion about implementing a RAG system using MemGraph for vector similarity search and document storage."
+      },
+      {
+        "id": "conv-002",
+        "start_time": "2025-05-11T09:22:15.987654",
+        "title": "Performance Optimization for RAG",
+        "summary": "Discussion on improving RAG system performance with better indexing strategies."
+      }
+    ],
+    "messages": [
+      {
+        "id": "msg-001",
+        "content": "How can we implement a Retrieval-Augmented Generation system?",
+        "role": "user",
+        "timestamp": "2025-05-10T13:45:20.123456"
+      },
+      {
+        "id": "msg-002",
+        "content": "RAG systems combine retrieval of relevant documents with generative AI. You'll need a vector database for document storage and similarity search.",
+        "role": "assistant",
+        "timestamp": "2025-05-10T13:45:45.654321"
+      },
+      {
+        "id": "msg-003",
+        "content": "Which vector database would work best with our system?",
+        "role": "user",
+        "timestamp": "2025-05-10T13:46:30.246801"
+      },
+      {
+        "id": "msg-004",
+        "content": "MemGraph can serve as your vector database with its vector search capabilities. It has built-in vector similarity functions for embedding similarity searches.",
+        "role": "assistant",
+        "timestamp": "2025-05-10T13:47:10.987123"
+      },
+      {
+        "id": "msg-005",
+        "content": "How can we optimize the performance of our RAG system?",
+        "role": "user",
+        "timestamp": "2025-05-11T09:22:15.987654"
+      },
+      {
+        "id": "msg-006",
+        "content": "You can optimize performance by implementing proper indexing strategies and using conversation-aware search.",
+        "role": "assistant",
+        "timestamp": "2025-05-11T09:23:05.123456"
+      }
+    ],
+    "concepts": [
+      {
+        "id": "concept-001",
+        "name": "RAG"
+      },
+      {
+        "id": "concept-002",
+        "name": "Vector Database"
+      },
+      {
+        "id": "concept-003",
+        "name": "MemGraph"
+      },
+      {
+        "id": "concept-004",
+        "name": "Embedding"
+      },
+      {
+        "id": "concept-005",
+        "name": "Similarity Search"
+      }
+    ],
+    "topics": [
+      {
+        "id": "topic-001",
+        "name": "Retrieval Systems"
+      },
+      {
+        "id": "topic-002",
+        "name": "Vector Databases"
+      },
+      {
+        "id": "topic-003",
+        "name": "Knowledge Graphs"
+      }
+    ],
+    "users": [
+      {
+        "id": "user-001",
+        "name": "Developer"
+      },
+      {
+        "id": "user-002",
+        "name": "Data Scientist"
+      },
+      {
+        "id": "user-003",
+        "name": "Product Manager"
+      }
+    ],
+    "tools": [
+      {
+        "name": "RetrieveTool"
+      },
+      {
+        "name": "IndexTool"
+      },
+      {
+        "name": "GraphSearchTool"
+      }
+    ],
+    "questions": [
+      {
+        "id": "question-001",
+        "content": "How does vector similarity search work?",
+        "created_at": "2025-05-12T10:30:45.123456"
+      },
+      {
+        "id": "question-002",
+        "content": "What are the best practices for implementing RAG?",
+        "created_at": "2025-05-13T14:22:33.987654"
+      }
+    ],
+    "entities": [
+      {
+        "id": "entity-001",
+        "name": "MemGraph",
+        "type": "technology"
+      },
+      {
+        "id": "entity-002",
+        "name": "OpenAI",
+        "type": "organization"
+      }
+    ]
+  },
+  "relationships": [
+    {
+      "source": "doc-005",
+      "target": "MemGraphClient",
+      "type": "REFERS_TO",
+      "source_type": "Document",
+      "target_type": "Symbol"
+    },
+    {
+      "source": "doc-001",
+      "target": "Retriever",
+      "type": "REFERS_TO",
+      "source_type": "Document",
+      "target_type": "Symbol"
+    },
+    {
+      "source": "doc-002",
+      "target": "DocumentIndexer",
+      "type": "REFERS_TO",
+      "source_type": "Document",
+      "target_type": "Symbol"
+    },
+    {
+      "source": "doc-005",
+      "target": "semantic_search",
+      "type": "REFERS_TO",
+      "source_type": "Document",
+      "target_type": "Symbol"
+    },
+    {
+      "source": "doc-002",
+      "target": "index_document",
+      "type": "REFERS_TO",
+      "source_type": "Document",
+      "target_type": "Symbol"
+    },
+    {
+      "source": "doc-003",
+      "target": "https://memgraph.com/docs/",
+      "type": "LINKS_TO",
+      "source_type": "Document",
+      "target_type": "Resource"
+    },
+    {
+      "source": "msg-001",
+      "target": "conv-001",
+      "type": "PART_OF",
+      "source_type": "Message",
+      "target_type": "Conversation"
+    },
+    {
+      "source": "msg-002",
+      "target": "conv-001",
+      "type": "PART_OF",
+      "source_type": "Message",
+      "target_type": "Conversation"
+    },
+    {
+      "source": "msg-003",
+      "target": "conv-001",
+      "type": "PART_OF",
+      "source_type": "Message",
+      "target_type": "Conversation"
+    },
+    {
+      "source": "msg-004",
+      "target": "conv-001",
+      "type": "PART_OF",
+      "source_type": "Message",
+      "target_type": "Conversation"
+    },
+    {
+      "source": "msg-005",
+      "target": "conv-002",
+      "type": "PART_OF",
+      "source_type": "Message",
+      "target_type": "Conversation"
+    },
+    {
+      "source": "msg-006",
+      "target": "conv-002",
+      "type": "PART_OF",
+      "source_type": "Message",
+      "target_type": "Conversation"
+    },
+    {
+      "source": "msg-002",
+      "target": "doc-001",
+      "type": "REFERENCES",
+      "source_type": "Message",
+      "target_type": "Document"
+    },
+    {
+      "source": "msg-004",
+      "target": "doc-003",
+      "type": "REFERENCES",
+      "source_type": "Message",
+      "target_type": "Document"
+    },
+    {
+      "source": "msg-006",
+      "target": "doc-005",
+      "type": "REFERENCES",
+      "source_type": "Message",
+      "target_type": "Document"
+    },
+    {
+      "source": "msg-002",
+      "target": "concept-001",
+      "type": "MENTIONS",
+      "source_type": "Message",
+      "target_type": "Concept"
+    },
+    {
+      "source": "msg-003",
+      "target": "concept-002",
+      "type": "MENTIONS",
+      "source_type": "Message",
+      "target_type": "Concept"
+    },
+    {
+      "source": "msg-004",
+      "target": "concept-003",
+      "type": "MENTIONS",
+      "source_type": "Message",
+      "target_type": "Concept"
+    },
+    {
+      "source": "msg-004",
+      "target": "concept-005",
+      "type": "MENTIONS",
+      "source_type": "Message",
+      "target_type": "Concept"
+    },
+    {
+      "source": "msg-006",
+      "target": "concept-004",
+      "type": "MENTIONS",
+      "source_type": "Message",
+      "target_type": "Concept"
+    },
+    {
+      "source": "doc-001",
+      "target": "topic-001",
+      "type": "BELONGS_TO",
+      "source_type": "Document",
+      "target_type": "Topic"
+    },
+    {
+      "source": "doc-003",
+      "target": "topic-001",
+      "type": "BELONGS_TO",
+      "source_type": "Document",
+      "target_type": "Topic"
+    },
+    {
+      "source": "doc-005",
+      "target": "topic-002",
+      "type": "BELONGS_TO",
+      "source_type": "Document",
+      "target_type": "Topic"
+    },
+    {
+      "source": "doc-001",
+      "target": "concept-001",
+      "type": "EXPLAINS",
+      "source_type": "Document",
+      "target_type": "Concept"
+    },
+    {
+      "source": "doc-003",
+      "target": "concept-001",
+      "type": "EXPLAINS",
+      "source_type": "Document",
+      "target_type": "Concept"
+    },
+    {
+      "source": "doc-005",
+      "target": "concept-005",
+      "type": "EXPLAINS",
+      "source_type": "Document",
+      "target_type": "Concept"
+    },
+    {
+      "source": "concept-001",
+      "target": "concept-002",
+      "type": "RELATED_TO",
+      "source_type": "Concept",
+      "target_type": "Concept"
+    },
+    {
+      "source": "concept-002",
+      "target": "concept-003",
+      "type": "RELATED_TO",
+      "source_type": "Concept",
+      "target_type": "Concept"
+    },
+    {
+      "source": "concept-004",
+      "target": "concept-005",
+      "type": "RELATED_TO",
+      "source_type": "Concept",
+      "target_type": "Concept"
+    },
+    {
+      "source": "user-001",
+      "target": "doc-001",
+      "type": "VIEWED",
+      "source_type": "User",
+      "target_type": "Document"
+    },
+    {
+      "source": "user-001",
+      "target": "doc-002",
+      "type": "VIEWED",
+      "source_type": "User",
+      "target_type": "Document"
+    },
+    {
+      "source": "user-002",
+      "target": "doc-003",
+      "type": "VIEWED",
+      "source_type": "User",
+      "target_type": "Document"
+    },
+    {
+      "source": "user-003",
+      "target": "doc-003",
+      "type": "VIEWED",
+      "source_type": "User",
+      "target_type": "Document"
+    },
+    {
+      "source": "question-001",
+      "target": "doc-005",
+      "type": "ANSWERED_BY",
+      "source_type": "Question",
+      "target_type": "Document"
+    },
+    {
+      "source": "question-002",
+      "target": "doc-003",
+      "type": "ANSWERED_BY",
+      "source_type": "Question",
+      "target_type": "Document"
+    },
+    {
+      "source": "doc-001",
+      "target": "doc-002",
+      "type": "REFERENCES",
+      "source_type": "Document",
+      "target_type": "Document"
+    },
+    {
+      "source": "doc-003",
+      "target": "doc-001",
+      "type": "REFERENCES",
+      "source_type": "Document",
+      "target_type": "Document"
+    },
+    {
+      "source": "doc-004",
+      "target": "doc-001",
+      "type": "REFERENCES",
+      "source_type": "Document",
+      "target_type": "Document"
+    },
+    {
+      "source": "doc-001",
+      "target": "https://platform.openai.com/docs/guides/embeddings",
+      "type": "REFERENCES",
+      "source_type": "Document",
+      "target_type": "Resource"
+    },
+    {
+      "source": "doc-002",
+      "target": "file:///data/training/embeddings_dataset.jsonl",
+      "type": "REFERENCES",
+      "source_type": "Document",
+      "target_type": "Resource"
+    },
+    {
+      "source": "doc-005",
+      "target": "file:///Users/nullchimp/Projects/ai-agent/src/core/rag/graph_client.py",
+      "type": "REFERENCES",
+      "source_type": "Document", 
+      "target_type": "Resource"
+    },
+    {
+      "source": "RetrieveTool",
+      "target": "doc-001",
+      "type": "DEFINED_IN",
+      "source_type": "Tool",
+      "target_type": "Document"
+    },
+    {
+      "source": "IndexTool",
+      "target": "doc-002",
+      "type": "DEFINED_IN",
+      "source_type": "Tool",
+      "target_type": "Document"
+    },
+    {
+      "source": "GraphSearchTool",
+      "target": "doc-005",
+      "type": "DEFINED_IN", 
+      "source_type": "Tool",
+      "target_type": "Document"
+    }
+  ]
+}
