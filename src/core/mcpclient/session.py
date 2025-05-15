@@ -6,7 +6,7 @@ from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 from mcp.shared.exceptions import McpError
 
-from core.pretty import prettify
+from core import prettify
 
 from core import DEBUG, graceful_exit, colorize_text
 class MCPSession:

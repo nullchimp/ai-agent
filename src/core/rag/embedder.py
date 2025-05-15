@@ -1,6 +1,7 @@
 from typing import List
 import asyncio
 
+from core.rag.schema import DocumentChunk
 from core.azureopenai.client import Client
 
 class EmbeddingService:
@@ -12,24 +13,30 @@ class EmbeddingService:
     
     async def get_embedding(
         self,
-        text: str
+        chunk: DocumentChunk,
+        callback: callable = None
     ) -> List[float]:
         try:
-            return await self._make_openai_embedding_request(text)
+            embedding = await self._make_openai_embedding_request(chunk.content)
+            chunk.embedding = embedding
+            if callback:
+                callback(chunk)
+            return embedding
         except Exception as e:
             raise e
     
     async def get_embeddings(
         self,
-        texts: List[str]
+        chunks: List[DocumentChunk],
+        callback: callable = None
     ) -> List[List[float]]:
         embeddings = []
 
         # Process in batches to avoid API limits
         batch_size = 5  # Can be adjusted based on needs
-        for i in range(0, len(texts), batch_size):
-            batch = texts[i:i+batch_size]
-            tasks = [self.get_embedding(text) for text in batch]
+        for i in range(0, len(chunks), batch_size):
+            batch = chunks[i:i+batch_size]
+            tasks = [self.get_embedding(chunk, callback) for chunk in batch]
             batch_embeddings = await asyncio.gather(*tasks)
             embeddings.extend(batch_embeddings)
 

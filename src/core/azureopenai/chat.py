@@ -6,7 +6,7 @@ from typing import Any, Dict, List
 from tools import Tool
 from .client import Client
 
-from core.pretty import prettify, colorize_text
+from core import prettify, colorize_text
 
 DEFAULT_TEMPERATURE = 0.5
 DEFAULT_MAX_TOKENS = 500

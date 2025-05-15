@@ -5,7 +5,7 @@ load_dotenv(override=True)
 
 import asyncio
 from core.azureopenai.client import Client
-from core.rag.embedding_service import EmbeddingService
+from core.rag.embedder import EmbeddingService
 
 
 async def get_embeddings_example():

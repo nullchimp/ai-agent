@@ -1,7 +1,5 @@
-import json
-import pytest
 from colorama import Fore, Style
-from core.pretty import colorize_text, colorize_json, prettify
+from core import colorize_text, colorize_json, prettify
 
 def test_colorize_text():
     """Test the colorize_text function with different colors"""
