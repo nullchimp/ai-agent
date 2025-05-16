@@ -9,7 +9,7 @@ TIMEOUT = 30.0 # seconds
 
 def get_model(type: str) -> str:
     model = {
-        "chat": os.environ.get("AZURE_OPENAI_MODEL", None),
+        "chat": os.environ.get("AZURE_OPENAI_CHAT_ENDPOINT", None),
         "embeddings": os.environ.get("AZURE_OPENAI_EMBEDDINGS_MODEL", None)
     }.get(type, None)
     
@@ -20,7 +20,7 @@ def get_model(type: str) -> str:
 
 def get_endpoint(type: str) -> str:
     endpoint = {
-        "chat": os.environ.get("AZURE_OPENAI_EMBEDDINGS_ENDPOINT", None),
+        "chat": os.environ.get("AZURE_OPENAI_CHAT_ENDPOINT", None),
         "embeddings": os.environ.get("AZURE_OPENAI_EMBEDDINGS_ENDPOINT", None)
     }.get(type, None)
 

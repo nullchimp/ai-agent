@@ -26,7 +26,7 @@ db = MemGraphClient(
 )
 
 client = Client(api_key=api_key)
-loader = WebLoader("http://localhost:4000/en/enterprise-cloud@latest")
+loader = WebLoader("http://localhost:4000/en/copilot/managing-copilot/monitoring-usage-and-entitlements/about-premium-requests")
 embedder = TextEmbedding3Small(client)
 
 vector_store = db.create_vector_store(

@@ -33,7 +33,7 @@ messages = [{"role": "system", "content": system_role}]
 
 async def run_conversation(user_prompt: str, rag_prompt) -> str:
     messages.append({"role": "user", "content": user_prompt})
-    messages.append({"role": "RAG", "content": rag_prompt})
+    messages.append({"role": "system", "content": rag_prompt})
     response = await chat.send_messages(messages)
 
     content = ""
@@ -64,7 +64,7 @@ client = Client(api_key=api_key)
 embedder = TextEmbedding3Small(client)
 
 async def test_vector_search():
-    query_text = "How do I get started with GitHub?"
+    query_text = "How do Premium Requests work?"
     print(f"Using query text (truncated): {query_text[:100]}...")
 
     # 6. Load a vector store to use for search
