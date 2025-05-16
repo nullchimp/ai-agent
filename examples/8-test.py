@@ -26,7 +26,7 @@ client = Client(api_key=api_key)
 embedder = TextEmbedding3Small(client)
 
 async def test_vector_search():
-    query_text = "How does NLP work?"
+    query_text = "Explain NLP to me in simple terms."
     print(f"Using query text (truncated): {query_text[:100]}...")
 
     # 6. Load a vector store to use for search
@@ -40,7 +40,10 @@ async def test_vector_search():
     print(f"Using vector store: {vector_store.id} (model: {vector_store.model})")
     
     # 7. Perform vector search
-    index_name = embedder.get_metadata()["index_name"]
+    index_name = vector_store.metadata.get("index_name", None)
+    if not index_name:
+        print("No index name found in vector store metadata")
+        return
     search_results = db.search_chunks(
         query_vector=query_embedding,
         k=5,

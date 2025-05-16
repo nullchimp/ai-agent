@@ -181,7 +181,7 @@ class MemGraphClient:
             # Create the actual vector index
             q = (
                 f"CREATE VECTOR INDEX {str(kwargs['index_name'])} "
-                f"ON :`{VectorStore.label()}`({kwargs['property_name']}) "
+                f"ON :`{Vector.label()}`({kwargs['property_name']}) "
                 f"WITH CONFIG {{"
                 f' "dimension": {kwargs["dimension"]}, '
                 f' "capacity": {kwargs["capacity"]}, '
@@ -217,7 +217,7 @@ class MemGraphClient:
         # Each row comes back as (node, distance, similarity)
         return [
             {
-                "node": dict(row[0]),
+                "node": dict(row[0].properties),
                 "distance": row[1],
                 "similarity": row[2],
             }
@@ -257,20 +257,7 @@ class MemGraphClient:
         """
         
         self._cur.execute(q, params)
-        return [dict(row[0]) for row in self._cur.fetchall()]
-        
-    def get_latest_vector_for_chunk(
-        self, 
-        chunk_id: str, 
-        vector_store_id: Optional[str] = None,
-        model: Optional[str] = None
-    ) -> Optional[Dict[str, Any]]:
-        """
-        Get the most recently created Vector node for a chunk.
-        Optional filters by vector store ID or model.
-        """
-        vectors = self.get_vectors_for_chunk(chunk_id, vector_store_id, model)
-        return vectors[0] if vectors else None
+        return [dict(row[0].properties) for row in self._cur.fetchall()]
 
     # Convenience wrapper for the common case: similarity search on chunks
     def search_chunks(
@@ -305,7 +292,7 @@ class MemGraphClient:
         self._cur.execute(q, {"id": chunk_id})
         result = self._cur.fetchone()
         if result:
-            return dict(result[0])
+            return dict(result[0].properties)
         return None
     
     def get_document_chunks(self, document_id: str) -> List[Dict[str, Any]]:
@@ -315,14 +302,14 @@ class MemGraphClient:
         ORDER BY c.chunk_index
         """
         self._cur.execute(q, {"doc_id": document_id})
-        return [dict(row[0]) for row in self._cur.fetchall()]
+        return [dict(row[0].properties) for row in self._cur.fetchall()]
         
     def get_document_by_id(self, document_id: str) -> Dict[str, Any]:
         q = "MATCH (d:Document {id: $id}) RETURN d"
         self._cur.execute(q, {"id": document_id})
         result = self._cur.fetchone()
         if result:
-            return dict(result[0])
+            return dict(result[0].properties)
         return None
     
     def load_vector_store(
@@ -367,4 +354,4 @@ class MemGraphClient:
         q = f"MATCH (v:`{Vector.label()}` {{id: $id}}) RETURN v"
         self._cur.execute(q, {"id": vector_id})
         result = self._cur.fetchone()
-        return dict(result[0]) if result else None
+        return dict(result[0].properties) if result else None
