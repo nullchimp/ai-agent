@@ -18,7 +18,7 @@ class Chat:
     debug = DEBUG
 
     def __init__(self, client, tool_list: List[Tool] = []):
-        self.client = client
+        self.client: Client = client
         self.tool_map = {tool.name: tool for tool in tool_list}
         self.tools = [tool.define() for tool in tool_list]
     

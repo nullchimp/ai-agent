@@ -1,4 +1,5 @@
 from dotenv import load_dotenv
+
 # Force reload of environment variables to avoid cached data
 load_dotenv(override=True)
 
@@ -8,7 +9,44 @@ from core.rag.graph_client import MemGraphClient
 
 import asyncio
 import os
-import random
+
+#################################################
+
+from core import pretty_print
+from datetime import date
+from core.azureopenai.chat import Chat
+
+# Initialize the Chat client
+chat = Chat.create()
+
+# Define enhanced system role with instructions on using all available tools
+system_role = f"""
+You are an expert on everything GitHub.
+Your Name is Agent Smith.
+
+Your goal is to criticly answer the user's question, based on the information you get from RAG.
+
+Today is {date.today().strftime("%d %B %Y")}.
+"""
+
+messages = [{"role": "system", "content": system_role}]
+
+async def run_conversation(user_prompt: str, rag_prompt) -> str:
+    messages.append({"role": "user", "content": user_prompt})
+    messages.append({"role": "RAG", "content": rag_prompt})
+    response = await chat.send_messages(messages)
+
+    content = ""
+    if response:
+        if isinstance(response, dict) and "choices" in response:
+            choices = response.get("choices", [])
+            if choices and len(choices) > 0:
+                message = choices[0].get("message", {})
+                content = message.get("content", "")
+
+    pretty_print(" Result ", content)
+
+#################################################
 
 # Set up clients
 api_key = os.environ.get("AZURE_OPENAI_API_KEY")
@@ -26,7 +64,7 @@ client = Client(api_key=api_key)
 embedder = TextEmbedding3Small(client)
 
 async def test_vector_search():
-    query_text = "Explain NLP to me in simple terms."
+    query_text = "How do I get started with GitHub?"
     print(f"Using query text (truncated): {query_text[:100]}...")
 
     # 6. Load a vector store to use for search
@@ -55,12 +93,14 @@ async def test_vector_search():
     print(f"Query text: {query_text[:100]}...")
     print(f"Found {len(search_results)} results\n")
     
+    rag_messages = []
     for i, result in enumerate(search_results):
         chunk = result["chunk"]
         similarity = result["similarity"]
-        print(f"Result {i+1} (similarity: {similarity:.4f}):")
-        print(f"Chunk content (truncated): {chunk['content'][:150]}...")
-        print("---")
+        rag_messages.append(f"Result {i+1} (similarity: {similarity:.4f}): {chunk['content']}")
+
+    await run_conversation(query_text, "\n".join(rag_messages))
+
 
 async def main():
     print("Starting vector search test...")

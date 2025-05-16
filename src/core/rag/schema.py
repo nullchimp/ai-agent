@@ -9,9 +9,10 @@ from __future__ import annotations
 # - Interaction: Represents a chat message or system interaction
 # - Source: Represents the origin of documents
 # - VectorStore: Represents an embedding storage system
+# - Vector: Represents embedding vectors for document chunks
 #
 # Relationships:
-# 1. Document ←(CHUNK_OF)← DocumentChunk
+# 1. DocumentChunk →(CHUNK_OF)→ Document
 #    Documents are split into chunks for embedding and retrieval
 #
 # 2. Interaction →(FOLLOWS)→ Interaction
@@ -20,8 +21,14 @@ from __future__ import annotations
 # 3. Document →(SOURCED_FROM)→ Source
 #    Documents are linked to their origin source
 #
-# 4. DocumentChunk →(STORED_IN)→ VectorStore
-#    Chunks are stored in specific vector stores
+# 4. Vector →(STORED_IN)→ VectorStore
+#    Vectors are stored in specific vector stores
+#
+# 5. Vector →(EMBEDDING_OF)→ DocumentChunk
+#    Vectors are embeddings of document chunks
+#
+# 6. Document →(REFERENCES)→ Source
+#    Documents can reference other sources
 
 import hashlib
 
@@ -47,6 +54,7 @@ class EdgeType(Enum):
     SOURCED_FROM = "SOURCED_FROM"  # Document ➜ Source
     STORED_IN = "STORED_IN"        # Vector ➜ VectorStore
     EMBEDDING_OF = "EMBEDDING_OF"  # Vector ➜ DocumentChunk
+    REFERENCES = "REFERENCES"      # Document ➜ Source
 
 # ────────────────────────────────
 #  Core nodes
@@ -68,8 +76,8 @@ class Node:
 
     def create(self) -> str:
         label = self.__class__.__name__.upper()
-        q = f"CREATE (n:`{label}`) SET n += $props RETURN n.id"
-        return [q, {"props": self.to_dict()}]
+        q = f"MERGE (n:`{label}` {{id: $id}}) SET n += $props RETURN n.id"
+        return [q, {"id": str(self.id), "props": self.to_dict()}]
 
     def link(
         self,
@@ -120,12 +128,14 @@ class Document(Node):
         content: str,
         title: str = "",
         source_id: str = "",            # Reference to Source node
+        reference_ids: List[str] = None,       # List of source IDs
     ):
         super().__init__()
         self.path = path
         self.content = content
         self.title = title
         self.source_id = source_id
+        self.reference_ids = reference_ids or []
 
 class DocumentChunk(Node):
     def __init__(

@@ -9,7 +9,7 @@ TIMEOUT = 30.0 # seconds
 
 def get_model(type: str) -> str:
     model = {
-        "chat": os.environ.get("AZURE_OPENAI_CHAT_MODEL", None),
+        "chat": os.environ.get("AZURE_OPENAI_MODEL", None),
         "embeddings": os.environ.get("AZURE_OPENAI_EMBEDDINGS_MODEL", None)
     }.get(type, None)
     
@@ -51,7 +51,6 @@ class Client:
     async def make_request(
         self,
         messages: List[Dict[str, Any]],
-        model: Optional[str] = None,
         temperature: float = 0.7,
         max_tokens: int = 2000,
         top_p: float = 1.0,

@@ -1,3 +1,6 @@
+from core import set_debug
+set_debug(True)
+
 from dotenv import load_dotenv
 load_dotenv(override=True)
 
