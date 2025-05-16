@@ -45,7 +45,4 @@ async def main():
         await embedder.process_chunks(chunks, callback=lambda v: vectors.append(v))
         store(source, doc, chunks, vectors)
 
-    print("Creating vector store...")
-    print(db.get_all_vector_stores())
-
 asyncio.run(main())

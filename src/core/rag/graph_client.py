@@ -89,11 +89,11 @@ class MemGraphClient:
         
         # Link document to source if source_id is provided
         if doc.source_id:
-            doc.link(
+            self._execute(*doc.link(
                 EdgeType.SOURCED_FROM,
                 Source.label(),
                 doc.source_id
-            )
+            ))
 
     def create_chunk(self, chunk: DocumentChunk) -> str:
         self._execute(*chunk.create())
@@ -101,11 +101,11 @@ class MemGraphClient:
         if not chunk.parent_document_id:
             raise ValueError("DocumentChunk must have a parent_document_id")
         
-        chunk.link(
+        self._execute(*chunk.link(
             EdgeType.CHUNK_OF,
             DocumentChunk.label(),
             chunk.parent_document_id,
-        )
+        ))
 
     def create_source(self, source: Source) -> str:
         return self._execute(*source.create())
@@ -119,28 +119,28 @@ class MemGraphClient:
 
         self._execute(*vector.create())
 
-        vector.link(
+        self._execute(*vector.link(
             EdgeType.EMBEDDING_OF,
             DocumentChunk.label(),
             vector.chunk_id,
-        )
+        ))
 
-        vector.link(
+        self._execute(*vector.link(
             EdgeType.STORED_IN,
             VectorStore.label(),
             vector.vector_store_id,
-        )
+        ))
 
     def create_interaction(
         self, interaction: Interaction, prev_interaction_id: str | None = None
     ) -> str:
         node_id = self._execute(*interaction.create())
         if prev_interaction_id:
-            interaction.link(
+            self._execute(*interaction.link(
                 EdgeType.FOLLOWS,
                 Interaction.label(),
                 interaction.id,
-            )
+            ))
         return node_id
         
     def update_chunk_embedding(

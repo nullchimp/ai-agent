@@ -83,7 +83,7 @@ class Node:
             f"(b:`{nodeType}` {{id: $rid}}) "
             f"MERGE (a)-[r:`{edge.value}`]->(b)"
         )
-        return [q, {"lid": self.id, "rid": to_id}]
+        return [q, {"lid": str(self.id), "rid": str(to_id)}]
 
     def to_dict(self) -> dict:
         def _value(v):
