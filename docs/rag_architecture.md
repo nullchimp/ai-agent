@@ -1,48 +1,200 @@
 # RAG Architecture
 
-This document outlines the architecture of our Retrieval-Augmented Generation (RAG) system using llama-index for document loading and text chunking with overlapping strategy.
+This document outlines the architecture of our Retrieval-Augmented Generation (RAG) system using a graph database (Memgraph) for storing documents, chunks, and their relationships, with vector embeddings for semantic search.
+
+## Core Components Overview
+
+The RAG system consists of these main components:
+
+1. **Loaders**: Specialized classes for loading different content types
+   - `DocumentLoader`: Processes files from local filesystem
+   - `WebLoader`: Extracts content from web pages (with crawling capability)
+
+2. **Text Processing**: Content chunking and preparation for embedding
+   - Uses `SentenceSplitter` from llama-index for semantically meaningful chunks
+   - Configurable chunk size and overlap parameters
+
+3. **Embedding Generation**: Creates vector representations
+   - `TextEmbedding3Small`: Azure OpenAI embeddings service
+   - Batch processing with concurrency control
+
+4. **Graph Database**: Stores documents, chunks, and relationships
+   - `MemGraphClient`: Interface to Memgraph database
+   - Entity relationships (CHUNK_OF, SOURCED_FROM, etc.)
+   - Vector indexing for similarity search
 
 ## Architecture Diagram
 
 ```mermaid
 graph TD
-    A[Raw Documents] --> B[Document Loader]
+    A[Content Sources] --> B[Document Loaders]
     B --> C[Text Splitter]
     C --> D[Document Chunks with Overlap]
     D --> E[Embedding Generation]
-    E --> F[Database Storage]
+    E --> F[Memgraph Storage]
     
-    subgraph "Document Loading"
+    subgraph "Content Loading"
         B
-        B1[PDF Loader] --> B
-        B2[Text Loader] --> B
-        B3[HTML Loader] --> B
-        B4[Markdown Loader] --> B
-        B5[DOCX Loader] --> B
+        B1[Document Loader] --> B
+        B2[Web Loader] --> B
     end
     
-    subgraph "Text Splitting"
+    subgraph "Text Processing"
         C
-        C1[Chunk Size] --> C
-        C2[Overlap Size] --> C
-        C3[Split Strategy] --> C
+        C1[Chunk Size=1024] --> C
+        C2[Overlap Size=200] --> C
+        C3[Sentence Splitting] --> C
     end
     
     subgraph "Database Integration"
         F
-        F1[Store Parent Document] --> F
-        F2[Store Chunks] --> F
-        F3[Link Chunks to Parent] --> F
-        F4[Store Metadata] --> F
+        F1[Store Source Node] --> F
+        F2[Store Document Node] --> F
+        F3[Store Chunk Nodes] --> F
+        F4[Store Vector Embeddings] --> F
+        F5[Create Relationships] --> F
     end
     
-    G[Query] --> H[Vector Search]
+    G[Query Text] --> H[Vector Search]
     H --> I[Retrieve Relevant Chunks]
     I --> J[Response Generation]
     
     subgraph "Semantic Search"
         H
-        H1[Chunk-Based Search] --> H
-        H2[Parent Document Search] --> H
-        H3[Conversation-Aware Search] --> H
+        H1[Vector Similarity] --> H
+        H2[Cosine Distance] --> H
+        H3[Top-K Results] --> H
     end
+```
+
+## Implementation Details
+
+### Data Schema
+
+The RAG system uses the following node types:
+
+1. **Source**: Represents the origin of documents
+   - Properties: name, type, base_uri
+   - Types: "file", "website", etc.
+
+2. **Document**: Represents a full document with content and metadata
+   - Properties: path, content, title, source_id, reference_ids
+   - Linked to Source with SOURCED_FROM relationship
+
+3. **DocumentChunk**: Represents a portion of a document for embedding
+   - Properties: path, content, content_hash, parent_document_id, chunk_index
+   - Linked to Document with CHUNK_OF relationship
+
+4. **VectorStore**: Represents embedding storage configuration
+   - Properties: model, status, index_name, dimension, etc.
+
+5. **Vector**: Represents embedding vectors for document chunks
+   - Properties: chunk_id, vector_store_id, embedding
+   - Linked to DocumentChunk with EMBEDDING_OF relationship
+   - Linked to VectorStore with STORED_IN relationship
+
+6. **Interaction**: Represents a chat message or system interaction
+   - Properties: session_id, content, role
+   - Linked chronologically with FOLLOWS relationship
+
+### Document Processing Flow
+
+The document processing pipeline follows these steps:
+
+1. **Loading**: Content is loaded using appropriate loaders
+   ```python
+   # Example: Loading from web
+   loader = WebLoader("https://example.com/page")
+   for source, doc, chunks in loader.load_data():
+       # Process source, document, and chunks
+   ```
+
+2. **Chunking**: Documents are split into optimal chunks
+   ```python
+   # Using sentence splitter with customizable parameters
+   splitter = SentenceSplitter(chunk_size=1024, chunk_overlap=200)
+   nodes = splitter.get_nodes_from_documents([document])
+   ```
+
+3. **Embedding**: Chunk text is converted to vector embeddings
+   ```python
+   # Process chunks and generate embeddings
+   await embedder.process_chunks(chunks, callback=lambda v: vectors.append(v))
+   ```
+
+4. **Storage**: All entities are stored in the graph database
+   ```python
+   # Store entities with relationships
+   db.create_source(source)
+   db.create_document(doc)
+   db.create_chunk(chunk)
+   db.create_vector(vector)
+   ```
+
+### Retrieval Process
+
+The retrieval process involves:
+
+1. **Query Embedding**: Convert user query to a vector
+   ```python
+   query_embedding = await embedder.get_embedding(query_text)
+   ```
+
+2. **Vector Search**: Find similar vectors in the database
+   ```python
+   results = db.search_chunks(query_embedding, k=5)
+   ```
+
+3. **Processing Results**: Extract and process matching chunks
+   ```python
+   for result in results:
+       chunk = result["chunk"]
+       similarity = result["similarity"]
+       # Process chunk content
+   ```
+
+## Environment Configuration
+
+The RAG system requires these environment variables:
+
+- `AZURE_OPENAI_API_KEY`: For embedding generation
+- `MEMGRAPH_URI`: Memgraph database connection URI (default: localhost)
+- `MEMGRAPH_PORT`: Database port (default: 7687)
+- `MEMGRAPH_USERNAME`: Database username (default: memgraph)
+- `MEMGRAPH_PASSWORD`: Database password (default: memgraph)
+
+## Usage Example
+
+```python
+from dotenv import load_dotenv
+load_dotenv(override=True)
+
+from core.azureopenai.client import Client
+from core.rag.embedder import TextEmbedding3Small
+from core.rag.graph_client import MemGraphClient
+from core.rag.loader.web_loader import WebLoader
+
+# Set up clients
+api_key = os.environ.get("AZURE_OPENAI_API_KEY")
+db = MemGraphClient(host=os.environ.get("MEMGRAPH_URI", "localhost"))
+client = Client(api_key=api_key)
+loader = WebLoader("https://example.com/page")
+embedder = TextEmbedding3Small(client)
+
+# Create vector store
+vector_store = db.create_vector_store(**embedder.get_metadata())
+
+# Process documents
+for source, doc, chunks in loader.load_data():
+    vectors = []
+    await embedder.process_chunks(chunks, callback=lambda v: vectors.append(v))
+    
+    # Store everything
+    db.create_source(source)
+    db.create_document(doc)
+    for chunk in chunks:
+        db.create_chunk(chunk)
+    for vector in vectors:
+        vector.vector_store_id = vector_store.id
+        db.create_vector(vector)
+```

@@ -1,102 +1,242 @@
-# RAG System: Edge and Relationship Building Architecture
+# RAG System: Edge and Relationship Structure
 
 ## Overview
 
-This document explains how the RAG (Retrieval Augmented Generation) system builds and maintains the edge relationships in the underlying graph database. The relationship structure is central to the system's ability to provide contextual, relevant information retrieval beyond simple vector similarity.
+This document details the relationships in our graph-based RAG (Retrieval-Augmented Generation) system. The relationship structure provides contextual information retrieval beyond simple vector similarity by modeling connections between documents, chunks, sources, and vectors.
 
-## Relationship Types
+## Core Relationship Types
 
-The RAG system uses the following core relationship types:
+The graph database uses these fundamental relationship types:
 
 | Relationship | Direction | Description |
 |--------------|-----------|-------------|
-| `[:CHUNK_OF]` | Chunk → Document | Connects a text chunk to its parent document |
-| `[:EXPLAINS]` | Document → Concept | Document explains or defines a concept |
-| `[:BELONGS_TO]` | Document → Topic | Document belongs to a broader topic |
-| `[:RELATED_TO]` | Concept ↔ Concept | Bidirectional relationship between related concepts |
-| `[:REFERENCES]` | Message → Document | Message in a conversation references a document |
-| `[:PART_OF]` | Message → Conversation | Message belongs to a conversation |
-| `[:VIEWED]` | User → Document | User has viewed a document |
-| `[:CREATED]` | User → Message | User created a message |
-| `[:MENTIONS]` | Message → Concept | Message mentions a concept |
+| `[:CHUNK_OF]` | DocumentChunk → Document | Connects a text chunk to its parent document |
+| `[:SOURCED_FROM]` | Document → Source | Links a document to its origin source |
+| `[:STORED_IN]` | Vector → VectorStore | Associates vectors with their storage system |
+| `[:EMBEDDING_OF]` | Vector → DocumentChunk | Links vector embeddings to their document chunks |
+| `[:FOLLOWS]` | Interaction → Interaction | Creates conversational thread chronology |
+| `[:REFERENCES]` | Document → Source | Document refers to an external source |
+
+## Internal Implementation
+
+The relationship structure is defined in the schema and enforced through the graph client:
+
+```python
+class EdgeType(Enum):
+    CHUNK_OF = "CHUNK_OF"          # DocumentChunk ➜ Document
+    FOLLOWS = "FOLLOWS"            # Interaction ➜ Interaction
+    SOURCED_FROM = "SOURCED_FROM"  # Document ➜ Source
+    STORED_IN = "STORED_IN"        # Vector ➜ VectorStore
+    EMBEDDING_OF = "EMBEDDING_OF"  # Vector ➜ DocumentChunk
+    REFERENCES = "REFERENCES"      # Document ➜ Source
+```
 
 ## Relationship Creation Mechanisms
 
-### 1. Document Processing Pipeline
+### Document Processing Pipeline
 
-Relationships are established during the document indexing process through the following pipeline:
+When documents are processed through the RAG system:
 
 ```
 +---------------+     +---------------+     +---------------+     +---------------+
 |               |     |               |     |               |     |               |
-| Document Load |---->| Text Splitting|---->| Embedding     |---->| Relationship  |
+| Content Load  |---->| Text Splitting|---->| Embedding     |---->| Relationship  |
 |               |     |               |     | Generation    |     | Establishment |
 +---------------+     +---------------+     +---------------+     +---------------+
 ```
 
-#### Document Loading and Chunking
+1. **Source Creation**: Register content origin
+   ```python
+   # Create source node based on content type
+   source = Source(name=domain, type="website", base_uri=url)
+   db.create_source(source)
+   ```
 
-When a document is loaded into the system:
+2. **Document Registration**: Store full document content
+   ```python
+   # Create document with reference to source
+   document = Document(path=path, content=content, source_id=source.id)
+   db.create_document(document)
+   ```
 
-1. The document is registered as a node with metadata (path, title, creation date)
-2. The document is split into semantic chunks via the `TextSplitter`
-3. Each chunk is stored as a separate node
-4. A `[:CHUNK_OF]` relationship is created from each chunk to its parent document
+3. **Chunk Generation**: Split document into semantic units
+   ```python
+   # Process document into chunks
+   nodes = splitter.get_nodes_from_documents([doc])
+   for idx, node in enumerate(nodes):
+       chunk = DocumentChunk(
+           path=path,
+           content=node.text,
+           parent_document_id=document.id,
+           chunk_index=idx
+       )
+       db.create_chunk(chunk)
+   ```
+
+4. **Vector Embedding**: Generate and store embeddings
+   ```python
+   # Create embeddings for chunks
+   vectors = []
+   await embedder.process_chunks(chunks, callback=lambda v: vectors.append(v))
+   for vector in vectors:
+       vector.vector_store_id = vector_store.id
+       db.create_vector(vector)
+   ```
+
+### Relationship Creation
+
+Relationships are established during entity creation:
 
 ```python
-async def index_document(doc_path: str) -> str:
-    # Create document node
-    doc_id = await client.create_document(path=doc_path)
+def create_chunk(self, chunk: DocumentChunk) -> str:
+    self._execute(*chunk.create())
     
-    # Load and split document
-    content = loader.load_document(doc_path)
-    chunks = splitter.split_text(content)
+    if not chunk.parent_document_id:
+        raise ValueError("DocumentChunk must have a parent_document_id")
     
-    # Create chunks and relationships
-    for chunk in chunks:
-        chunk_id = await client.create_chunk(content=chunk, doc_id=doc_id)
-        await client.create_relationship(
-            from_id=chunk_id, 
-            to_id=doc_id, 
-            relationship_type="CHUNK_OF"
-        )
-    
-    return doc_id
+    # Create CHUNK_OF relationship from chunk to document
+    self._execute(*chunk.link(
+        EdgeType.CHUNK_OF,
+        Document.label(),
+        chunk.parent_document_id,
+    ))
 ```
 
-### 2. Concept and Topic Extraction
+## Implementation in the Node Class
 
-The system extracts concepts and topics from documents using:
-
-1. **Named Entity Recognition**: Identifies entities like people, organizations, and technologies
-2. **Keyword Extraction**: Identifies significant terms using TF-IDF or similar algorithms
-3. **Topic Modeling**: Uses techniques like LDA to identify broad themes
-
-For each identified concept or topic:
+The base `Node` class provides methods for link creation:
 
 ```python
-async def link_document_to_concepts(doc_id: str, text: str) -> None:
-    # Extract concepts from text
-    concepts = concept_extractor.extract_concepts(text)
-    
-    for concept in concepts:
-        # Create or retrieve concept node
-        concept_id = await client.create_or_get_concept(name=concept.name)
-        
-        # Link document to concept
-        await client.link_document_explains_concept(
-            document_id=doc_id,
-            concept_id=concept_id
-        )
-        
-        # Create relationships between concepts that co-occur
-        for other_concept in concepts:
-            if other_concept != concept:
-                other_id = await client.create_or_get_concept(name=other_concept.name)
-                await client.link_related_concepts(concept_id, other_id)
+def link(
+    self,
+    edge: EdgeType,
+    nodeType: str,
+    to_id: str,
+) -> None:
+    label = self.__class__.__name__.upper()
+    q = (
+        f"MATCH (a:`{label}` {{id: $lid}}), "
+        f"(b:`{nodeType}` {{id: $rid}}) "
+        f"MERGE (a)-[r:`{edge.value}`]->(b)"
+    )
+    return [q, {"lid": str(self.id), "rid": str(to_id)}]
 ```
 
-### 3. Conversation Context Tracking
+## Vector Search Operations
+
+The relationship structure enables efficient vector search:
+
+```python
+def search_chunks(
+    self,
+    query_vector: Sequence[float],
+    k: int = 5,
+    index_name: str = "vector_embedding_index"
+) -> List[Dict[str, Any]]:
+    # First, search for matching vectors
+    vector_results = self.vector_search(index_name, query_vector, k)
+    
+    # For each vector result, fetch the associated chunk
+    results = []
+    for result in vector_results:
+        vector_node = result["node"]
+        chunk_id = vector_node.get("chunk_id")
+        
+        if chunk_id:
+            chunk = self.get_chunk_by_id(chunk_id)
+            if chunk:
+                results.append({
+                    "chunk": chunk,
+                    "vector": vector_node,
+                    "distance": result["distance"],
+                    "similarity": result["similarity"]
+                })
+                
+    return results
+```
+
+## Web Content Relationships
+
+For web content, specialized relationship handling occurs:
+
+```python
+# Create document with references to linked pages
+document = Document(
+    path=display_url,
+    content=content,
+    title=title,
+    source_id=source.id,
+    reference_ids=[hashlib.sha256(url.encode()).hexdigest()[:16] for url in new_urls]
+)
+```
+
+## Technical Implementation Notes
+
+### Graph Database Connection
+
+The `MemGraphClient` class provides the interface to Memgraph:
+
+```python
+def __init__(
+    self,
+    host: str = "127.0.0.1",
+    port: int = 7687,
+    username: str | None = None,
+    password: str | None = None,
+    **kwargs,
+) -> None:
+    # Remove bolt:// prefix if present in host
+    if host.startswith("bolt://"):
+        host = host.replace("bolt://", "")
+        
+    # Handle localhost -> 127.0.0.1 conversion (more reliable)
+    if host == "localhost":
+        host = "127.0.0.1"
+        
+    try:
+        print(f"Connecting to Memgraph at {host}:{port}")
+        self._conn = mgclient.connect(
+            host=host,
+            port=port,
+            username=username,
+            password=password,
+            **kwargs,
+        )
+        self._conn.autocommit = True
+        self._cur = self._conn.cursor()
+```
+
+### Vector Indexing
+
+Vector searches utilize Memgraph's vector index capability:
+
+```python
+def create_vector_store(
+    self,
+    **kwargs: Any
+) -> VectorStore:
+    # Create the actual vector index
+    q = (
+        f"CREATE VECTOR INDEX {str(kwargs['index_name'])} "
+        f"ON :`{Vector.label()}`({kwargs['property_name']}) "
+        f"WITH CONFIG {{"
+        f' "dimension": {kwargs["dimension"]}, '
+        f' "capacity": {kwargs["capacity"]}, '
+        f' "metric": "{kwargs["metric"]}", '
+        f' "resize_coefficient": {kwargs["resize_coefficient"]}'
+        f" }};"
+    )
+```
+
+## Further Enhancements
+
+Potential extensions to the relationship model:
+
+1. **Temporal Relationships**: Track document changes over time
+2. **User Interaction Tracking**: Record user views and relevance feedback
+3. **Concept Extraction**: Identify and link key concepts across documents
+4. **Multi-hop Navigation**: Enable knowledge discovery across multiple relationships
+5. **Conversation Threading**: Link interactions in a conversational context
 
 As conversations progress, the system builds a graph of messages and referenced documents:
 

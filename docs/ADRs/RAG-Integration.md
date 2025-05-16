@@ -1,103 +1,195 @@
-# Architectural Decision Record: Integrate Retrieval-Augmented Generation (RAG) via Graph Database for Knowledge Management
+# Architectural Decision Record: Retrieval-Augmented Generation (RAG) with Graph Database for Knowledge Storage
 
 ## Context
-The AI Agent currently answers queries by forwarding the full chat history to Azure OpenAI.  
-Limitations:
 
-* **Knowledge persistence** – conversations are ephemeral with no persistent knowledge across sessions.
-* **Contextual understanding** – the agent lacks ability to link related information from past interactions.
-* **Knowledge horizon** – the LLM can only answer from its training cutoff.
-* **Conversational memory** – no mechanism to recall specific prior user interactions.
+The AI Agent previously answered queries by sending the full chat history to Azure OpenAI, which had several limitations:
 
-Retrieval-Augmented Generation (RAG) with a knowledge graph approach mitigates these issues by creating a persistent, traversable store of knowledge and chat history.  
-A **graph database** (e.g. Neo4j, Memgraph) is preferred over a vector store alone because:
+* **No Knowledge Persistence**: Conversations were ephemeral with no information retained across sessions
+* **Limited Context Size**: Token limits restricted the amount of conversation history
+* **Knowledge Cutoff**: LLMs could only answer based on their training data cutoff point
+* **No Relationship Modeling**: Simple vector stores couldn't model complex knowledge relationships
 
-* **Conversation threading** – allows tracking of complete conversation flows and their relationships.
-* **Knowledge evolution** – captures how information changes over time through user interactions.
-* **Contextual recall** – enables retrieval based on conversational context, not just content similarity.
-* **Multi-hop reasoning** – supports traversing relationships between concepts mentioned across conversations.
+Implementing a RAG system with a graph database addresses these limitations by providing:
+
+* **Persistent Knowledge Store**: Documents and their relationships are preserved
+* **Semantic Search**: Vector embeddings enable finding relevant information regardless of phrasing
+* **Knowledge Relationships**: Graph structure captures connections between information pieces
+* **Extendable Schema**: The model can evolve to support new entity and relationship types
 
 ## Decision
-1. **Implement `src/core/rag/` domain with MemGraphClient**  
+
+1. **Implementation Structure**
+   
+   Created a modular implementation in `src/core/rag/` with these components:
+
+   ```
+   src/core/rag/
+   ├── graph_client.py     # Memgraph database client
+   ├── schema.py           # Node and edge type definitions
+   ├── loader/             # Content loading mechanisms
+   │   ├── __init__.py     # Base loader class
+   │   ├── document_loader.py  # File-based document loader
+   │   └── web_loader.py   # Web content loader
+   ├── embedder/           # Vector embedding generation
+   │   ├── __init__.py     # Base embedding service
+   │   └── text_embedding_3_small.py  # Azure OpenAI embedding
+   ```
+
+2. **Data Model and Schema**
+
+   The implementation uses these core node types:
+
+   ```
+   (:Source {id, name, type, base_uri})  # Origin of documents
+   (:Document {id, path, content, title, source_id})  # Full documents
+   (:DocumentChunk {id, path, content, parent_document_id, chunk_index})  # Document portions
+   (:VectorStore {id, model, status})  # Vector embedding configuration
+   (:Vector {id, chunk_id, vector_store_id, embedding})  # Actual embeddings
+   (:Interaction {id, session_id, content, role})  # Chat messages
+   ```
+
+   Connected by these relationships:
+
+   ```
+   (:Document)-[:SOURCED_FROM]->(:Source)  # Document origin
+   (:DocumentChunk)-[:CHUNK_OF]->(:Document)  # Document hierarchy
+   (:Vector)-[:EMBEDDING_OF]->(:DocumentChunk)  # Link vectors to content
+   (:Vector)-[:STORED_IN]->(:VectorStore)  # Vector configuration
+   (:Interaction)-[:FOLLOWS]->(:Interaction)  # Message sequence
+   (:Document)-[:REFERENCES]->(:Source)  # External references
+   ```
+
+3. **Content Embedding Pipeline**
+
+   The system processes content through this workflow:
+
+   1. **Content Loading**: Files or web pages are loaded via specialized loaders
+   2. **Text Splitting**: Content is divided into semantic chunks with overlap
+   3. **Embedding Generation**: Chunks are converted to vector embeddings
+   4. **Graph Storage**: Content and embeddings are stored with relationships
+
+4. **Vector Search Capabilities**
+
+   The implementation supports:
+   
+   * **Vector Similarity Search**: `search_chunks()` finds relevant content
+   * **Batch Processing**: `process_chunks()` handles multiple chunks efficiently
+   * **Configurable Parameters**: Customizable chunk size, overlap, vector dimensions
+
+5. **Memgraph Integration**
+
+   Chose Memgraph as the graph database because it offers:
+   
+   * Vector search capabilities with various distance metrics (cosine, euclidean)
+   * Cypher query language for relationship traversal
+   * Open-source availability with containerized deployment option
+
+## Consequences
+
+### Positive
++ ✅ **Enhanced Retrieval**: The system can find relevant information based on semantic similarity
++ ✅ **Persistent Knowledge**: Documents and their relationships are preserved across sessions
++ ✅ **Separation of Concerns**: Modular design allows for swapping components (loaders, embedders)
++ ✅ **Flexible Content Sources**: Support for both file-based and web-based content
++ ✅ **Batch Processing**: Efficient handling of multiple documents and chunks
+
+### Negative
+- ❌ **Increased Complexity**: More components to maintain and coordinate
+- ❌ **Infrastructure Requirements**: Requires running Memgraph database
+- ❌ **Storage Overhead**: Storing both content and embeddings increases storage needs
+- ❌ **Environment Dependencies**: Relies on Azure OpenAI API for embeddings
+
+## Technical Implementation Details
+
+### Core Components
+
+1. **Graph Client**
+   ```python
+   class MemGraphClient:
+       def __init__(
+           self,
+           host: str = "127.0.0.1",
+           port: int = 7687,
+           username: str | None = None,
+           password: str | None = None,
+       )
+   ```
+
+2. **Schema Definition**
+   ```python
+   class EdgeType(Enum):
+       CHUNK_OF = "CHUNK_OF"          # DocumentChunk ➜ Document
+       FOLLOWS = "FOLLOWS"            # Interaction ➜ Interaction
+       SOURCED_FROM = "SOURCED_FROM"  # Document ➜ Source
+       STORED_IN = "STORED_IN"        # Vector ➜ VectorStore
+       EMBEDDING_OF = "EMBEDDING_OF"  # Vector ➜ DocumentChunk
+       REFERENCES = "REFERENCES"      # Document ➜ Source
+   ```
+
+3. **Content Loading**
+   ```python
+   class WebLoader(Loader):
+       def __init__(self, 
+                   url: str, 
+                   url_pattern: Optional[str] = None, 
+                   max_urls: int = 10000, 
+                   chunk_size: int = 1024, 
+                   chunk_overlap: int = 200)
+   ```
+
+4. **Embedding Service**
+   ```python
+   class TextEmbedding3Small(EmbeddingService):
+       @property
+       def model(self) -> str:
+           return "text-embedding-3-small"
+   ```
+
+5. **Vector Search**
+   ```python
+   def search_chunks(
+       self,
+       query_vector: Sequence[float],
+       k: int = 5,
+       index_name: str = "vector_embedding_index"
+   ) -> List[Dict[str, Any]]
+   ```
+
+### Environment Configuration
+
+The implementation relies on these environment variables:
+
 ```
-src/core/rag/
-├── graph_client.py      # core wrapper around Neo4j/Memgraph driver
-├── document_loader.py   # handles ingestion of various document formats
-├── text_splitter.py     # splits documents into overlapping chunks
-├── _indexer.py          # ingests artifacts, messages, and conversations
-├── retriever.py         # conversation-aware knowledge retrieval
-└── memory.py            # manages long-term conversation history
+AZURE_OPENAI_API_KEY: For embedding generation
+MEMGRAPH_URI: Graph database location (default: localhost)
+MEMGRAPH_PORT: Database port (default: 7687)
+MEMGRAPH_USERNAME: Database credentials (default: memgraph)
+MEMGRAPH_PASSWORD: Database credentials (default: memgraph)
 ```
 
-2. **Conversation and Knowledge Storage Model**  
-* Current implemented schema (from graph_client.py):
-```
-(:Conversation {id, start_time, title, summary})
-(:Message {id, content, role, timestamp})-[:PART_OF]->(:Conversation)
-(:Message)-[:REFERENCES]->(:Document)
-(:Message)-[:MENTIONS]->(:Concept)
-(:Document {id, path, content, embedding, content_hash, embedding_version, updated_at, source_path, title, author, mime_type})
-(:DocumentChunk {id, path, content, embedding, content_hash, embedding_version, chunk_index, parent_document_id, updated_at})-[:CHUNK_OF]->(:Document)
-(:Resource {uri, type, description})
-(:User {id, name})-[:VIEWED]->(:Document)
-(:Concept {id, name})
-(:Topic {id, name})
-(:Symbol {name})
-(:Tool {name})-[:DEFINED_IN]->(:Document)
-(:Question {id, content, created_at})-[:ANSWERED_BY]->(:Document)
-(:Entity {id, name, type})
-```
+## Alternatives Considered
 
-* Relationship types implemented:
-```
-(:Document)-[:REFERS_TO]->(:Symbol)
-(:Document)-[:LINKS_TO]->(:Resource)
-(:DocumentChunk)-[:CHUNK_OF]->(:Document)
-(:Message)-[:PART_OF]->(:Conversation)
-(:Message)-[:REFERENCES]->(:Document)
-(:Message)-[:MENTIONS]->(:Concept)
-(:Document)-[:BELONGS_TO]->(:Topic)
-(:Document)-[:EXPLAINS]->(:Concept)
-(:Concept)-[:RELATED_TO]->(:Concept)
-(:User)-[:VIEWED]->(:Document)
-(:Question)-[:ANSWERED_BY]->(:Document)
-(:Document)-[:REFERENCES]->(:Document)
-(:Document)-[:REFERENCES]->(:Resource)
-```
+1. **Pure Vector Database**: Considered using Pinecone or similar, but would lack relationship modeling
+2. **Traditional Document Database**: MongoDB or similar would lack vector similarity search
+3. **Using LlamaIndex directly**: Would provide many features but with less control over the implementation
+4. **Neo4j instead of Memgraph**: Neo4j has more mature ecosystem but Memgraph offered better vector operations
 
-3. **Enhanced Chat History Management**
-* Implemented conversation storage with metadata:
-```
-(:Conversation {
-   id: UUID,
-   start_time: DateTime,
-   title: String,
-   summary: String        // AI-generated summary of conversation topic
-})
+## Future Enhancements
 
-(:Message {
-   id: UUID,
-   content: String,
-   role: String,         // "user" or "assistant"
-   timestamp: DateTime
-})-[:PART_OF]->(:Conversation)
+1. **Conversation Context Integration**
+   - Track chat history in the graph
+   - Connect user messages to relevant document chunks
+   - Enable conversation-aware document retrieval
 
-// Message references to documents and concepts
-(:Message)-[:REFERENCES]->(:Document)
-(:Message)-[:MENTIONS]->(:Concept)
-```
+2. **Knowledge Graph Enrichment**
+   - Extract concepts and entities from documents
+   - Build relationships between related concepts
+   - Enable traversal-based knowledge discovery
 
-4. **Vector-Based Semantic Search**
-* The implementation uses vector embeddings for document search with fallback mechanisms:
-  * Primary: `semantic_search()` using Memgraph's vector operations with cosine similarity
-  * Fallback: `semantic_search_fallback()` with client-side vector similarity computation
-  * Enhanced: `conversation_aware_search()` that combines document and conversation search
-
-5. **Privacy and Retention Management**
-* Conversation management with features for data lifecycle:
-  * `get_expired_conversations()`: Find conversations older than retention period (default 90 days)
-  * `delete_conversation()`: Remove conversations and orphaned messages
-  * Future enhancement: Implement anonymization for sensitive information
+3. **Relevance Feedback**
+   - Track which documents were helpful for which queries
+   - Improve ranking based on feedback
+   - Implement personalized document ranking
 
 6. **Agent Integration**  
 * The graph client provides methods for integrating with the main agent:

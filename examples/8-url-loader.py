@@ -8,8 +8,6 @@ from core.rag.graph_client import MemGraphClient
 
 from core.rag.loader.web_loader import WebLoader
 
-from core import chatutil, graceful_exit, mainloop, pretty_print
-
 import asyncio
 import os
 
