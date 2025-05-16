@@ -3,33 +3,40 @@ import os
 import uuid
 import hashlib
 
+from . import Loader
+
 from llama_index.core.readers import SimpleDirectoryReader
-from llama_index.core.node_parser import SentenceSplitter
 
-from .schema import Document, DocumentChunk
+from core.rag.schema import Document, DocumentChunk, Source
 
-class DocumentLoader:
-    def __init__(self, chunk_size: int = 1024, chunk_overlap: int = 200):
-        self.chunk_size = chunk_size
-        self.chunk_overlap = chunk_overlap
-        self.sentence_splitter = SentenceSplitter(
-            chunk_size=chunk_size,
-            chunk_overlap=chunk_overlap
+class DocumentLoader(Loader):
+    def create_source(self, source_path) -> Document:
+        if not self.path:
+            raise ValueError("Path cannot be empty.")
+
+        source = Source(
+            name=source_path.split("/")[-1],
+            type="file",
+            base_uri=source_path
         )
-        
-    def load_document_chunks(self, path: str) -> Generator[Tuple[Document, List[DocumentChunk]], None, None]:
-        path = os.path.abspath(path)
 
+        source.id = hashlib.sha256(self.path.encode()).hexdigest()[:16]
+        source.add_metadata(**{
+            "file_type": source_path.split(".")[-1],
+            "directory": "/".join(source_path.split("/")[:-1])
+        })
+        
+        return source
+
+    def load_data(self) -> Generator[Tuple[Document, List[DocumentChunk]], Source]:
         try:
-            # Check if path exists
-            if not os.path.exists(path):
-                raise ValueError(f"File not found: {path}")
+            path = os.path.abspath(self.path)
 
             # Load the document using SimpleDirectoryReader
             reader = SimpleDirectoryReader(
                 input_dir=path,
                 filename_as_id=True,
-                recursive=True
+                recursive=self.recursive
             )
 
             docs = reader.load_data()
@@ -41,38 +48,32 @@ class DocumentLoader:
                 if not doc.text:
                     continue
                 
-                # Create parent document
-                content_hash = hashlib.md5(doc.text.encode()).hexdigest()
-                parent_doc = Document(
-                    id=str(uuid.uuid4()),
+                source = self.create_source(doc.metadata.get("file_path", ""))
+
+                document = Document(
                     path=path,
                     content=doc.text,
                     title=os.path.basename(doc.metadata.get("file_path", "Untitled")),
-                    source_uri=doc.metadata.get("file_path", ""),
-                    content_hash=content_hash
+                    source_id=source.id
                 )
                 
-                # Split document into sentence chunks with overlap
                 nodes = self.sentence_splitter.get_nodes_from_documents([doc])
                 
                 chunks = []
                 for idx, node in enumerate(nodes):
                     chunk_content = node.text
-                    chunk_hash = hashlib.sha256(chunk_content.encode()).hexdigest()
-
+                    
                     doc_chunk = DocumentChunk(
-                        id=str(uuid.uuid4()),
                         path=path,
                         content=chunk_content,
-                        parent_document_id=parent_doc.id,
+                        parent_document_id=document.id,
                         chunk_index=idx,
-                        token_count=len(chunk_content.split()),
-                        content_hash=chunk_hash
+                        token_count=len(chunk_content.split())
                     )
                     
                     chunks.append(doc_chunk)
                 
-                yield parent_doc, chunks
+                yield source, document, chunks
 
         except Exception as e:
             raise ValueError(f"Failed to load document {path}: {str(e)}")
