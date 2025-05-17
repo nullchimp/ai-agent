@@ -24,16 +24,14 @@ system_role = f"""
 You are an expert on everything GitHub.
 Your Name is Agent Smith.
 
-Your goal is to criticly answer the user's question, based on the information you get.
-SOmetimes the user
-
 Today is {date.today().strftime("%d %B %Y")}.
 """
 
 messages = [{"role": "system", "content": system_role}]
 
-async def run_conversation(user_prompt: str, rag_prompt) -> str:
-    messages.append({"role": "system", "content": rag_prompt})
+async def run_conversation(user_prompt: str, rag_prompt = None) -> str:
+    if rag_prompt:
+        messages.append({"role": "system", "content": rag_prompt})
     messages.append({"role": "user", "content": user_prompt})
     response = await chat.send_messages(messages)
 
@@ -63,8 +61,7 @@ db = MemGraphClient(
 
 embedder = TextEmbedding3Small()
 
-async def test_vector_search():
-    query_text = "How do Premium Requests work?"
+async def test_vector_search(query_text: str):
     print(f"Using query text (truncated): {query_text[:100]}...")
 
     # 6. Load a vector store to use for search
@@ -87,24 +84,62 @@ async def test_vector_search():
         index_name=index_name,
         k=10
     )
-    
-    # 8. Display results
-    print("\n----- Search Results -----")
-    print(f"Query text: {query_text[:100]}...")
-    print(f"Found {len(search_results)} results\n")
-    
-    rag_messages = []
-    for i, result in enumerate(search_results):
-        chunk = result["chunk"]
-        similarity = result["similarity"]
-        rag_messages.append(f"Result {i+1} (similarity: {similarity:.4f}): {chunk['content']}")
 
-    await run_conversation(query_text, f"#Context:{"\n-".join(rag_messages)}")
+    doc_ids = set()
+    for result in search_results:
+        chunk = result["chunk"]
+        doc_id = chunk["parent_document_id"]
+        if not doc_id in doc_ids:
+            doc_ids.add(doc_id)
+    
+    from core.rag.schema import Document
+
+    data = []
+    references = set()
+    for doc_id in doc_ids:
+        document = db.get_by_id(Document, doc_id)
+        print(f"Document ID: {doc_id}")
+        refs = db.get_references(doc_id)
+        for ref in refs:
+            ref_uri = ref["base_uri"]
+            if not ref_uri in references:
+                references.add(ref_uri)
+        
+        sources = db.get_sources(doc_id)
+        print(f"Sources: {sources}")
+        source_uris = [source["base_uri"] for source in sources]
+        data.append({
+            "sources": source_uris,
+            "content": document["content"],
+            "references": list(references),
+        })
+
+    # 8. Display results
+    import json
+    print("\n----- Search Results -----")
+    print(f"Data: {json.dumps(data, indent=2)}")
+
+    rag_prompt = f"""
+You are an expert on everything GitHub.
+You have information in the following format of JSON:
+[
+    {{
+        "sources": <list of source URIs>,
+        "content": <content that is grounded in the sources>,
+        "references": <list of references to other sources>
+    }}
+]
+I need you to always ground your response in this information and return relevant sources and references.
+Here is the information You have:\n
+    """
+
+    await run_conversation(query_text, f"{rag_prompt}{json.dumps(data)}")
 
 
 async def main():
-    print("Starting vector search test...")
-    await test_vector_search()
+    text = input("Enter your text: ")
+    await test_vector_search(text)
+    #await run_conversation(text)
     print("Test completed.")
 
 if __name__ == "__main__":

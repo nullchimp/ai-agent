@@ -12,6 +12,7 @@ import mgclient
 from typing import Any, Dict, List, Optional, Sequence, Union
 
 from core.rag.schema import (
+    Node as BaseNode,
     EdgeType, 
     Document, 
     DocumentChunk, 
@@ -285,7 +286,7 @@ class MemGraphClient:
             chunk_id = vector_node.get("chunk_id")
             
             if chunk_id:
-                chunk = self.get_chunk_by_id(chunk_id)
+                chunk = self.get_by_id(DocumentChunk, chunk_id)
                 if chunk:
                     results.append({
                         "chunk": chunk,
@@ -295,15 +296,7 @@ class MemGraphClient:
                     })
                     
         return results
-        
-    def get_chunk_by_id(self, chunk_id: str) -> Dict[str, Any]:
-        q = f"MATCH (c:`{DocumentChunk.label()}` {{id: $id}}) RETURN c"
-        self._cur.execute(q, {"id": chunk_id})
-        result = self._cur.fetchone()
-        if result:
-            return dict(result[0].properties)
-        return None
-    
+
     def get_document_chunks(self, document_id: str) -> List[Dict[str, Any]]:
         q = f"""
         MATCH (c:`{DocumentChunk.label()}`)-[:CHUNK_OF]->(d:`{Document.label()}` {{id: $doc_id}})
@@ -312,15 +305,44 @@ class MemGraphClient:
         """
         self._cur.execute(q, {"doc_id": document_id})
         return [dict(row[0].properties) for row in self._cur.fetchall()]
-        
-    def get_document_by_id(self, document_id: str) -> Dict[str, Any]:
-        q = "MATCH (d:Document {id: $id}) RETURN d"
-        self._cur.execute(q, {"id": document_id})
+    
+    def get_references(
+        self, 
+        document_id: str
+    ) -> List[Dict[str, Any]]:
+        q = f"""
+        MATCH (d:`{Document.label()}` {{id: $doc_id}})-[:REFERENCES]->(s:`{Source.label()}`)
+        RETURN s
+        """
+        self._cur.execute(q, {"doc_id": document_id})
+        return [dict(row[0].properties) for row in self._cur.fetchall()]
+    
+    def get_sources(
+        self, 
+        document_id: str
+    ) -> List[Dict[str, Any]]:
+        q = f"""
+        MATCH (d:`{Document.label()}` {{id: $doc_id}})-[:SOURCED_FROM]->(s:`{Source.label()}`)
+        RETURN s
+        """
+        self._cur.execute(q, {"doc_id": document_id})
+        return [dict(row[0].properties) for row in self._cur.fetchall()]
+
+    def get_by_id(
+        self, 
+        label: BaseNode | str, 
+        node_id: str
+    ) -> Optional[Dict[str, Any]]:
+        if issubclass(label, BaseNode) or isinstance(label, BaseNode):
+            label = label.label()
+
+        q = f"MATCH (n:`{label}` {{id: $id}}) RETURN n"
+        self._cur.execute(q, {"id": node_id})
         result = self._cur.fetchone()
         if result:
             return dict(result[0].properties)
         return None
-    
+
     def load_vector_store(
         self,
         model: str = None,
@@ -355,12 +377,3 @@ class MemGraphClient:
 
         vector_store.id = vs_dict.get('id')
         return vector_store
-    
-    def get_vector_by_id(self, vector_id: str) -> Optional[Dict[str, Any]]:
-        """
-        Get a Vector node by its ID.
-        """
-        q = f"MATCH (v:`{Vector.label()}` {{id: $id}}) RETURN v"
-        self._cur.execute(q, {"id": vector_id})
-        result = self._cur.fetchone()
-        return dict(result[0].properties) if result else None
