@@ -7,5 +7,5 @@ You have to obay the following rules:
 3. All tests that you write have to pass.
 4. The test coverage needs to be at least 80%.
 5. You are forbidden from modifying any files that are not the tests folder.
-6. You are only allowed to write tests for the code in the `src` folder. Do not test anything else!
+6. You are only allowed to write tests for the code in the subfolders of the `src` folder. Do not test anything else!
 7. You are not done until you have achieved your goal.
