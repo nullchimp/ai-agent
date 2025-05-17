@@ -4,7 +4,7 @@ import json
 from typing import Any, Dict, List
 
 from tools import Tool
-from .client import Client
+from .client import ChatClient
 
 from core import prettify, colorize_text
 
@@ -17,8 +17,8 @@ from core import DEBUG
 class Chat:
     debug = DEBUG
 
-    def __init__(self, client, tool_list: List[Tool] = []):
-        self.client: Client = client
+    def __init__(self, tool_list: List[Tool] = []):
+        self.chat_client: ChatClient = ChatClient()
         self.tool_map = {tool.name: tool for tool in tool_list}
         self.tools = [tool.define() for tool in tool_list]
     
@@ -32,20 +32,18 @@ class Chat:
         if not api_key:
             raise ValueError(f"{DEFAULT_API_KEY_ENV} environment variable is required")
         
-        client = Client(api_key=api_key)
-
         if Chat.debug:
             for tool in tool_list:
                 print(colorize_text(f"<Tool Initialized: {colorize_text(tool.name, "yellow")}>", "cyan"))
             print("\n")
 
-        return cls(client, tool_list)
+        return cls(tool_list)
     
     async def send_messages(
         self,
         messages: List[Dict[str, Any]]
     ) -> Dict[str, Any]:
-        resp = await self.client.make_request(
+        resp = await self.chat_client.make_request(
             messages=messages,
             temperature=0.7,
             max_tokens=32000,

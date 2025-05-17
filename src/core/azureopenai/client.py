@@ -7,47 +7,104 @@ from core import pretty_print, colorize_text
 
 TIMEOUT = 30.0 # seconds
 
-def get_model(type: str) -> str:
-    model = {
-        "chat": os.environ.get("AZURE_OPENAI_CHAT_ENDPOINT", None),
-        "embeddings": os.environ.get("AZURE_OPENAI_EMBEDDINGS_MODEL", None)
-    }.get(type, None)
-    
-    if not model:
-        raise ValueError(f"Model for {type} not set in environment variables.")
-    
-    return model
-
-def get_endpoint(type: str) -> str:
-    endpoint = {
-        "chat": os.environ.get("AZURE_OPENAI_CHAT_ENDPOINT", None),
-        "embeddings": os.environ.get("AZURE_OPENAI_EMBEDDINGS_ENDPOINT", None)
-    }.get(type, None)
-
-    if not endpoint:
-        raise ValueError(f"Endpoint for {type} not set in environment variables.")  
-
-    return endpoint
-
 from core import DEBUG
 class Client:
     debug = DEBUG
 
     def __init__(
         self, 
-        api_key: str, 
+        model: str,
+        endpoint: str,
         timeout: Optional[float] = None
     ):
-        self.api_key = api_key
+        self.api_key = os.environ.get("AZURE_OPENAI_API_KEY")
+        self.model = model
+        self.endpoint = endpoint
+
+        if not (self.api_key and self.model and self.endpoint):
+            raise ValueError("API key, model, and endpoint must be provided")
+
         self.timeout = timeout or TIMEOUT
         self.http_client = httpx.AsyncClient(timeout=self.timeout)
 
         if Client.debug:
             print(colorize_text(f"<Client Initialized>", "grey"))
             print(colorize_text(f"<Timeout: {timeout}>", "grey"))
-            print(colorize_text(f"<Model: {get_model("chat")}>\n", "grey"))
-            print(colorize_text(f"<Embeddings: {get_model("embeddings")}>\n", "grey"))
+            print(colorize_text(f"<Model: {self.model}>\n", "grey"))
     
+    async def make_request(
+        self,
+        messages: List[Dict[str, Any]],
+        temperature: float = 0.7,
+        max_tokens: int = 2000,
+        top_p: float = 1.0,
+        tools: Optional[Any] = None
+    ) -> Dict[str, Any]:
+        raise NotImplementedError("Subclasses should implement this method")
+    
+
+class EmbeddingsClient(Client):
+    def __init__(
+        self,
+        model: str = None,
+        timeout: Optional[float] = None
+    ):
+        self.model = os.environ.get("AZURE_OPENAI_EMBEDDINGS_MODEL", model)
+        self.endpoint = os.environ.get("AZURE_OPENAI_EMBEDDINGS_ENDPOINT", None)
+        super().__init__(self.model, self.endpoint, timeout)
+
+    async def make_request(
+        self,
+        messages: List[Dict[str, Any]],
+        temperature: float = 0.7,
+        max_tokens: int = 2000,
+        top_p: float = 1.0,
+        tools: Optional[Any] = None
+    ) -> Dict[str, Any]:
+        """Make a request to the Azure OpenAI embeddings endpoint."""
+        
+        payload = {
+            "input": messages[0],
+            "model": self.model
+        }
+        
+        headers = {
+            "Content-Type": "application/json",
+            "api-key": self.api_key
+        }
+        
+        if Client.debug:
+            pretty_print("Agent -> Embeddings Model", payload, "magenta")
+        
+        response = await self.http_client.post(
+            self.endpoint,
+            headers=headers,
+            json=payload
+        )
+        
+        if response.status_code != 200:
+            response_data = response.json()
+            error_msg = "Unknown error"
+            if response_data and "error" in response_data:
+                error_msg = response_data["error"].get("message", "Unknown error")
+            
+            raise Exception(f"Embeddings API error ({response.status_code}): {error_msg}")
+        
+        if Client.debug:
+            pretty_print("Embeddings Model -> Agent", response.json(), "cyan")
+            
+        return response.json()
+
+class ChatClient(Client):
+    def __init__(
+        self,
+        model: str = None,
+        timeout: Optional[float] = None
+    ):
+        self.model = os.environ.get("AZURE_OPENAI_CHAT_MODEL", model)
+        self.endpoint = os.environ.get("AZURE_OPENAI_CHAT_ENDPOINT", None)
+        super().__init__(self.model, self.endpoint, timeout)
+
     async def make_request(
         self,
         messages: List[Dict[str, Any]],
@@ -80,7 +137,7 @@ class Client:
                 message_data.append(message)
 
         payload = {
-            "model": get_model("chat"),
+            "model": self.model,
             "messages": message_data,
             "temperature": temperature,
             "max_tokens": max_tokens,
@@ -99,7 +156,7 @@ class Client:
             pretty_print("Agent -> Model", payload, "magenta")
 
         response = await self.http_client.post(
-            get_endpoint("chat"),
+            self.endpoint,
             headers=headers,
             json=payload
         )
@@ -115,55 +172,4 @@ class Client:
         if Client.debug:
             pretty_print("Model -> Agent", response.json(), "cyan")
 
-        return response.json()
-        
-    async def get_completion(
-        self,
-        messages: List[Dict[str, Any]],
-        **kwargs
-    ) -> str:
-        """Get just the completion text from a chat request."""
-        response = await self.make_request(messages, **kwargs)
-        
-        if not response.get("choices") or len(response["choices"]) == 0:
-            raise Exception("No completion choices returned from API")
-            
-        return response["choices"][0]["message"]["content"]
-    
-    async def make_embeddings_request(
-        self,
-        input: Union[str, List[str]]
-    ) -> Dict[str, Any]:
-        """Make a request to the Azure OpenAI embeddings endpoint."""
-        
-        payload = {
-            "input": input,
-            "model": get_model("embeddings")
-        }
-        
-        headers = {
-            "Content-Type": "application/json",
-            "api-key": self.api_key
-        }
-        
-        if Client.debug:
-            pretty_print("Agent -> Embeddings Model", payload, "magenta")
-        
-        response = await self.http_client.post(
-            get_endpoint("embeddings"),
-            headers=headers,
-            json=payload
-        )
-        
-        if response.status_code != 200:
-            response_data = response.json()
-            error_msg = "Unknown error"
-            if response_data and "error" in response_data:
-                error_msg = response_data["error"].get("message", "Unknown error")
-            
-            raise Exception(f"Embeddings API error ({response.status_code}): {error_msg}")
-        
-        if Client.debug:
-            pretty_print("Embeddings Model -> Agent", response.json(), "cyan")
-            
         return response.json()

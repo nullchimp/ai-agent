@@ -159,7 +159,7 @@ async def test_run_conversation_no_response():
         
         # Verify that some error was printed
         error_calls = [call for call in mock_print.call_args_list if "Error" in str(call)]
-        assert len(error_calls) > 0, "Expected an error message to be printed"
+        assert len(error_calls), "Expected an error message to be printed"
         
         # Since the error handler returns None, the result should be None
         assert result is None

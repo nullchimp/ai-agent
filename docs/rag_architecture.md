@@ -177,9 +177,8 @@ from core.rag.loader.web_loader import WebLoader
 # Set up clients
 api_key = os.environ.get("AZURE_OPENAI_API_KEY")
 db = MemGraphClient(host=os.environ.get("MEMGRAPH_URI", "localhost"))
-client = Client(api_key=api_key)
 loader = WebLoader("https://example.com/page")
-embedder = TextEmbedding3Small(client)
+embedder = TextEmbedding3Small()
 
 # Create vector store
 vector_store = db.create_vector_store(**embedder.get_metadata())

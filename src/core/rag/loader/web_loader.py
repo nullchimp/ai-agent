@@ -87,7 +87,7 @@ class WebLoader(Loader):
         except Exception as e:
             raise ValueError(f"Failed to fetch URLs from {url}: {str(e)}")
     
-    def _visit_site(self, url: str) -> str:
+    def _visit_site(self, url: str, retry = 3) -> str:
         try:
             headers = {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
@@ -114,7 +114,9 @@ class WebLoader(Loader):
             return text, links
             
         except Exception as e:
-            raise ValueError(f"Failed to fetch content from {url}: {str(e)}")
+            if retry <= 0:
+                raise ValueError(f"Failed to fetch content from {url}: {str(e)}")
+            return self._visit_site(url, retry - 1)
 
     def load_data(self) -> Generator[Tuple[Source, Document, List[DocumentChunk]], None, None]:
         try:
@@ -151,7 +153,7 @@ class WebLoader(Loader):
                     content=content,
                     title=title,
                     source_id=source.id,
-                    reference_ids=[hashlib.sha256(url.encode()).hexdigest()[:16] for url in new_urls]
+                    references=[self.create_source(url) for url in new_urls]
                 )
                 
                 from llama_index.core import Document as LlamaDocument

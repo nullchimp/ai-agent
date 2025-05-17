@@ -2,14 +2,13 @@ from typing import List
 import asyncio
 
 from core.rag.schema import DocumentChunk, Vector
-from core.azureopenai.client import Client
+from core.azureopenai.client import *
 
 class EmbeddingService:
     def __init__(
-        self,
-        client: Client,
+        self
     ):
-        self._client = client
+        self._client = EmbeddingsClient()
         
     def get_index_config(self) -> dict:
         raise NotImplementedError("Subclasses should implement this method")
@@ -26,7 +25,7 @@ class EmbeddingService:
         try:
             embedding = await self._make_embedding_request(chunk.content)
         except Exception as e:
-            raise ValueError(f"Failed to process chunk {chunk.id}: {e}")
+            raise ValueError(f"Failed to get embedding: {str(e)}")
 
         vector = Vector(
             chunk_id=chunk.id,
@@ -60,13 +59,18 @@ class EmbeddingService:
         query_vector = await self._make_embedding_request(text)
         return await self._vector_store.search(query_vector, limit)
     
-    async def _make_embedding_request(self, text: str) -> List[float]:
-        response = await self._client.make_embeddings_request(input=text)
+    async def _make_embedding_request(self, text: str, retry = 3) -> List[float]:
+        try:
+            response = await self._client.make_request([text])
+        except Exception as e:
+            if "429" in str(e):
+                await asyncio.sleep(60) # Wait for 1 minute before retrying
+                return await self._make_embedding_request(text, retry=retry-1)
 
         # Extract embedding from response
-        if response and "data" in response and len(response["data"]) > 0:
+        if response and "data" in response and len(response["data"]):
             return response["data"][0]["embedding"]
         
         raise ValueError("Failed to get embedding from Azure OpenAI")
     
-from .text_embedding_3_small import TextEmbedding3Small
+from core.rag.embedder.text_embedding_3_small import TextEmbedding3Small

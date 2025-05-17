@@ -40,7 +40,7 @@ async def test_chat_internal_implementation():
         choices = response.get("choices", [])
         
         # Assert response is properly processed
-        assert len(choices) > 0
+        assert len(choices)
         message = choices[0].get("message", {})
         assert message.get("content") == "Test response"
         

@@ -128,14 +128,16 @@ class Document(Node):
         content: str,
         title: str = "",
         source_id: str = "",            # Reference to Source node
-        reference_ids: List[str] = None,       # List of source IDs
+        references: List[str] = None,       # List of source IDs
     ):
         super().__init__()
         self.path = path
         self.content = content
         self.title = title
         self.source_id = source_id
-        self.reference_ids = reference_ids or []
+
+        # Will not be stored in the graph
+        self._references = references or []
 
 class DocumentChunk(Node):
     def __init__(

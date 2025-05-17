@@ -40,7 +40,7 @@ async def run_conversation(user_prompt: str) -> str:
     if response:
         if isinstance(response, dict) and "choices" in response:
             choices = response.get("choices", [])
-            if choices and len(choices) > 0:
+            if choices and len(choices):
                 message = choices[0].get("message", {})
                 content = message.get("content", "")
 

@@ -11,7 +11,7 @@ from unittest.mock import MagicMock, AsyncMock, patch
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../src')))
 
 from core.azureopenai.chat import Chat, DEFAULT_API_KEY_ENV
-from core.pretty import colorize_text  # Import colorize_text to mock it
+from core import colorize_text  # Import colorize_text to mock it
 
 @pytest.mark.asyncio
 async def test_debug_flag_paths():
@@ -57,7 +57,7 @@ async def test_debug_flag_paths():
                 await chat.process_tool_calls(assistant_message, MagicMock())
                 
                 # Verify debug prints happened
-                assert mock_print.call_count > 0
+                assert mock_print.call_count
                 
                 # Test exception path with debug=True
                 mock_print.reset_mock()
@@ -73,7 +73,7 @@ async def test_debug_flag_paths():
                 await chat.process_tool_calls(assistant_message, MagicMock())
                 
                 # Verify debug prints happened
-                assert mock_print.call_count > 0
+                assert mock_print.call_count
                 
                 # Test exception in tool run
                 mock_print.reset_mock()
@@ -94,7 +94,7 @@ async def test_debug_flag_paths():
                 await chat.process_tool_calls(assistant_message, MagicMock())
                 
                 # Verify debug prints happened
-                assert mock_print.call_count > 0
+                assert mock_print.call_count
     
     finally:
         # Restore debug flag

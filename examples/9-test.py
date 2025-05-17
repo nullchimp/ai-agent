@@ -41,7 +41,7 @@ async def run_conversation(user_prompt: str, rag_prompt) -> str:
     if response:
         if isinstance(response, dict) and "choices" in response:
             choices = response.get("choices", [])
-            if choices and len(choices) > 0:
+            if choices and len(choices):
                 message = choices[0].get("message", {})
                 content = message.get("content", "")
 
@@ -61,8 +61,7 @@ db = MemGraphClient(
     password=os.environ.get("MEMGRAPH_PASSWORD", "memgraph"),
 )
 
-client = Client(api_key=api_key)
-embedder = TextEmbedding3Small(client)
+embedder = TextEmbedding3Small()
 
 async def test_vector_search():
     query_text = "How do Premium Requests work?"

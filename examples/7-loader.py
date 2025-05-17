@@ -21,9 +21,8 @@ db = MemGraphClient(
     password=os.environ.get("MEMGRAPH_PASSWORD", "memgraph"),
 )
 
-client = Client(api_key=api_key)
 loader = DocumentLoader("data")
-embedder = TextEmbedding3Small(client)
+embedder = TextEmbedding3Small()
 
 vector_store = db.create_vector_store(
     **embedder.get_metadata()

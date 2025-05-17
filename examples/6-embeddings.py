@@ -4,7 +4,6 @@ from dotenv import load_dotenv
 load_dotenv(override=True)
 
 import asyncio
-from core.azureopenai.client import Client
 from core.rag.embedder import EmbeddingService
 
 
@@ -14,7 +13,7 @@ async def get_embeddings_example():
     if not api_key:
         raise ValueError("Missing AZURE_OPENAI_API_KEY environment variable")
     
-    embedding_service = EmbeddingService(Client(api_key=api_key))
+    embedding_service = EmbeddingService()
     
     # Get embeddings
     texts_to_embed = [

@@ -95,6 +95,15 @@ class MemGraphClient:
                 doc.source_id
             ))
 
+        if doc._references and len(doc._references):
+            for ref in doc._references:
+                self._execute(*ref.create())
+                self._execute(*doc.link(
+                    EdgeType.REFERENCES,
+                    ref.label(),
+                    ref.id
+                ))
+
     def create_chunk(self, chunk: DocumentChunk) -> str:
         self._execute(*chunk.create())
         
