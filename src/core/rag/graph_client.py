@@ -204,8 +204,8 @@ class MemGraphClient:
 
     def vector_search(
         self,
-        index_name: str,
         query_vector: Sequence[float],
+        index_name: str,
         k: int = 5,
     ) -> List[Dict[str, Any]]:
         q = (
@@ -263,11 +263,11 @@ class MemGraphClient:
     def search_chunks(
         self,
         query_vector: Sequence[float],
-        k: int = 5,
-        index_name: str = "vector_embedding_index"
+        index_name: str = "vector_embedding_index",
+        k: int = 5
     ) -> List[Dict[str, Any]]:
         # First, search for matching vectors
-        vector_results = self.vector_search(index_name, query_vector, k)
+        vector_results = self.vector_search(query_vector, index_name, k)
         
         # For each vector result, fetch the associated chunk
         results = []

@@ -24,7 +24,8 @@ system_role = f"""
 You are an expert on everything GitHub.
 Your Name is Agent Smith.
 
-Your goal is to criticly answer the user's question, based on the information you get from RAG.
+Your goal is to criticly answer the user's question, based on the information you get.
+SOmetimes the user
 
 Today is {date.today().strftime("%d %B %Y")}.
 """
@@ -32,8 +33,8 @@ Today is {date.today().strftime("%d %B %Y")}.
 messages = [{"role": "system", "content": system_role}]
 
 async def run_conversation(user_prompt: str, rag_prompt) -> str:
-    messages.append({"role": "user", "content": user_prompt})
     messages.append({"role": "system", "content": rag_prompt})
+    messages.append({"role": "user", "content": user_prompt})
     response = await chat.send_messages(messages)
 
     content = ""
@@ -84,8 +85,8 @@ async def test_vector_search():
         return
     search_results = db.search_chunks(
         query_vector=query_embedding,
-        k=5,
-        index_name=index_name
+        index_name=index_name,
+        k=10
     )
     
     # 8. Display results
@@ -99,7 +100,7 @@ async def test_vector_search():
         similarity = result["similarity"]
         rag_messages.append(f"Result {i+1} (similarity: {similarity:.4f}): {chunk['content']}")
 
-    await run_conversation(query_text, "\n".join(rag_messages))
+    await run_conversation(query_text, f"#Context:{"\n-".join(rag_messages)}")
 
 
 async def main():
