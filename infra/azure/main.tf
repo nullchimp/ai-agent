@@ -23,9 +23,9 @@ resource "azurerm_key_vault" "ai_agent" {
     object_id = var.object_id
 
     secret_permissions = [
-      "get",
-      "list",
-      "set",
+      "Get",
+      "List",
+      "Set",
     ]
   }
 }
