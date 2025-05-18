@@ -75,7 +75,6 @@ resource "azurerm_kubernetes_cluster_node_pool" "ai_agent_pool" {
   name                  = "agentpool"
   kubernetes_cluster_id = azurerm_kubernetes_cluster.ai_agent.id
   vm_size               = "Standard_D4_v2"
-  enable_auto_scaling   = true
   min_count             = 1
   max_count             = 3
 }
