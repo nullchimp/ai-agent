@@ -6,7 +6,7 @@ import agent
 import os
 
 from core import graceful_exit, mainloop
-from core.mcpclient.sessions_manager import MCPSessionManager
+from core.mcp.sessions_manager import MCPSessionManager
 
 session_manager = MCPSessionManager()
 

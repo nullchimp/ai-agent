@@ -1,31 +1,33 @@
 from . import Tool
 
 class WriteFile(Tool):
-    def define(self) -> dict:
+    @property
+    def name(self) -> str:
+        return "write_file"
+    
+    @property
+    def description(self) -> str:
+        return "Write content to a specified file within a secure base directory."
+    
+    @property
+    def parameters(self) -> dict:
         return {
-            "type": "function",
-            "function": {
-                "name": f"{self.name}",
-                "description": "Write content to a file within a secure base directory.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "base_dir": {
-                            "type": "string",
-                            "description": "Base directory for file operations"
-                        },
-                        "filename": {
-                            "type": "string",
-                            "description": "The name of the file to write to (relative path)"
-                        },
-                        "content": {
-                            "type": "string",
-                            "description": "The content to write to the file"
-                        }
-                    },
-                    "required": ["base_dir", "filename", "content"]
+            "type": "object",
+            "properties": {
+                "base_dir": {
+                    "type": "string",
+                    "description": "Base directory for file operations"
+                },
+                "filename": {
+                    "type": "string",
+                    "description": "The name of the file to write to (relative path)"
+                },
+                "content": {
+                    "type": "string",
+                    "description": "The content to write to the file"
                 }
-            }
+            },
+            "required": ["base_dir", "filename", "content"]
         }
     
     async def run(self, base_dir: str, filename: str, content: str):

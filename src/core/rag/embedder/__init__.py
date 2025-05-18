@@ -2,7 +2,7 @@ from typing import List
 import asyncio
 
 from core.rag.schema import DocumentChunk, Vector
-from core.azureopenai.client import *
+from core.llm.client import *
 
 class EmbeddingService:
     def __init__(

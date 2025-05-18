@@ -3,9 +3,9 @@ from dotenv import load_dotenv
 # Force reload of environment variables to avoid cached data
 load_dotenv(override=True)
 
-from core.azureopenai.client import Client
+from core.llm.client import Client
 from core.rag.embedder import TextEmbedding3Small
-from core.rag.graph_client import MemGraphClient
+from core.rag.dbhandler.memgraph import MemGraphClient
 
 import asyncio
 import os
@@ -14,7 +14,7 @@ import os
 
 from core import pretty_print
 from datetime import date
-from core.azureopenai.chat import Chat
+from core.llm.chat import Chat
 
 # Initialize the Chat client
 chat = Chat.create()

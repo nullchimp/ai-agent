@@ -7,21 +7,19 @@ load_dotenv(override=True)
 from datetime import date
 
 from core import chatutil, graceful_exit, pretty_print
-from core.azureopenai.chat import Chat
+from core.llm.chat import Chat
 
 from tools import Tool
 from tools.google_search import GoogleSearch
 from tools.read_file import ReadFile
 from tools.write_file import WriteFile
 from tools.list_files import ListFiles
-from tools.web_fetch import WebFetch
 
 tools = {
-    GoogleSearch("google_search"),
-    ReadFile("read_file"),
-    WriteFile("write_file"),
-    ListFiles("list_files"),
-    WebFetch("web_fetch")
+    GoogleSearch(),
+    ReadFile(),
+    WriteFile(),
+    ListFiles()
 }
 
 chat = Chat.create(tools)

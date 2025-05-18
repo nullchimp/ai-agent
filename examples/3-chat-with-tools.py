@@ -8,8 +8,8 @@ load_dotenv(override=True)
 from datetime import date
 
 from core import chatutil, graceful_exit, mainloop, pretty_print
-from core.azureopenai.chat import Chat
-from core.azureopenai.client import Client
+from core.llm.chat import Chat
+from core.llm.client import Client
 
 from tools.write_file import WriteFile
 from tools.google_search import GoogleSearch

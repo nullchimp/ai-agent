@@ -2,10 +2,10 @@ from dotenv import load_dotenv
 # Force reload of environment variables to avoid cached data
 load_dotenv(override=True)
 
-from core.azureopenai.client import Client
-from core.rag.loader.document_loader import DocumentLoader
+from core.llm.client import Client
+from libs.dataloader.document import DocumentLoader
 from core.rag.embedder import TextEmbedding3Small
-from core.rag.graph_client import MemGraphClient
+from core.rag.dbhandler.memgraph import MemGraphClient
 
 import asyncio
 import os

@@ -10,12 +10,12 @@ import asyncio
 from datetime import date
 
 from core import chatutil, graceful_exit, mainloop, pretty_print
-from core.azureopenai.chat import Chat
+from core.llm.chat import Chat
 
 from tools.write_file import WriteFile
 from tools.google_search import GoogleSearch
 
-from core.mcpclient.sessions_manager import MCPSessionManager
+from core.mcp.sessions_manager import MCPSessionManager
 
 session_manager = MCPSessionManager()
 

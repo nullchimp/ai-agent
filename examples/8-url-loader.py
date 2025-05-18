@@ -3,9 +3,9 @@ from dotenv import load_dotenv
 load_dotenv(override=True)
 
 from core.rag.embedder import TextEmbedding3Small
-from core.rag.graph_client import MemGraphClient
+from core.rag.dbhandler.memgraph import MemGraphClient
 
-from core.rag.loader.web_loader import WebLoader
+from libs.dataloader.web import WebLoader
 
 import asyncio
 import os

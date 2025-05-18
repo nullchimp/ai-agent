@@ -1,6 +1,6 @@
 from core.rag.schema import NodeLabel          # your real dataclass
 from core.rag.embedder import EmbeddingService
-from core.rag.graph_client import MemGraphClient
+from core.rag.dbhandler.memgraph import MemGraphClient
 
 async def main():
     embedder = EmbeddingService()

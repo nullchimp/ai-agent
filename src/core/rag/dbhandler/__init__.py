@@ -24,9 +24,9 @@ from core.rag.schema import (
 )
 
 # ════════════════════════════════════════════════════════════════════════
-#  MemGraphClient
+#  GraphClient
 # ════════════════════════════════════════════════════════════════════════
-class MemGraphClient:
+class GraphClient:
     # ───── Connection boilerplate ─────
     def __init__(
         self,
@@ -36,36 +36,28 @@ class MemGraphClient:
         password: str | None = None,
         **kwargs,
     ) -> None:
-        # Remove bolt:// prefix if present in host
-        if host.startswith("bolt://"):
-            host = host.replace("bolt://", "")
-            
-        # Handle localhost -> 127.0.0.1 conversion (more reliable)
-        if host == "localhost":
-            host = "127.0.0.1"
-            
+        self.host = host
+        self.port = port
+        self.username = username
+        self.password = password
+        self._conn = None
+        self._cur = None
+
         try:
-            print(f"Connecting to Memgraph at {host}:{port}")
-            self._conn = mgclient.connect(
-                host=host,
-                port=port,
-                username=username,
-                password=password,
-                **kwargs,
-            )
-            self._conn.autocommit = True
-            self._cur = self._conn.cursor()
-            print(f"Connected successfully to Memgraph")
+            self.connect(**kwargs)
         except Exception as e:
             print(f"Connection error: {str(e)}")
             raise ConnectionError(f"Failed to connect to Memgraph at {host}:{port}: {str(e)}") from e
+
+    def connect(self, *args, **kwargs) -> None:
+        raise ConnectionError("Not implemented")
 
     def close(self) -> None:
         self._cur.close()
         self._conn.close()
 
     # Context-manager support
-    def __enter__(self) -> "MemGraphClient":
+    def __enter__(self) -> GraphClient:
         return self
 
     def __exit__(self, exc_type, exc, tb) -> None:
@@ -205,12 +197,7 @@ class MemGraphClient:
             return vector_store
         except Exception as e:
             print(f"Error creating vector store: {str(e)}")
-            raise
-
-    def list_vector_indices(self) -> List[Dict[str, Any]]:
-        q = "CALL vector_search.show_index_info() YIELD * RETURN *"
-        self._cur.execute(q)
-        return [dict(row) for row in self._cur.fetchall()]
+            raise e
 
     def vector_search(
         self,
@@ -333,38 +320,53 @@ class MemGraphClient:
         label: BaseNode | str, 
         node_id: str
     ) -> Optional[Dict[str, Any]]:
+        return self.get_by_property(label, "id", node_id, fetch_one=True)
+    
+    def get_by_property(
+        self, 
+        label: BaseNode | str, 
+        property_name: str,
+        property_value: Any,
+        fetch_one: bool = False
+    ) -> Optional[Dict[str, Any]]:
         if issubclass(label, BaseNode) or isinstance(label, BaseNode):
             label = label.label()
 
-        q = f"MATCH (n:`{label}` {{id: $id}}) RETURN n"
-        self._cur.execute(q, {"id": node_id})
-        result = self._cur.fetchone()
-        if result:
-            return dict(result[0].properties)
-        return None
+        q = f"MATCH (n:`{label}` {{{property_name}: $value}}) RETURN n"
+        self._cur.execute(q, {"value": property_value})
+
+        if fetch_one:
+            result = self._cur.fetchone()
+            if result:
+                return dict(result[0].properties)
+            return None
+        
+        return [dict(row[0].properties) for row in self._cur.fetchall()]
 
     def load_vector_store(
         self,
         model: str = None,
         vector_store_id: str = None
     ) -> VectorStore:
-        if vector_store_id:
-            # Find vector store by ID
-            q = f"MATCH (vs:`{VectorStore.label()}` {{id: $id}}) RETURN vs"
-            self._cur.execute(q, {"id": vector_store_id})
-        elif model:
-            # Find vector store by model name
-            q = f"MATCH (vs:`{VectorStore.label()}` {{model: $model}}) RETURN vs"
-            self._cur.execute(q, {"model": model})
-        else:
+        if not (vector_store_id or model):
             raise ValueError("Either model or vector_store_id must be provided")
         
-        result = self._cur.fetchone()
-        if not result:
+        prop = "id"
+        value = vector_store_id
+        if not vector_store_id:
+            prop = "model"
+            value = model
+
+        vs_dict = self.get_by_property(
+            VectorStore,
+            prop,
+            value,
+            fetch_one=True
+        )
+
+        if not vs_dict:
             return None
         
-        print(f"Found vector store: {result}")
-        vs_dict = dict(result[0].properties)
         print(f"Loaded vector store: {vs_dict}")
         # Create a VectorStore object from the dictionary
         vector_store = VectorStore(
@@ -375,5 +377,4 @@ class MemGraphClient:
             if key not in ['model', 'id']:
                 vector_store.fill(key, value)
 
-        vector_store.id = vs_dict.get('id')
         return vector_store
