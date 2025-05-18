@@ -71,6 +71,14 @@ if az keyvault show --name "$KV_NAME" --resource-group "$RESOURCE_GROUP" &>/dev/
   fi
 fi
 
+# Import AKS Node Pool if it exists
+if az aks show --name "$AKS_NAME" --resource-group "$RESOURCE_GROUP" &>/dev/null; then
+  # Check if the node pool named "agentpool" exists
+  if az aks nodepool show --name "agentpool" --cluster-name "$AKS_NAME" --resource-group "$RESOURCE_GROUP" &>/dev/null; then
+    terraform import azurerm_kubernetes_cluster_node_pool.ai_agent_pool "/subscriptions/$SUBSCRIPTION_ID/resourceGroups/$RESOURCE_GROUP/providers/Microsoft.ContainerService/managedClusters/$AKS_NAME/agentPools/agentpool" || true
+  fi
+fi
+
 # Try to import Key Vault Access Policy for AKS if both resources exist
 if az keyvault show --name "$KV_NAME" --resource-group "$RESOURCE_GROUP" &>/dev/null && \
    az aks show --name "$AKS_NAME" --resource-group "$RESOURCE_GROUP" &>/dev/null; then
@@ -79,7 +87,10 @@ if az keyvault show --name "$KV_NAME" --resource-group "$RESOURCE_GROUP" &>/dev/
   AKS_PRINCIPAL_ID=$(az aks show --name "$AKS_NAME" --resource-group "$RESOURCE_GROUP" --query "identity.principalId" -o tsv)
   
   if [ -n "$AKS_PRINCIPAL_ID" ]; then
-    terraform import azurerm_key_vault_access_policy.aks "/subscriptions/$SUBSCRIPTION_ID/resourceGroups/$RESOURCE_GROUP/providers/Microsoft.KeyVault/vaults/$KV_NAME/objectId/$AKS_PRINCIPAL_ID" || true
+    # Check if the access policy actually exists before trying to import it
+    if az keyvault show --name "$KV_NAME" --resource-group "$RESOURCE_GROUP" --query "properties.accessPolicies[?objectId=='$AKS_PRINCIPAL_ID']" -o tsv | grep -q .; then
+      terraform import azurerm_key_vault_access_policy.aks "/subscriptions/$SUBSCRIPTION_ID/resourceGroups/$RESOURCE_GROUP/providers/Microsoft.KeyVault/vaults/$KV_NAME/objectId/$AKS_PRINCIPAL_ID" || true
+    fi
   fi
 fi
 

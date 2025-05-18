@@ -19,13 +19,29 @@ resource "azurerm_key_vault" "ai_agent" {
   purge_protection_enabled = true
 
   access_policy {
-    tenant_id = var.tenant_id
+    tenant_id = data.azurerm_client_config.current.tenant_id
     object_id = var.object_id
 
     secret_permissions = [
       "Get",
       "List",
       "Set",
+    ]
+  }
+  
+  # Add the current user/service principal
+  access_policy {
+    tenant_id = data.azurerm_client_config.current.tenant_id
+    object_id = data.azurerm_client_config.current.object_id
+
+    secret_permissions = [
+      "Get",
+      "List",
+      "Set",
+      "Delete",
+      "Recover",
+      "Backup",
+      "Restore"
     ]
   }
 }
@@ -76,6 +92,7 @@ resource "azurerm_kubernetes_cluster_node_pool" "ai_agent_pool" {
   name                  = "agentpool"
   kubernetes_cluster_id = azurerm_kubernetes_cluster.ai_agent.id
   vm_size               = "Standard_D4_v2"
+  auto_scaling_enabled  = true
   min_count             = 1
   max_count             = 3
 }
