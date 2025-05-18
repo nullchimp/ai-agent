@@ -42,7 +42,9 @@ jobs:
           terraform plan -var="environment=${{ env.ENVIRONMENT }}" \
             -var="memgraph_username=${{ secrets.MEMGRAPH_USERNAME }}" \
             -var="memgraph_password=${{ secrets.MEMGRAPH_PASSWORD }}" \
-            -var="subscription_id=${{ secrets.AZURE_SUBSCRIPTION_ID }}"
+            -var="subscription_id=${{ secrets.AZURE_SUBSCRIPTION_ID }}" \
+            -var="tenant_id=${{ secrets.AZURE_TENANT_ID }}" \
+            -var="object_id=${{ secrets.AZURE_SP_OBJECT_ID }}"
       
       - name: Terraform Apply
         run: |
@@ -51,7 +53,9 @@ jobs:
             -var="environment=${{ env.ENVIRONMENT }}" \
             -var="memgraph_username=${{ secrets.MEMGRAPH_USERNAME }}" \
             -var="memgraph_password=${{ secrets.MEMGRAPH_PASSWORD }}" \
-            -var="subscription_id=${{ secrets.AZURE_SUBSCRIPTION_ID }}"
+            -var="subscription_id=${{ secrets.AZURE_SUBSCRIPTION_ID }}" \
+            -var="tenant_id=${{ secrets.AZURE_TENANT_ID }}" \
+            -var="object_id=${{ secrets.AZURE_SP_OBJECT_ID }}"
       
       - name: Get AKS Credentials
         run: |

@@ -17,6 +17,17 @@ resource "azurerm_key_vault" "ai_agent" {
   sku_name            = "standard"
   
   purge_protection_enabled = true
+
+  access_policy {
+    tenant_id = var.tenant_id
+    object_id = var.object_id
+
+    secret_permissions = [
+      "get",
+      "list",
+      "set",
+    ]
+  }
 }
 
 # Add secrets to Key Vault
