@@ -1,6 +1,11 @@
 #!/bin/bash
 # filepath: /Users/nullchimp/Projects/ai-agent/infra/azure/import_resources.sh
 # This script imports existing Azure resources into Terraform state
+#
+# Usage in CI workflows:
+#   CI_MODE=true ENVIRONMENT=dev ./import_resources.sh
+#
+# This will prevent the script from prompting for variable values during import
 
 set -e
 
@@ -8,6 +13,9 @@ set -e
 ENVIRONMENT=${ENVIRONMENT:-dev}
 SUBSCRIPTION_ID=${SUBSCRIPTION_ID:-$(az account show --query id -o tsv)}
 RESOURCE_GROUP="GitHub"
+CI_MODE=${CI_MODE:-false}
+TENANT_ID=${TENANT_ID:-$(az account show --query tenantId -o tsv)}
+OBJECT_ID=${OBJECT_ID:-$(az ad signed-in-user show --query id -o tsv 2>/dev/null || echo "00000000-0000-0000-0000-000000000000")}
 
 # Colors for output
 GREEN='\033[0;32m'
@@ -18,6 +26,25 @@ NC='\033[0m' # No Color
 echo -e "${YELLOW}Checking for existing resources to import into Terraform state...${NC}"
 echo -e "${YELLOW}Using environment: $ENVIRONMENT${NC}"
 echo -e "${YELLOW}Resource group: $RESOURCE_GROUP${NC}"
+echo -e "${YELLOW}CI Mode: $CI_MODE${NC}"
+
+# Create a temporary terraform.tfvars file for imports with placeholders
+# when running in CI mode, we don't need real values for imports
+if [ "$CI_MODE" = "true" ]; then
+  echo -e "${YELLOW}Creating temporary terraform.tfvars file for CI mode...${NC}"
+  cat > terraform.tfvars.tmp << EOF
+environment = "$ENVIRONMENT"
+subscription_id = "$SUBSCRIPTION_ID"
+tenant_id = "$TENANT_ID"
+object_id = "$OBJECT_ID"
+memgraph_username = "placeholder-for-import"
+memgraph_password = "placeholder-for-import"
+EOF
+  
+  # Use the temporary file
+  mv terraform.tfvars.tmp terraform.tfvars
+  echo -e "${GREEN}Created terraform.tfvars with placeholder values for import operation${NC}"
+fi
 
 # Initialize Terraform (required for importing)
 terraform init
@@ -84,6 +111,12 @@ if az keyvault show --name "$KV_NAME" --resource-group "$RESOURCE_GROUP" &>/dev/
 fi
 
 echo -e "${GREEN}Resource import completed. Now you can run 'terraform plan' and 'terraform apply'${NC}"
+
+# Clean up the temporary tfvars file if in CI mode
+if [ "$CI_MODE" = "true" ]; then
+  echo -e "${YELLOW}Cleaning up temporary terraform.tfvars file...${NC}"
+  rm -f terraform.tfvars
+fi
 
 # Run terraform plan to show changes (optional)
 if [ "${RUN_PLAN:-false}" == "true" ]; then

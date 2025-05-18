@@ -41,6 +41,9 @@ jobs:
           cd infra/azure
           ENVIRONMENT=${{ env.ENVIRONMENT }} \
           SUBSCRIPTION_ID=${{ secrets.AZURE_SUBSCRIPTION_ID }} \
+          TENANT_ID=${{ secrets.AZURE_TENANT_ID }} \
+          OBJECT_ID=${{ secrets.AZURE_SP_OBJECT_ID }} \
+          CI_MODE=true \
           ./import_resources.sh
       
       - name: Terraform Plan
