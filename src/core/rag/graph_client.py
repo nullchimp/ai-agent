@@ -113,7 +113,7 @@ class MemGraphClient:
         
         self._execute(*chunk.link(
             EdgeType.CHUNK_OF,
-            DocumentChunk.label(),
+            Document.label(),
             chunk.parent_document_id,
         ))
 
