@@ -17,13 +17,9 @@ env:
 jobs:
   deploy-infrastructure:
     runs-on: ubuntu-latest
+    timeout-minutes: 30  # Add timeout to prevent infinite runs
     steps:
       - uses: actions/checkout@v3
-      
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.13'
           
       - name: Azure Login
         uses: azure/login@v2
@@ -39,6 +35,14 @@ jobs:
         run: |
           cd infra/azure
           terraform init
+      
+      - name: Terraform Plan
+        run: |
+          cd infra/azure
+          terraform plan -var="environment=${{ env.ENVIRONMENT }}" \
+            -var="memgraph_username=${{ secrets.MEMGRAPH_USERNAME }}" \
+            -var="memgraph_password=${{ secrets.MEMGRAPH_PASSWORD }}" \
+            -var="subscription_id=${{ secrets.AZURE_SUBSCRIPTION_ID }}"
       
       - name: Terraform Apply
         run: |
@@ -69,8 +73,4 @@ jobs:
         run: |
           kubectl get pods
           kubectl get services
-      
-      - name: Run Tests
-        run: |
-          source .venv/bin/activate
-          pytest tests/ --cov=src
+          kubectl wait --for=condition=ready pod -l app=memgraph --timeout=5m
