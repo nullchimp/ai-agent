@@ -60,9 +60,10 @@ resource "azurerm_kubernetes_cluster" "ai_agent" {
   dns_prefix          = "aiagent"
 
   default_node_pool {
-    name       = "default"
-    node_count = 1
-    vm_size    = "Standard_D4_v2"
+    name                   = "default"
+    node_count             = 1
+    vm_size                = "Standard_D4_v2"
+    temporary_name_for_rotation = "tempnodepool"
   }
 
   identity {
