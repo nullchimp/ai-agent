@@ -9,6 +9,7 @@ fi
 
 AZURE_CLIENT_ID=$1
 CREDENTIAL_NAME="GitHubActionsFederatedCredential"
+BRANCH_NAME="dev"
 
 # Check if the federated credential already exists
 echo "Checking if federated credential '$CREDENTIAL_NAME' already exists..."
@@ -19,14 +20,14 @@ if [ "$(echo $EXISTING_CREDENTIAL | jq 'length')" -gt "0" ]; then
 else
     echo "Creating federated credential '$CREDENTIAL_NAME'..."
     az ad app federated-credential create --id $AZURE_CLIENT_ID \
-      --parameters '{
-        "name": "GitHubActionsFederatedCredential",
-        "issuer": "https://token.actions.githubusercontent.com",
-        "subject": "repo:nullchimp/ai-agent:ref:refs/heads/RAG",
-        "audiences": [
-          "api://AzureADTokenExchange"
+      --parameters "{
+        \"name\": \"GitHubActionsFederatedCredential\",
+        \"issuer\": \"https://token.actions.githubusercontent.com\",
+        \"subject\": \"repo:nullchimp/ai-agent:ref:refs/heads/$BRANCH_NAME\",
+        \"audiences\": [
+          \"api://AzureADTokenExchange\"
         ]
-      }'
+      }"
     
     if [ $? -eq 0 ]; then
         echo "Federated credential created successfully."
