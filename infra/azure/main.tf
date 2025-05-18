@@ -62,7 +62,12 @@ resource "azurerm_kubernetes_cluster" "ai_agent" {
   default_node_pool {
     name       = "default"
     node_count = 1
-    vm_size    = "Standard_D2_v2"
+    vm_size    = "Standard_D4_v2"  # Increased from D2 to D4 for more resources
+    
+    # Enable auto-scaling for better resource management
+    enable_auto_scaling = true
+    min_count           = 1
+    max_count           = 3
   }
 
   identity {

@@ -154,14 +154,35 @@ jobs:
           kubectl get pods
           kubectl get services
           
-          echo "Waiting for Memgraph pod to be ready (may take up to 5 minutes)..."
-          if ! kubectl wait --for=condition=ready pod -l app=memgraph --timeout=5m; then
+          echo "Waiting for Memgraph pod to be ready (may take up to 10 minutes)..."
+          # First, check if there are any existing failed pods and delete them
+          FAILED_PODS=$(kubectl get pods -l app=memgraph -o jsonpath="{.items[?(@.status.phase=='Failed' || @.status.containerStatuses[0].state.waiting.reason=='CrashLoopBackOff')].metadata.name}")
+          if [[ -n "$FAILED_PODS" ]]; then
+            echo "Found failed pods, cleaning up before proceeding:"
+            echo "$FAILED_PODS" | tr ' ' '\n' | while read pod; do
+              echo "Deleting failed pod: $pod"
+              kubectl delete pod $pod
+            done
+            echo "Waiting for cleanup to complete..."
+            sleep 30
+          fi
+          
+          # Wait for pod to be ready with increased timeout and check interval
+          if ! kubectl wait --for=condition=ready pod -l app=memgraph --timeout=10m; then
             echo "Error: Memgraph pod did not become ready within the timeout period."
             echo "Checking Memgraph pod logs:"
             POD_NAME=$(kubectl get pods -l app=memgraph -o jsonpath="{.items[0].metadata.name}")
-            kubectl logs $POD_NAME
+            
+            echo "Pod details:"
             kubectl describe pod $POD_NAME
-            echo "Deployment verification failed!"
+            
+            echo "Pod logs:"
+            kubectl logs $POD_NAME --tail=100
+            
+            echo "Checking node resource utilization:"
+            kubectl describe nodes
+            
+            echo "Deployment verification failed! Please check the Kubernetes cluster's resources and capacity."
             exit 1
           fi
           
@@ -169,10 +190,18 @@ jobs:
           
           # Wait for the LoadBalancer service to get an external IP
           echo "Waiting for LoadBalancer to get external IP..."
-          for i in {1..30}; do
+          for i in {1..45}; do
             EXTERNAL_IP=$(kubectl get service memgraph -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
             if [[ -n "$EXTERNAL_IP" ]]; then
               echo "Memgraph is accessible at: ${EXTERNAL_IP}:7687"
+              
+              # Add a simple connectivity check
+              echo "Performing basic connectivity test..."
+              if nc -z -w 5 ${EXTERNAL_IP} 7687; then
+                echo "Successfully connected to Memgraph on port 7687!"
+              else
+                echo "Warning: Could not connect to Memgraph on port 7687. The service may not be fully ready yet."
+              fi
               break
             fi
             echo "Waiting for external IP (attempt $i)..."
@@ -181,4 +210,6 @@ jobs:
           
           if [[ -z "$EXTERNAL_IP" ]]; then
             echo "Warning: Could not obtain external IP for Memgraph service within timeout."
+            echo "Checking LoadBalancer service status:"
+            kubectl describe service memgraph
           fi
