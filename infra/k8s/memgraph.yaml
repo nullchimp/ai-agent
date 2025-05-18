@@ -1,0 +1,122 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: memgraph-config
+data:
+  MG_LOG_LEVEL: "TRACE"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: memgraph
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: memgraph
+  template:
+    metadata:
+      labels:
+        app: memgraph
+    spec:
+      containers:
+      - name: memgraph
+        image: memgraph/memgraph-mage:latest
+        args: ["--log-level=TRACE", "--also-log-to-stderr"]
+        ports:
+        - containerPort: 7687  # Bolt protocol
+        - containerPort: 7444  # HTTP API
+        - containerPort: 3000  # MemGraph Lab UI
+        env:
+        - name: MEMGRAPH_USER
+          valueFrom:
+            secretKeyRef:
+              name: memgraph-credentials
+              key: username
+        - name: MEMGRAPH_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: memgraph-credentials
+              key: password
+        volumeMounts:
+        - name: data
+          mountPath: /data
+        - name: logs
+          mountPath: /var/log/memgraph
+        - name: config
+          mountPath: /etc/memgraph
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "1"
+        livenessProbe:
+          httpGet:
+            path: /api/v1/storage/status
+            port: 7444
+          initialDelaySeconds: 30
+          periodSeconds: 30
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: memgraph-data
+      - name: logs
+        persistentVolumeClaim:
+          claimName: memgraph-logs
+      - name: config
+        persistentVolumeClaim:
+          claimName: memgraph-config
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: memgraph-data
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: memgraph-logs
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: memgraph-config
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: memgraph
+spec:
+  selector:
+    app: memgraph
+  ports:
+  - name: bolt
+    port: 7687
+    targetPort: 7687
+  - name: http
+    port: 7444
+    targetPort: 7444
+  - name: ui
+    port: 3000
+    targetPort: 3000
+  type: LoadBalancer

@@ -19,9 +19,20 @@ An intelligent AI agent framework written in Python, designed to facilitate seam
 - Modular file operations (read, write, list)
 - Web fetching and conversion utilities
 - Search client with pluggable backends
-- Tooling for codegen workflows
-- Configurable via environment variables and JSON configuration files
-- Retrieval-Augmented Generation (RAG) with graph database for knowledge management
+- Azure-based deployment with secure secret management
+
+## Azure Deployment
+The AI Agent can be deployed to Azure using Kubernetes (AKS) with the following features:
+- Infrastructure as code using Terraform
+- Secrets managed securely in Azure Key Vault
+- Continuous deployment with GitHub Actions
+- Persistent storage for Memgraph data
+
+To deploy to Azure:
+1. Run the setup script: `./scripts/setup_azure.sh`
+2. Add the generated service principal credentials to GitHub secrets as `AZURE_CREDENTIALS`
+3. Add `MEMGRAPH_USERNAME` and `MEMGRAPH_PASSWORD` to GitHub secrets
+4. Push to main branch to trigger deployment or manually trigger the workflow
 
 ## Architecture
 The project follows a component-based architecture where the AI Agent orchestrates interactions between users, language models, local tools, and MCP servers.
