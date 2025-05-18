@@ -15,3 +15,8 @@ variable "memgraph_password" {
   type        = string
   sensitive   = true
 }
+
+variable "subscription_id" {
+  description = "The Azure subscription ID"
+  type        = string
+}
