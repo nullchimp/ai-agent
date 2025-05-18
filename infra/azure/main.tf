@@ -62,17 +62,22 @@ resource "azurerm_kubernetes_cluster" "ai_agent" {
   default_node_pool {
     name       = "default"
     node_count = 1
-    vm_size    = "Standard_D4_v2"  # Increased from D2 to D4 for more resources
-    
-    # Enable auto-scaling for better resource management
-    enable_auto_scaling = true
-    min_count           = 1
-    max_count           = 3
+    vm_size    = "Standard_D4_v2"
   }
 
   identity {
     type = "SystemAssigned"
   }
+}
+
+# Define a separate node pool with auto-scaling enabled
+resource "azurerm_kubernetes_cluster_node_pool" "ai_agent_pool" {
+  name                  = "agentpool"
+  kubernetes_cluster_id = azurerm_kubernetes_cluster.ai_agent.id
+  vm_size               = "Standard_D4_v2"
+  enable_auto_scaling   = true
+  min_count             = 1
+  max_count             = 3
 }
 
 # For access to Key Vault from AKS
