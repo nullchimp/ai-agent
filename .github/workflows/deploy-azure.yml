@@ -48,12 +48,7 @@ jobs:
           OBJECT_ID=${{ secrets.AZURE_SP_OBJECT_ID }} \
           CI_MODE=true \
           ./import_resources.sh
-          
-      - name: Import Existing Key Vault Secrets
-        run: |
-          cd infra/azure
-          ./import_secrets.sh ${{ env.ENVIRONMENT }}
-      
+
       - name: Terraform Plan
         run: |
           cd infra/azure

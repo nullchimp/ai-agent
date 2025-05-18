@@ -60,12 +60,14 @@ fi
 if az keyvault show --name "$KV_NAME" --resource-group "$RESOURCE_GROUP" &>/dev/null; then
   # Check for memgraph-username secret
   if az keyvault secret show --name "memgraph-username" --vault-name "$KV_NAME" &>/dev/null; then
-    terraform import azurerm_key_vault_secret.memgraph_username "$KV_NAME/memgraph-username" || true
+    SECRET_URI=$(az keyvault secret show --name "memgraph-username" --vault-name "$KV_NAME" --query id -o tsv)
+    terraform import azurerm_key_vault_secret.memgraph_username "$SECRET_URI" || true
   fi
   
   # Check for memgraph-password secret
   if az keyvault secret show --name "memgraph-password" --vault-name "$KV_NAME" &>/dev/null; then
-    terraform import azurerm_key_vault_secret.memgraph_password "$KV_NAME/memgraph-password" || true
+    SECRET_URI=$(az keyvault secret show --name "memgraph-password" --vault-name "$KV_NAME" --query id -o tsv)
+    terraform import azurerm_key_vault_secret.memgraph_password "$SECRET_URI" || true
   fi
 fi
 
