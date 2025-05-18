@@ -5,6 +5,10 @@ on:
     branches: [ RAG ]
   workflow_dispatch:
 
+permissions:
+  id-token: write
+  contents: read
+
 env:
   ENVIRONMENT: dev
   AZURE_RESOURCE_GROUP: GitHub
@@ -27,7 +31,8 @@ jobs:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-      
+          auth-type: oidc
+          
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v2
       
