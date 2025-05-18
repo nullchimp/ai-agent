@@ -13,6 +13,7 @@ env:
   ENVIRONMENT: dev
   AZURE_RESOURCE_GROUP: GitHub
   AZURE_LOCATION: germanywestcentral
+  MEMGRAPH_URI_TEMPLATE: memgraph-aiagent-{env}.{location}.cloudapp.azure.com
 
 jobs:
   deploy-infrastructure:
