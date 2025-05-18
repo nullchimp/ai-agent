@@ -46,7 +46,8 @@ jobs:
           terraform apply -auto-approve \
             -var="environment=${{ env.ENVIRONMENT }}" \
             -var="memgraph_username=${{ secrets.MEMGRAPH_USERNAME }}" \
-            -var="memgraph_password=${{ secrets.MEMGRAPH_PASSWORD }}"
+            -var="memgraph_password=${{ secrets.MEMGRAPH_PASSWORD }}" \
+            -var="subscription_id=${{ secrets.AZURE_SUBSCRIPTION_ID }}"
       
       - name: Get AKS Credentials
         run: |
