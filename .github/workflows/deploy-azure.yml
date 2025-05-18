@@ -43,6 +43,7 @@ jobs:
       - name: Import Existing Resources
         run: |
           cd infra/azure
+          chmod +x ./import_resources.sh
           ENVIRONMENT=${{ env.ENVIRONMENT }} \
           SUBSCRIPTION_ID=${{ secrets.AZURE_SUBSCRIPTION_ID }} \
           TENANT_ID=${{ secrets.AZURE_TENANT_ID }} \
@@ -50,16 +51,6 @@ jobs:
           CI_MODE=true \
           ./import_resources.sh
 
-      - name: Terraform Plan
-        run: |
-          cd infra/azure
-          terraform plan -var="environment=${{ env.ENVIRONMENT }}" \
-            -var="memgraph_username=${{ secrets.MEMGRAPH_USERNAME }}" \
-            -var="memgraph_password=${{ secrets.MEMGRAPH_PASSWORD }}" \
-            -var="subscription_id=${{ secrets.AZURE_SUBSCRIPTION_ID }}" \
-            -var="tenant_id=${{ secrets.AZURE_TENANT_ID }}" \
-            -var="object_id=${{ secrets.AZURE_SP_OBJECT_ID }}"
-      
       - name: Terraform Apply
         run: |
           cd infra/azure
@@ -107,33 +98,24 @@ jobs:
             done
           fi
           
-          # Create a credentials hash to force pod restart when credentials change using maximum security approach
-          # Create a random file name to prevent predictable access
-          TEMP_FILE=$(mktemp)
-          
-          # Write credentials directly to file descriptor to prevent command line visibility
-          {
-            printf "%s" "${{ secrets.MEMGRAPH_USERNAME }}"
-            printf "%s" "${{ secrets.MEMGRAPH_PASSWORD }}"
-          } > "$TEMP_FILE"
-          
-          # Generate hash and immediately remove the file
-          CREDENTIALS_HASH=$(sha256sum "$TEMP_FILE" | awk '{print $1}')
-          rm -f "$TEMP_FILE"
-          
-          # Store hash in environment variable for later use
+          # Create a credentials hash to force pod restart when credentials change
+          CREDENTIALS_HASH=$(echo -n "${{ secrets.MEMGRAPH_USERNAME }}${{ secrets.MEMGRAPH_PASSWORD }}" | sha256sum | awk '{print $1}')
           echo "CREDENTIALS_HASH=$CREDENTIALS_HASH" >> $GITHUB_ENV
           
-          # Apply the kubernetes secret with the new credentials
+          # Create secret directly using kubectl command
           kubectl create secret generic memgraph-credentials \
-            --from-literal=username=${{ secrets.MEMGRAPH_USERNAME }} \
-            --from-literal=password=${{ secrets.MEMGRAPH_PASSWORD }} \
+            --from-literal=username="${{ secrets.MEMGRAPH_USERNAME }}" \
+            --from-literal=password="${{ secrets.MEMGRAPH_PASSWORD }}" \
             --dry-run=client -o yaml | kubectl apply -f -
+          
+          echo "Memgraph credentials secret created successfully"
       
       - name: Deploy to AKS
         run: |
-          # Replace the placeholder with the actual credentials hash
-          cat infra/k8s/memgraph.yaml | CREDENTIALS_HASH=${CREDENTIALS_HASH} envsubst > memgraph_deploy.yaml
+          # Replace the placeholder with the actual credentials hash and environment
+          cat infra/k8s/memgraph.yaml | \
+            sed "s/\${CREDENTIALS_HASH}/$CREDENTIALS_HASH/g" | \
+            sed "s/\${ENVIRONMENT}/${{ env.ENVIRONMENT }}/g" > memgraph_deploy.yaml
           
           # Apply the updated deployment manifest
           kubectl apply -f memgraph_deploy.yaml
@@ -167,7 +149,7 @@ jobs:
             sleep 30
           fi
           
-          # Wait for pod to be ready with increased timeout and check interval
+          # Wait for pod to be ready with increased timeout
           if ! kubectl wait --for=condition=ready pod -l app=memgraph --timeout=10m; then
             echo "Error: Memgraph pod did not become ready within the timeout period."
             echo "Checking Memgraph pod logs:"
@@ -212,4 +194,14 @@ jobs:
             echo "Warning: Could not obtain external IP for Memgraph service within timeout."
             echo "Checking LoadBalancer service status:"
             kubectl describe service memgraph
+          else
+            MEMGRAPH_HOST="memgraph-aiagent-${{ env.ENVIRONMENT }}.${{ env.AZURE_LOCATION }}.cloudapp.azure.com"
+            echo "=========================================================="
+            echo "Memgraph Connection Information:"
+            echo "Host: $MEMGRAPH_HOST"
+            echo "Port: 7687 (Bolt), 7444 (HTTP API), 3000 (UI)"
+            echo "Username: ${{ secrets.MEMGRAPH_USERNAME }}"
+            echo "Password: [Configured in secrets]"
+            echo "Connection URL: bolt://${{ secrets.MEMGRAPH_USERNAME }}@$MEMGRAPH_HOST:7687"
+            echo "=========================================================="
           fi

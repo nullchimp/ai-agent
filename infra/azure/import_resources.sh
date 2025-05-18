@@ -58,16 +58,16 @@ fi
 
 # Import Key Vault Secrets if they exist
 if az keyvault show --name "$KV_NAME" --resource-group "$RESOURCE_GROUP" &>/dev/null; then
-  # Check for memgraph-username secret
+  # Check for memgraph-username secret - get specific version
   if az keyvault secret show --name "memgraph-username" --vault-name "$KV_NAME" &>/dev/null; then
-    SECRET_URI=$(az keyvault secret show --name "memgraph-username" --vault-name "$KV_NAME" --query id -o tsv)
-    terraform import azurerm_key_vault_secret.memgraph_username "$SECRET_URI" || true
+    SECRET_ID=$(az keyvault secret show --name "memgraph-username" --vault-name "$KV_NAME" --query id -o tsv)
+    terraform import azurerm_key_vault_secret.memgraph_username "$SECRET_ID" || true
   fi
   
-  # Check for memgraph-password secret
+  # Check for memgraph-password secret - get specific version
   if az keyvault secret show --name "memgraph-password" --vault-name "$KV_NAME" &>/dev/null; then
-    SECRET_URI=$(az keyvault secret show --name "memgraph-password" --vault-name "$KV_NAME" --query id -o tsv)
-    terraform import azurerm_key_vault_secret.memgraph_password "$SECRET_URI" || true
+    SECRET_ID=$(az keyvault secret show --name "memgraph-password" --vault-name "$KV_NAME" --query id -o tsv)
+    terraform import azurerm_key_vault_secret.memgraph_password "$SECRET_ID" || true
   fi
 fi
 
@@ -98,3 +98,5 @@ fi
 if [ "$CI_MODE" = "true" ]; then
   rm -f terraform.tfvars
 fi
+
+echo "Resource import completed!"
