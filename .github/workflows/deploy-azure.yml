@@ -36,6 +36,13 @@ jobs:
           cd infra/azure
           terraform init
       
+      - name: Import Existing Resources
+        run: |
+          cd infra/azure
+          ENVIRONMENT=${{ env.ENVIRONMENT }} \
+          SUBSCRIPTION_ID=${{ secrets.AZURE_SUBSCRIPTION_ID }} \
+          ./import_resources.sh
+      
       - name: Terraform Plan
         run: |
           cd infra/azure
@@ -59,11 +66,40 @@ jobs:
       
       - name: Get AKS Credentials
         run: |
+          # Wait for the AKS cluster to be ready
+          echo "Waiting for AKS cluster to be ready..."
+          for i in {1..30}; do
+            if az aks show --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
+                --name aks-ai-agent-${{ env.ENVIRONMENT }} --query "provisioningState" -o tsv | grep -q "Succeeded"; then
+              echo "AKS cluster is ready"
+              break
+            fi
+            echo "Waiting for AKS cluster to be ready (attempt $i)..."
+            sleep 10
+          done
+          
+          # Get credentials
           az aks get-credentials --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
             --name aks-ai-agent-${{ env.ENVIRONMENT }}
       
       - name: Create K8s Secret for Memgraph
         run: |
+          # Check if kubectl is working and the cluster is accessible
+          if ! kubectl get nodes &>/dev/null; then
+            echo "Cannot connect to Kubernetes cluster. Waiting for it to become available..."
+            for i in {1..10}; do
+              sleep 15
+              if kubectl get nodes &>/dev/null; then
+                echo "Successfully connected to Kubernetes cluster"
+                break
+              fi
+              echo "Attempt $i: Still waiting for Kubernetes cluster..."
+              if [ $i -eq 10 ]; then
+                echo "Failed to connect to Kubernetes cluster after multiple attempts. Continuing anyway..."
+              fi
+            done
+          fi
+          
           kubectl create secret generic memgraph-credentials \
             --from-literal=username=${{ secrets.MEMGRAPH_USERNAME }} \
             --from-literal=password=${{ secrets.MEMGRAPH_PASSWORD }} \
