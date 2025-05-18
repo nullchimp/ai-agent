@@ -12,6 +12,16 @@ This directory contains Terraform configurations for setting up the Azure infras
 
 When working with existing Azure resources, the `import_resources.sh` script helps to import them into Terraform state.
 
+### Importing Key Vault Secrets
+
+If you're having issues with Key Vault secrets that already exist in Azure but not in your Terraform state, use the `import_secrets.sh` script:
+
+```bash
+./import_secrets.sh dev  # Replace 'dev' with your environment name
+```
+
+This script will look up the exact version IDs of your Key Vault secrets and properly import them into Terraform state.
+
 ### Running in CI/CD Pipelines
 
 When running in CI/CD pipelines, use the CI_MODE flag to prevent password prompts:
