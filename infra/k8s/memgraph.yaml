@@ -18,7 +18,16 @@ spec:
     metadata:
       labels:
         app: memgraph
+      annotations:
+        # This annotation will be updated whenever we want to force a pod restart
+        credentials-hash: "${CREDENTIALS_HASH}"
     spec:
+      initContainers:
+      - name: init-sysctl
+        image: busybox:1.28
+        command: ["sysctl", "-w", "vm.max_map_count=262144"]
+        securityContext:
+          privileged: true
       containers:
       - name: memgraph
         image: memgraph/memgraph-mage:latest

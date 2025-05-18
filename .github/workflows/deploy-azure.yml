@@ -107,6 +107,24 @@ jobs:
             done
           fi
           
+          # Create a credentials hash to force pod restart when credentials change using maximum security approach
+          # Create a random file name to prevent predictable access
+          TEMP_FILE=$(mktemp)
+          
+          # Write credentials directly to file descriptor to prevent command line visibility
+          {
+            printf "%s" "${{ secrets.MEMGRAPH_USERNAME }}"
+            printf "%s" "${{ secrets.MEMGRAPH_PASSWORD }}"
+          } > "$TEMP_FILE"
+          
+          # Generate hash and immediately remove the file
+          CREDENTIALS_HASH=$(sha256sum "$TEMP_FILE" | awk '{print $1}')
+          rm -f "$TEMP_FILE"
+          
+          # Store hash in environment variable for later use
+          echo "CREDENTIALS_HASH=$CREDENTIALS_HASH" >> $GITHUB_ENV
+          
+          # Apply the kubernetes secret with the new credentials
           kubectl create secret generic memgraph-credentials \
             --from-literal=username=${{ secrets.MEMGRAPH_USERNAME }} \
             --from-literal=password=${{ secrets.MEMGRAPH_PASSWORD }} \
@@ -114,10 +132,53 @@ jobs:
       
       - name: Deploy to AKS
         run: |
-          kubectl apply -f infra/k8s/memgraph.yaml
+          # Replace the placeholder with the actual credentials hash
+          cat infra/k8s/memgraph.yaml | CREDENTIALS_HASH=${CREDENTIALS_HASH} envsubst > memgraph_deploy.yaml
+          
+          # Apply the updated deployment manifest
+          kubectl apply -f memgraph_deploy.yaml
+          
+          # Force restart if the deployment already exists
+          POD_NAME=$(kubectl get pods -l app=memgraph -o jsonpath="{.items[0].metadata.name}" 2>/dev/null || echo "")
+          if [[ -n "$POD_NAME" ]]; then
+            echo "Forcing restart of existing Memgraph pod..."
+            kubectl delete pod $POD_NAME
+          fi
+          
+          # Remove the temporary file
+          rm memgraph_deploy.yaml
       
       - name: Verify Deployment
         run: |
+          echo "Checking deployment status..."
           kubectl get pods
           kubectl get services
-          kubectl wait --for=condition=ready pod -l app=memgraph --timeout=5m
+          
+          echo "Waiting for Memgraph pod to be ready (may take up to 5 minutes)..."
+          if ! kubectl wait --for=condition=ready pod -l app=memgraph --timeout=5m; then
+            echo "Error: Memgraph pod did not become ready within the timeout period."
+            echo "Checking Memgraph pod logs:"
+            POD_NAME=$(kubectl get pods -l app=memgraph -o jsonpath="{.items[0].metadata.name}")
+            kubectl logs $POD_NAME
+            kubectl describe pod $POD_NAME
+            echo "Deployment verification failed!"
+            exit 1
+          fi
+          
+          echo "Memgraph deployment successful!"
+          
+          # Wait for the LoadBalancer service to get an external IP
+          echo "Waiting for LoadBalancer to get external IP..."
+          for i in {1..30}; do
+            EXTERNAL_IP=$(kubectl get service memgraph -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+            if [[ -n "$EXTERNAL_IP" ]]; then
+              echo "Memgraph is accessible at: ${EXTERNAL_IP}:7687"
+              break
+            fi
+            echo "Waiting for external IP (attempt $i)..."
+            sleep 10
+          done
+          
+          if [[ -z "$EXTERNAL_IP" ]]; then
+            echo "Warning: Could not obtain external IP for Memgraph service within timeout."
+          fi

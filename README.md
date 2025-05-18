@@ -34,6 +34,8 @@ To deploy to Azure:
 3. Add `MEMGRAPH_USERNAME` and `MEMGRAPH_PASSWORD` to GitHub secrets
 4. Push to main branch to trigger deployment or manually trigger the workflow
 
+If you encounter issues connecting to Memgraph after deployment, see [Memgraph Troubleshooting Guide](docs/memgraph-troubleshooting.md).
+
 ## Architecture
 The project follows a component-based architecture where the AI Agent orchestrates interactions between users, language models, local tools, and MCP servers.
 
