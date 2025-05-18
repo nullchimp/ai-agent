@@ -114,12 +114,12 @@ class Source(Node):
         self,
         name: str,
         type: str,                     # e.g., "website", "file", "api"
-        base_uri: str = "",             # Base location/URL
+        uri: str = "",             # Base location/URL
     ):
         super().__init__()
         self.name = name
         self.type = type
-        self.base_uri = base_uri
+        self.uri = uri
 
 class Document(Node):
     def __init__(
@@ -133,6 +133,7 @@ class Document(Node):
         super().__init__()
         self.path = path
         self.content = content
+        self.content_hash =  hashlib.sha256(content.encode()).hexdigest()
         self.title = title
         self.source_id = source_id
 
@@ -152,7 +153,7 @@ class DocumentChunk(Node):
         self.path = path
         self.content = content
         self.content_hash =  hashlib.sha256(content.encode()).hexdigest()
-        self.parent_document_id = parent_document_id
+        self.parent_id = parent_document_id
         self.chunk_index = chunk_index
         self.token_count = token_count
 
@@ -166,6 +167,7 @@ class Interaction(Node):
         super().__init__()
         self.session_id = session_id
         self.content = content
+        self.content_hash =  hashlib.sha256(content.encode()).hexdigest()
         self.role = role
 
 class VectorStore(Node):
