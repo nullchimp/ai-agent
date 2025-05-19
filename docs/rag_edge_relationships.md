@@ -48,7 +48,7 @@ When documents are processed through the RAG system:
 1. **Source Creation**: Register content origin
    ```python
    # Create source node based on content type
-   source = Source(name=domain, type="website", base_uri=url)
+   source = Source(name=domain, type="website", uri=url)
    db.create_source(source)
    ```
 
@@ -67,7 +67,7 @@ When documents are processed through the RAG system:
        chunk = DocumentChunk(
            path=path,
            content=node.text,
-           parent_document_id=document.id,
+           parent_id=document.id,
            chunk_index=idx
        )
        db.create_chunk(chunk)
@@ -91,14 +91,14 @@ Relationships are established during entity creation:
 def create_chunk(self, chunk: DocumentChunk) -> str:
     self._execute(*chunk.create())
     
-    if not chunk.parent_document_id:
-        raise ValueError("DocumentChunk must have a parent_document_id")
+    if not chunk.parent_id:
+        raise ValueError("DocumentChunk must have a parent_id")
     
     # Create CHUNK_OF relationship from chunk to document
     self._execute(*chunk.link(
         EdgeType.CHUNK_OF,
         Document.label(),
-        chunk.parent_document_id,
+        chunk.parent_id,
     ))
 ```
 

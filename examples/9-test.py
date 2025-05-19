@@ -88,7 +88,7 @@ async def test_vector_search(query_text: str):
     doc_ids = set()
     for result in search_results:
         chunk = result["chunk"]
-        doc_id = chunk["parent_document_id"]
+        doc_id = chunk["parent_id"]
         if not doc_id in doc_ids:
             doc_ids.add(doc_id)
     
@@ -101,13 +101,13 @@ async def test_vector_search(query_text: str):
         print(f"Document ID: {doc_id}")
         refs = db.get_references(doc_id)
         for ref in refs:
-            ref_uri = ref["base_uri"]
+            ref_uri = ref["uri"]
             if not ref_uri in references:
                 references.add(ref_uri)
         
         sources = db.get_sources(doc_id)
         print(f"Sources: {sources}")
-        source_uris = [source["base_uri"] for source in sources]
+        source_uris = [source["uri"] for source in sources]
         data.append({
             "sources": source_uris,
             "content": document["content"],

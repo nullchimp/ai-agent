@@ -40,9 +40,9 @@ Implementing a RAG system with a graph database addresses these limitations by p
    The implementation uses these core node types:
 
    ```
-   (:Source {id, name, type, base_uri})  # Origin of documents
+   (:Source {id, name, type, uri})  # Origin of documents
    (:Document {id, path, content, title, source_id})  # Full documents
-   (:DocumentChunk {id, path, content, parent_document_id, chunk_index})  # Document portions
+   (:DocumentChunk {id, path, content, parent_id, chunk_index})  # Document portions
    (:VectorStore {id, model, status})  # Vector embedding configuration
    (:Vector {id, chunk_id, vector_store_id, embedding})  # Actual embeddings
    (:Interaction {id, session_id, content, role})  # Chat messages
@@ -368,7 +368,7 @@ class TextSplitter:
 class ChunkMetadata(DocumentMetadata):
     chunk_index: int
     chunk_count: int
-    parent_document_id: str
+    parent_id: str
     parent_document_path: str
     is_chunk: bool
 

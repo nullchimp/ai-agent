@@ -100,13 +100,13 @@ class GraphClient:
     def create_chunk(self, chunk: DocumentChunk) -> str:
         self._execute(*chunk.create())
         
-        if not chunk.parent_document_id:
-            raise ValueError("DocumentChunk must have a parent_document_id")
+        if not chunk.parent_id:
+            raise ValueError("DocumentChunk must have a parent_id")
         
         self._execute(*chunk.link(
             EdgeType.CHUNK_OF,
             Document.label(),
-            chunk.parent_document_id,
+            chunk.parent_id,
         ))
 
     def create_source(self, source: Source) -> str:

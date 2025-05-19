@@ -145,7 +145,7 @@ class DocumentChunk(Node):
         self,
         path: str,
         content: str,                   # Keep content in the graph for direct access
-        parent_document_id: str,
+        parent_id: str,
         chunk_index: int = 0,
         token_count: int = 0,
     ):
@@ -153,7 +153,7 @@ class DocumentChunk(Node):
         self.path = path
         self.content = content
         self.content_hash =  hashlib.sha256(content.encode()).hexdigest()
-        self.parent_id = parent_document_id
+        self.parent_id = parent_id
         self.chunk_index = chunk_index
         self.token_count = token_count
 

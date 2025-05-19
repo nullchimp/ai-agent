@@ -44,7 +44,7 @@ class WebLoader(Loader):
         source = Source(
             name=domain,
             type="website",
-            base_uri=source_url
+            uri=source_url
         )
         
         source.id = hashlib.sha256(source_url.encode()).hexdigest()[:16]
@@ -168,7 +168,7 @@ class WebLoader(Loader):
                     doc_chunk = DocumentChunk(
                         path=display_url,
                         content=chunk_content,
-                        parent_document_id=document.id,
+                        parent_id=document.id,
                         chunk_index=idx,
                         token_count=len(chunk_content.split())
                     )

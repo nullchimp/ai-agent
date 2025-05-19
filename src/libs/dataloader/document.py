@@ -17,7 +17,7 @@ class DocumentLoader(Loader):
         source = Source(
             name=source_path.split("/")[-1],
             type="file",
-            base_uri=source_path
+            uri=source_path
         )
 
         source.id = hashlib.sha256(self.path.encode()).hexdigest()[:16]
@@ -66,7 +66,7 @@ class DocumentLoader(Loader):
                     doc_chunk = DocumentChunk(
                         path=path,
                         content=chunk_content,
-                        parent_document_id=document.id,
+                        parent_id=document.id,
                         chunk_index=idx,
                         token_count=len(chunk_content.split())
                     )

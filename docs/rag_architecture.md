@@ -74,7 +74,7 @@ graph TD
 The RAG system uses the following node types:
 
 1. **Source**: Represents the origin of documents
-   - Properties: name, type, base_uri
+   - Properties: name, type, uri
    - Types: "file", "website", etc.
 
 2. **Document**: Represents a full document with content and metadata
@@ -82,7 +82,7 @@ The RAG system uses the following node types:
    - Linked to Source with SOURCED_FROM relationship
 
 3. **DocumentChunk**: Represents a portion of a document for embedding
-   - Properties: path, content, content_hash, parent_document_id, chunk_index
+   - Properties: path, content, content_hash, parent_id, chunk_index
    - Linked to Document with CHUNK_OF relationship
 
 4. **VectorStore**: Represents embedding storage configuration
