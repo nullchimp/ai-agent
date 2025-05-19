@@ -43,12 +43,6 @@ class GraphClient:
         self._conn = None
         self._cur = None
 
-        try:
-            self.connect(**kwargs)
-        except Exception as e:
-            print(f"Connection error: {str(e)}")
-            raise ConnectionError(f"Failed to connect to Memgraph at {host}:{port}: {str(e)}") from e
-
     def connect(self, *args, **kwargs) -> None:
         raise ConnectionError("Not implemented")
 
@@ -57,7 +51,13 @@ class GraphClient:
         self._conn.close()
 
     # Context-manager support
-    def __enter__(self) -> GraphClient:
+    def __enter__(self, *args, **kwargs) -> GraphClient:
+        try:
+            self.connect(**kwargs)
+        except Exception as e:
+            print(f"Connection error: {str(e)}")
+            raise ConnectionError(f"Failed to connect to Memgraph at {self.host}:{self.port}: {str(e)}") from e
+
         return self
 
     def __exit__(self, exc_type, exc, tb) -> None:

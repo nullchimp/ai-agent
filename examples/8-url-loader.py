@@ -16,6 +16,7 @@ db = MemGraphClient(
     username=os.environ.get("MEMGRAPH_USERNAME", "memgraph"),
     password=os.environ.get("MEMGRAPH_PASSWORD", "memgraph"),
 )
+db.connect()
 
 loader = WebLoader("http://localhost:4000/en/enterprise-cloud@latest/copilot")
 embedder = TextEmbedding3Small()
@@ -39,6 +40,8 @@ async def main():
         vectors = []
         await embedder.process_chunks(chunks, callback=lambda v: vectors.append(v))
         store(source, doc, chunks, vectors)
+
+    db.close()
     
 
 if __name__ == "__main__":
