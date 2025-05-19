@@ -25,8 +25,7 @@ def test_memgraph_connection(max_retries=3, retry_delay=5) -> bool:
                 host=host, 
                 port=port,
                 username=username,
-                password=password,
-                connect_timeout_ms=10000  # 10 second timeout
+                password=password
             )
             
             conn.autocommit = True

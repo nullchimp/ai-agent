@@ -150,13 +150,18 @@ jobs:
           kubectl get services
           
           echo "Waiting for Memgraph pod to be ready (may take up to 10 minutes)..."
-          # First, check if there are any existing failed pods and delete them
-          FAILED_PODS=$(kubectl get pods -l app=memgraph -o jsonpath="{.items[?(@.status.phase=='Failed' || @.status.containerStatuses[0].state.waiting.reason=='CrashLoopBackOff')].metadata.name}")
+          # Check for failed pods with a simpler approach that doesn't rely on complex jsonpath
+          FAILED_PODS_FAILED=$(kubectl get pods -l app=memgraph --field-selector=status.phase=Failed -o jsonpath="{.items[*].metadata.name}" 2>/dev/null || echo "")
+          FAILED_PODS_CRASH=$(kubectl get pods -l app=memgraph -o jsonpath="{.items[?(@.status.containerStatuses[0].state.waiting.reason=='CrashLoopBackOff')].metadata.name}" 2>/dev/null || echo "")
+          
+          FAILED_PODS="$FAILED_PODS_FAILED $FAILED_PODS_CRASH"
           if [[ -n "$FAILED_PODS" ]]; then
             echo "Found failed pods, cleaning up before proceeding:"
-            echo "$FAILED_PODS" | tr ' ' '\n' | while read pod; do
-              echo "Deleting failed pod: $pod"
-              kubectl delete pod $pod
+            for pod in $FAILED_PODS; do
+              if [[ -n "$pod" ]]; then
+                echo "Deleting failed pod: $pod"
+                kubectl delete pod $pod
+              fi
             done
             echo "Waiting for cleanup to complete..."
             sleep 30
@@ -166,13 +171,17 @@ jobs:
           if ! kubectl wait --for=condition=ready pod -l app=memgraph --timeout=10m; then
             echo "Error: Memgraph pod did not become ready within the timeout period."
             echo "Checking Memgraph pod logs:"
-            POD_NAME=$(kubectl get pods -l app=memgraph -o jsonpath="{.items[0].metadata.name}")
+            POD_NAME=$(kubectl get pods -l app=memgraph -o jsonpath="{.items[0].metadata.name}" 2>/dev/null || echo "")
             
-            echo "Pod details:"
-            kubectl describe pod $POD_NAME
-            
-            echo "Pod logs:"
-            kubectl logs $POD_NAME --tail=100
+            if [[ -n "$POD_NAME" ]]; then
+              echo "Pod details:"
+              kubectl describe pod $POD_NAME
+              
+              echo "Pod logs:"
+              kubectl logs $POD_NAME --tail=100
+            else
+              echo "No Memgraph pod found to check logs."
+            fi
             
             echo "Checking node resource utilization:"
             kubectl describe nodes
@@ -185,8 +194,8 @@ jobs:
           
           echo "Waiting for LoadBalancer to expose an address..."
           for i in {1..45}; do
-            EXTERNAL_IP=$(kubectl get service memgraph -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
-            DNS_NAME=$(kubectl get service memgraph -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+            EXTERNAL_IP=$(kubectl get service memgraph -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || echo "")
+            DNS_NAME=$(kubectl get service memgraph -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo "")
             if [[ -n "$EXTERNAL_IP" || -n "$DNS_NAME" ]]; then
               HOST=${EXTERNAL_IP:-$DNS_NAME}
               echo "Memgraph is accessible at: ${HOST}:7687"
