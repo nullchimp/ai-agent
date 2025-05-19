@@ -129,7 +129,7 @@ You have information in the following format of JSON:
         "references": <list of references to other sources>
     }}
 ]
-I always HAVE TO ground your response in this information.
+You always HAVE TO ground your response in this information.
 You always HAVE TO return the source, where the information is coming from, at the end of your response.
 Use the following format:
 
@@ -147,8 +147,8 @@ Here is the information You have:\n
 
 
 async def main():
-    #text = input("Enter your text: ")
-    text = "Tell me what the multipliers for premium requests are, based on the Model for GitHub Copilot!"
+    text = input("Enter your text: ")
+    #text = "Tell me what the multipliers for premium requests are, based on the Model for GitHub Copilot!"
     await test_vector_search(text)
     #await run_conversation(text)
     print("Test completed.")

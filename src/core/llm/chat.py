@@ -6,7 +6,7 @@ from typing import Any, Dict, List
 from tools import Tool
 from .client import ChatClient
 
-from core import prettify, colorize_text
+from core import prettify, colorize_text, complex_handler
 
 DEFAULT_TEMPERATURE = 0.5
 DEFAULT_MAX_TOKENS = 500
@@ -99,5 +99,5 @@ class Chat:
             call_back({
                 "role": "tool",
                 "tool_call_id": tool_call.get("id", "unknown_tool"),
-                "content": json.dumps(tool_result)
+                "content": json.dumps(tool_result, default=complex_handler),
             })

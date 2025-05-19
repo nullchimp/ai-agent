@@ -43,9 +43,5 @@ class Tool:
         for tool_data in data:
             if tool_data[0] != "content":
                 continue
-            results = []
-            for t in tool_data[1]:
-                results.append({
-                    "content": t.text,
-                })
-            return results
+
+            return tool_data[1]
