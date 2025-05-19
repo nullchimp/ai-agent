@@ -116,6 +116,7 @@ class WebLoader(Loader):
         except Exception as e:
             if retry <= 0:
                 raise ValueError(f"Failed to fetch content from {url}: {str(e)}")
+            print(f"Error fetching {url}: {str(e)}, Retrying... ({retry - 1} attempts left)")
             return self._visit_site(url, retry - 1)
 
     def load_data(self) -> Generator[Tuple[Source, Document, List[DocumentChunk]], None, None]:

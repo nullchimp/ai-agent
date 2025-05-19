@@ -21,7 +21,7 @@ chat = Chat.create()
 
 # Define enhanced system role with instructions on using all available tools
 system_role = f"""
-You are an expert on everything GitHub.
+You are a helpful assistant. 
 Your Name is Agent Smith.
 
 Today is {date.today().strftime("%d %B %Y")}.
@@ -53,11 +53,11 @@ if not api_key:
     raise ValueError(f"AZURE_OPENAI_API_KEY environment variable is required")
 
 db = MemGraphClient(
-    host=os.environ.get("MEMGRAPH_URI", "localhost"),
+    host="localhost" or os.environ.get("MEMGRAPH_URI", "localhost"),
     port=int(os.environ.get("MEMGRAPH_PORT", 7687)),
     username=os.environ.get("MEMGRAPH_USERNAME", "memgraph"),
     password=os.environ.get("MEMGRAPH_PASSWORD", "memgraph"),
-)
+).connect()
 
 embedder = TextEmbedding3Small()
 
@@ -129,7 +129,17 @@ You have information in the following format of JSON:
         "references": <list of references to other sources>
     }}
 ]
-I need you to always ground your response in this information and return relevant sources and references.
+I always HAVE TO ground your response in this information.
+You always HAVE TO return the source, where the information is coming from, at the end of your response.
+Use the following format:
+
+# Sources:
+1. <Source Name>: <Source URI>
+2. <Source Name>: <Source URI>
+...
+
+It is totally fine to only use 1 source, but you have to mention it.
+If you don't know the answer, say "I don't know".
 Here is the information You have:\n
     """
 
@@ -137,7 +147,8 @@ Here is the information You have:\n
 
 
 async def main():
-    text = input("Enter your text: ")
+    #text = input("Enter your text: ")
+    text = "Tell me what the multipliers for premium requests are, based on the Model for GitHub Copilot!"
     await test_vector_search(text)
     #await run_conversation(text)
     print("Test completed.")

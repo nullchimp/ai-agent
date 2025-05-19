@@ -42,4 +42,6 @@ class MemGraphClient(GraphClient):
         self._conn.autocommit = True
         self._cur = self._conn.cursor()
         print(f"Connected successfully to Memgraph")
+
+        return self
         
