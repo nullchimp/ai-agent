@@ -52,7 +52,7 @@ spec:
         - containerPort: 7444  # HTTP API
         - containerPort: 3000  # MemGraph Lab UI
         env:
-        - name: MEMGRAPH_USER
+        - name: MEMGRAPH_USERNAME            # aligns with test script
           valueFrom:
             secretKeyRef:
               name: memgraph-credentials
@@ -62,13 +62,24 @@ spec:
             secretKeyRef:
               name: memgraph-credentials
               key: password
+        - name: MG_USERNAME                  # Memgraph native vars
+          valueFrom:
+            secretKeyRef:
+              name: memgraph-credentials
+              key: username
+        - name: MG_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: memgraph-credentials
+              key: password
+        envFrom:                             # auto-load future config vars
+        - configMapRef:
+            name: memgraph-config
         volumeMounts:
         - name: data
           mountPath: /data
         - name: logs
           mountPath: /var/log/memgraph
-        - name: config
-          mountPath: /etc/memgraph
         resources:
           requests:
             memory: "1Gi"
@@ -76,21 +87,18 @@ spec:
           limits:
             memory: "2Gi"
             cpu: "1000m"
-        livenessProbe:
-          httpGet:
-            path: /api/v1/storage/status
-            port: 7444
-          initialDelaySeconds: 60
-          periodSeconds: 30
-          timeoutSeconds: 10
-          failureThreshold: 3
-        readinessProbe:
-          httpGet:
-            path: /api/v1/storage/status
-            port: 7444
+        livenessProbe:                       # simpler, always available
+          tcpSocket:
+            port: 7687
           initialDelaySeconds: 30
           periodSeconds: 15
           timeoutSeconds: 5
+        readinessProbe:
+          tcpSocket:
+            port: 7687
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 3
       volumes:
       - name: data
         persistentVolumeClaim:
@@ -98,9 +106,9 @@ spec:
       - name: logs
         persistentVolumeClaim:
           claimName: memgraph-logs
-      - name: config
-        persistentVolumeClaim:
-          claimName: memgraph-config
+      - name: config                         # mount ConfigMap instead of PVC
+        configMap:
+          name: memgraph-config
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -123,17 +131,6 @@ spec:
   resources:
     requests:
       storage: 5Gi
----
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: memgraph-config
-spec:
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: 1Gi
 ---
 apiVersion: v1
 kind: Service

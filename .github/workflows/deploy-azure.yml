@@ -13,7 +13,6 @@ env:
   ENVIRONMENT: dev
   AZURE_RESOURCE_GROUP: GitHub
   AZURE_LOCATION: germanywestcentral
-  MEMGRAPH_URI_TEMPLATE: memgraph-aiagent-{env}.{location}.cloudapp.azure.com
 
 jobs:
   deploy-infrastructure:
@@ -170,32 +169,32 @@ jobs:
           
           echo "Memgraph deployment successful!"
           
-          # Wait for the LoadBalancer service to get an external IP
-          echo "Waiting for LoadBalancer to get external IP..."
+          echo "Waiting for LoadBalancer to expose an address..."
           for i in {1..45}; do
             EXTERNAL_IP=$(kubectl get service memgraph -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
-            if [[ -n "$EXTERNAL_IP" ]]; then
-              echo "Memgraph is accessible at: ${EXTERNAL_IP}:7687"
-              
-              # Add a simple connectivity check
+            DNS_NAME=$(kubectl get service memgraph -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+            if [[ -n "$EXTERNAL_IP" || -n "$DNS_NAME" ]]; then
+              HOST=${EXTERNAL_IP:-$DNS_NAME}
+              echo "Memgraph is accessible at: ${HOST}:7687"
+              # make host usable by subsequent steps
+              echo "MEMGRAPH_URI=${HOST}" >> $GITHUB_ENV
               echo "Performing basic connectivity test..."
-              if nc -z -w 5 ${EXTERNAL_IP} 7687; then
+              if nc -z -w 5 ${HOST} 7687; then
                 echo "Successfully connected to Memgraph on port 7687!"
               else
                 echo "Warning: Could not connect to Memgraph on port 7687. The service may not be fully ready yet."
               fi
               break
             fi
-            echo "Waiting for external IP (attempt $i)..."
+            echo "Waiting for address (attempt $i)..."
             sleep 10
           done
           
-          if [[ -z "$EXTERNAL_IP" ]]; then
-            echo "Warning: Could not obtain external IP for Memgraph service within timeout."
-            echo "Checking LoadBalancer service status:"
+          if [[ -z "$EXTERNAL_IP" && -z "$DNS_NAME" ]]; then
+            echo "Warning: LoadBalancer address not available within timeout."
             kubectl describe service memgraph
           else
-            MEMGRAPH_HOST="memgraph-aiagent-${{ env.ENVIRONMENT }}.${{ env.AZURE_LOCATION }}.cloudapp.azure.com"
+            MEMGRAPH_HOST=${EXTERNAL_IP:-$DNS_NAME}
             echo "=========================================================="
             echo "Memgraph Connection Information:"
             echo "Host: $MEMGRAPH_HOST"
