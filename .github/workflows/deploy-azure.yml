@@ -115,19 +115,33 @@ jobs:
           cat infra/k8s/memgraph.yaml | \
             sed "s/\${CREDENTIALS_HASH}/$CREDENTIALS_HASH/g" | \
             sed "s/\${ENVIRONMENT}/${{ env.ENVIRONMENT }}/g" > memgraph_deploy.yaml
-          
-          # Apply the updated deployment manifest
-          kubectl apply -f memgraph_deploy.yaml
-          
+
+          # Split the manifest into PVC and non-PVC resources
+          csplit -z -f part_ memgraph_deploy.yaml "/^---$/" '{*}'
+
+          # Apply PVCs only if they do not exist
+          for f in part_*; do
+            if grep -q 'kind: PersistentVolumeClaim' "$f"; then
+              PVC_NAME=$(grep 'name:' "$f" | head -1 | awk '{print $2}')
+              if kubectl get pvc "$PVC_NAME" &>/dev/null; then
+                echo "PVC $PVC_NAME already exists, skipping creation."
+              else
+                kubectl apply -f "$f"
+              fi
+            else
+              kubectl apply -f "$f"
+            fi
+          done
+
           # Force restart if the deployment already exists
           POD_NAME=$(kubectl get pods -l app=memgraph -o jsonpath="{.items[0].metadata.name}" 2>/dev/null || echo "")
           if [[ -n "$POD_NAME" ]]; then
             echo "Forcing restart of existing Memgraph pod..."
             kubectl delete pod $POD_NAME
           fi
-          
-          # Remove the temporary file
-          rm memgraph_deploy.yaml
+
+          # Remove the temporary files
+          rm memgraph_deploy.yaml part_*
       
       - name: Verify Deployment
         run: |
