@@ -19,6 +19,7 @@ provider "azurerm" {
 variable "subscription_id" { type = string }
 variable "location"        { type = string }
 variable "environment"     { type = string }
+variable "resource_group"  { type = string }
 variable "node_vm_size" {
   type        = string
   description = "VM size of the default AKS node-pool"
@@ -26,7 +27,7 @@ variable "node_vm_size" {
 }
 
 locals {
-  rg_name  = "nullchimp-ai-agent-${var.environment}"
+  rg_name  = var.resource_group"
   aks_name = "aks-memgraph-${var.environment}"
 }
 
