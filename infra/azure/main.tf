@@ -75,6 +75,13 @@ resource "azurerm_kubernetes_cluster" "ai_agent" {
   resource_group_name = data.azurerm_resource_group.github.name
   dns_prefix          = "aiagent"
 
+  default_node_pool {
+    name                   = "default"
+    node_count             = 1
+    vm_size                = "Standard_E2a_v4"
+    temporary_name_for_rotation = "tempnodepool"
+  }
+
   identity {
     type = "SystemAssigned"
   }
