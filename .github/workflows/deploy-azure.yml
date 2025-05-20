@@ -88,5 +88,19 @@ jobs:
       run: envsubst < infra/k8s/memgraph.yaml | kubectl apply -f -
 
     #──────────────────────── Smoke test ────────────────────────
-    - name: Wait for rollout
-      run: kubectl rollout status deployment/memgraph --timeout=5m
+    - name: Wait for rollout (with diagnostics)
+      run: |
+        set -e
+        if kubectl rollout status deployment/memgraph --timeout=10m ; then
+          echo "Memgraph deployment ready ✓"
+        else
+          echo "::warning::Rollout timed out – printing diagnostics"
+          kubectl get pods -o wide
+          kubectl describe deployment memgraph || true
+          POD=$(kubectl get pods -l app=memgraph -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+          if [ -n "$POD" ]; then
+            kubectl describe pod "$POD" || true
+            kubectl logs "$POD" --all-containers --tail=100 || true
+          fi
+          exit 1
+        fi

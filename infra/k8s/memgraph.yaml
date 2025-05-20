@@ -1,5 +1,5 @@
 ###############################################################
-#  ConfigMap – runtime flags, add more keys as needed
+#  ConfigMap
 ###############################################################
 apiVersion: v1
 kind: ConfigMap
@@ -25,15 +25,15 @@ spec:
       labels:
         app: memgraph
       annotations:
-        credentials-hash: "${CREDENTIALS_HASH}"   # forces rolling restart
+        credentials-hash: "${CREDENTIALS_HASH}"
     spec:
-      initContainers:
-      - name: init-sysctl
-        image: busybox:1.28
-        command: ["sysctl", "-w", "vm.max_map_count=262144"]
-        securityContext: { privileged: true }
+      # ── sysctl without privileged container ──────────────────
+      securityContext:
+        sysctls:
+        - name: vm.max_map_count
+          value: "262144"
 
-      # Prefer (but don't require) the cheap B2ms nodes
+      # node-affinity & tolerations (unchanged) …
       affinity:
         nodeAffinity:
           preferredDuringSchedulingIgnoredDuringExecution:
@@ -43,7 +43,6 @@ spec:
               - key: beta.kubernetes.io/instance-type
                 operator: In
                 values: [ Standard_B2ms ]
-
       tolerations:
       - key: "node.kubernetes.io/memory-pressure"
         operator: "Exists"
@@ -58,7 +57,6 @@ spec:
         - { containerPort: 7444, name: http }
         - { containerPort: 3000, name: ui }
 
-        # secrets ➜ env vars
         env:
         - name: MEMGRAPH_USERNAME
           valueFrom: { secretKeyRef: { name: memgraph-credentials, key: username } }
@@ -69,11 +67,9 @@ spec:
         - name: MG_PASSWORD
           valueFrom: { secretKeyRef: { name: memgraph-credentials, key: password } }
 
-        # load everything from the config-map automatically
         envFrom:
         - configMapRef: { name: memgraph-config }
 
-        # durable volumes
         volumeMounts:
         - { name: data, mountPath: /data }
         - { name: logs, mountPath: /var/log/memgraph }
@@ -101,7 +97,7 @@ spec:
         persistentVolumeClaim: { claimName: memgraph-logs }
 ---
 ###############################################################
-#  Persistent Volume Claims – backed by Standard HDD Azure Disk
+#  PVCs
 ###############################################################
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -122,7 +118,7 @@ spec:
   resources: { requests: { storage: 5Gi } }
 ---
 ###############################################################
-#  Service – public LoadBalancer with stable DNS label
+#  Service
 ###############################################################
 apiVersion: v1
 kind: Service
