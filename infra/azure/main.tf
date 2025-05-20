@@ -75,13 +75,6 @@ resource "azurerm_kubernetes_cluster" "ai_agent" {
   resource_group_name = data.azurerm_resource_group.github.name
   dns_prefix          = "aiagent"
 
-  default_node_pool {
-    name                   = "default"
-    node_count             = 1
-    vm_size                = "Standard_D4_v2"
-    temporary_name_for_rotation = "tempnodepool"
-  }
-
   identity {
     type = "SystemAssigned"
   }
@@ -91,7 +84,7 @@ resource "azurerm_kubernetes_cluster" "ai_agent" {
 resource "azurerm_kubernetes_cluster_node_pool" "ai_agent_pool" {
   name                  = "agentpool"
   kubernetes_cluster_id = azurerm_kubernetes_cluster.ai_agent.id
-  vm_size               = "Standard_D4_v2"
+  vm_size               = "Standard_E2a_v4"
   auto_scaling_enabled  = true
   min_count             = 1
   max_count             = 3
