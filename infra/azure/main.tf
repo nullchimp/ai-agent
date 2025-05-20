@@ -95,6 +95,7 @@ resource "azurerm_kubernetes_cluster_node_pool" "ai_agent_pool" {
   auto_scaling_enabled  = true
   min_count             = 1
   max_count             = 3
+  temporary_name_for_rotation = "tmppool"
 }
 
 # For access to Key Vault from AKS
