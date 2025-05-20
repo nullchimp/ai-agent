@@ -120,20 +120,38 @@ jobs:
         # Check if cluster exists first to avoid errors
         if az aks show --resource-group "$RG_NAME" --name "$AKS_NAME" &>/dev/null; then
           echo "Checking for in-progress operations on AKS cluster..."
-          OPERATIONS=$(az aks operation-list --resource-group "$RG_NAME" --name "$AKS_NAME" -o json)
-          IN_PROGRESS=$(echo "$OPERATIONS" | jq '.[] | select(.status == "InProgress") | .name')
           
-          if [ -n "$IN_PROGRESS" ]; then
+          # Get cluster provisioning state
+          PROVISIONING_STATE=$(az aks show --resource-group "$RG_NAME" --name "$AKS_NAME" --query "provisioningState" -o tsv)
+          
+          if [[ "$PROVISIONING_STATE" == "InProgress" || "$PROVISIONING_STATE" == "Updating" ]]; then
             echo "::warning::Found in-progress operations, attempting to abort them..."
-            echo "$OPERATIONS" | jq -r '.[] | select(.status == "InProgress") | .name' | while read OPERATION_ID; do
-              if [ -n "$OPERATION_ID" ]; then
-                echo "Aborting operation: $OPERATION_ID"
-                az aks operation-abort --resource-group "$RG_NAME" --name "$AKS_NAME" --operation-id "$OPERATION_ID"
-                sleep 10
-              fi
-            done
+            
+            # Get the operation ID from activity logs (last operation started in the last hour)
+            OPERATION_IDS=$(az monitor activity-log list \
+              --resource-group "$RG_NAME" \
+              --resource-id "/subscriptions/${{ env.ARM_SUBSCRIPTION_ID }}/resourceGroups/$RG_NAME/providers/Microsoft.ContainerService/managedClusters/$AKS_NAME" \
+              --status "Started" \
+              --start-time "$(date -u -d '1 hour ago' '+%Y-%m-%dT%H:%M:%SZ')" \
+              --query "[?properties.statusCode=='Accepted'].correlationId" -o tsv)
+              
+            if [ -n "$OPERATION_IDS" ]; then
+              echo "$OPERATION_IDS" | while read -r OPERATION_ID; do
+                if [ -n "$OPERATION_ID" ]; then
+                  echo "Attempting to abort operation: $OPERATION_ID"
+                  az aks operation-abort --resource-group "$RG_NAME" --name "$AKS_NAME" --operation-id "$OPERATION_ID" || true
+                  sleep 10
+                fi
+              done
+              
+              # Wait for a moment to let operations complete/abort
+              echo "Waiting 30 seconds for operations to settle..."
+              sleep 30
+            else
+              echo "No specific operation IDs found, but cluster is updating. Will attempt Terraform apply with retries."
+            fi
           else
-            echo "No in-progress operations found."
+            echo "No in-progress operations found. Cluster state: $PROVISIONING_STATE"
           fi
         else
           echo "AKS cluster doesn't exist yet, no operations to abort."
