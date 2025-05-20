@@ -1,3 +1,4 @@
+# .github/workflows/deploy-memgraph-aks.yml
 name: Deploy Memgraph on AKS
 
 on:
@@ -6,18 +7,27 @@ on:
   workflow_dispatch:
 
 permissions:
-  id-token: write   # OIDC login
-  contents: read
+  id-token: write          # OIDC login
+  contents:  read
 
 env:
-  # Azure authentication
+  ############################################################
+  # Azure authentication (set these three as repo secrets)
+  ############################################################
   ARM_SUBSCRIPTION_ID:  ${{ secrets.AZURE_SUBSCRIPTION_ID }}
   ARM_TENANT_ID:        ${{ secrets.AZURE_TENANT_ID }}
   ARM_CLIENT_ID:        ${{ secrets.AZURE_CLIENT_ID }}
 
+  ############################################################
   # Stack parameters
-  ENVIRONMENT:   dev
-  NODE_VM_SIZE:  Standard_B2ms        # change here if you need a bigger node
+  ############################################################
+  ENVIRONMENT:  dev
+  NODE_VM_SIZE: Standard_B2ms
+
+  ############################################################
+  # Location of your *.tf files (change only this line
+  # if you move Terraform to another folder)
+  ############################################################
   TF_DIR: infra/azure
 
 jobs:
@@ -29,7 +39,7 @@ jobs:
     #─────────────────────────── repo ───────────────────────────
     - uses: actions/checkout@v4
 
-    #────────────────────── Azure login (OIDC) ──────────────────
+    #────────────────── Azure login (OIDC) ──────────────────────
     - name: Azure login
       uses: azure/login@v2
       with:
@@ -39,79 +49,84 @@ jobs:
         auth-type: SERVICE_PRINCIPAL
         audience: api://AzureADTokenExchange
 
-    #────────────────────── Terraform ─────────────────────────
+    #────────────────────── Terraform init ──────────────────────
     - uses: hashicorp/setup-terraform@v2
 
     - name: Terraform init
       env: { TF_IN_AUTOMATION: true }
-      run: terraform -chdir=$TF_DIR init -input=false -no-color
+      run: |
+        terraform -chdir="$TF_DIR" init -input=false -no-color
 
-    # TRY TO IMPORT ALL PRE-EXISTING RESOURCES  ───────────────────
-    - name: Import pre-existing resources (generic)
-      env:
-        TF_IN_AUTOMATION: true
-        RG_NAME:  rg-aks-memgraph-${{ env.ENVIRONMENT }}
-        AKS_NAME: aks-memgraph-${{ env.ENVIRONMENT }}
+    #─────────── Import EVERY pre-existing resource ─────────────
+    - name: Import Azure resources already present
+      env: { TF_IN_AUTOMATION: true }
       run: |
         set -euo pipefail
-        echo "::group::Import resources"
+        echo "::group::terraform import"
 
-        # 1) Always import the resource-group if it exists
+        RG_NAME="rg-aks-memgraph-${{ env.ENVIRONMENT }}"
+        AKS_NAME="aks-memgraph-${{ env.ENVIRONMENT }}"
+
+        ### 1) Resource-group (special-case test) ###############
         if az group exists --name "$RG_NAME" | grep -q true; then
-          terraform -chdir="$TF_DIR" import -no-color -input=false -lock=false \
+          terraform -chdir="$TF_DIR" import -no-color -input=false \
             azurerm_resource_group.this \
-            "/subscriptions/${ARM_SUBSCRIPTION_ID}/resourceGroups/${RG_NAME}" \
-            || true
+            "/subscriptions/${ARM_SUBSCRIPTION_ID}/resourceGroups/${RG_NAME}"
         else
-          echo "RG $RG_NAME not found – will be created"
+          echo "RG $RG_NAME will be created by Terraform."
         fi
 
-        # 2) Generic map for everything else
-        declare -A IMPORT_MAP
+        ### 2) Generic map – add new rows when you add resources
+        declare -A MAP
 
-        # ── AKS cluster
-        IMPORT_MAP[azurerm_kubernetes_cluster.this]="\/subscriptions/${ARM_SUBSCRIPTION_ID}/resourceGroups/${RG_NAME}/providers/Microsoft.ContainerService/managedClusters/${AKS_NAME}"
+        # AKS cluster
+        MAP[azurerm_kubernetes_cluster.this]="\/subscriptions/${ARM_SUBSCRIPTION_ID}/resourceGroups/${RG_NAME}/providers/Microsoft.ContainerService/managedClusters/${AKS_NAME}"
 
-        # ── ADD FUTURE RESOURCES HERE -----------------------------------
-        # Example for a Key Vault called kv-ai-agent:
-        # IMPORT_MAP[azurerm_key_vault.this]="\
+        # ── Example for future resources (uncomment / adapt) ──
+        # MAP[azurerm_key_vault.this]="\
         # /subscriptions/${ARM_SUBSCRIPTION_ID}/resourceGroups/${RG_NAME}/providers/Microsoft.KeyVault/vaults/kv-ai-agent"
+        # MAP[azurerm_container_registry.this]="\
+        # /subscriptions/${ARM_SUBSCRIPTION_ID}/resourceGroups/${RG_NAME}/providers/Microsoft.ContainerRegistry/registries/craiagentreg"
 
-        for TF_ADDR in "${!IMPORT_MAP[@]}"; do
-          AZ_ID="${IMPORT_MAP[$TF_ADDR]}"
-          echo "Attempting import: $TF_ADDR → $AZ_ID"
-          terraform -chdir="$TF_DIR" import -no-color -input=false -lock=false \
-            "$TF_ADDR" "$AZ_ID" || echo "Import skipped/not found"
+        ### Attempt imports; skip if object truly absent ########
+        for TF_ADDR in "${!MAP[@]}"; do
+          AZ_ID="${MAP[$TF_ADDR]}"
+          if az resource show --ids "$AZ_ID" --query "id" -o tsv &>/dev/null; then
+            echo "Importing $TF_ADDR"
+            terraform -chdir="$TF_DIR" import -no-color -input=false \
+              "$TF_ADDR" "$AZ_ID"
+          else
+            echo "Azure object not found → $AZ_ID (skipping)"
+          fi
         done
 
         echo "::endgroup::"
 
+    #────────────────────── Terraform apply ────────────────────
     - name: Terraform apply
       env: { TF_IN_AUTOMATION: true }
       run: |
-        terraform -chdir=$TF_DIR apply -auto-approve -input=false -no-color \
+        terraform -chdir="$TF_DIR" apply -auto-approve -input=false -no-color \
           -var="subscription_id=${{ env.ARM_SUBSCRIPTION_ID }}" \
           -var="location=germanywestcentral" \
           -var="environment=${{ env.ENVIRONMENT }}" \
           -var="node_vm_size=${{ env.NODE_VM_SIZE }}"
 
-
-    #─────────────────── Get AKS kubeconfig ─────────────────────
+    #─────────────── Get AKS kubeconfig (always) ────────────────
     - name: Pull cluster credentials
       run: |
         az aks get-credentials \
-          --resource-group rg-aks-memgraph-${{ env.ENVIRONMENT }} \
-          --name          aks-memgraph-${{ env.ENVIRONMENT }} \
+          --resource-group "rg-aks-memgraph-${{ env.ENVIRONMENT }}" \
+          --name          "aks-memgraph-${{ env.ENVIRONMENT }}" \
           --overwrite-existing
 
-    #────────────────── Build / store credentials ──────────────
+    #────────── Secret (username / password) in K8s ────────────
     - name: Build credentials hash
       id: hash
       run: |
-        echo "value=$(echo -n '${{ secrets.MEMGRAPH_USERNAME }}${{ secrets.MEMGRAPH_PASSWORD }}' \
-              | sha256sum | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+        echo "value=$(echo -n '${{ secrets.MEMGRAPH_USERNAME }}${{ secrets.MEMGRAPH_PASSWORD }}' | sha256sum | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
 
-    - name: Create / update K8s secret
+    - name: Create or update memgraph-credentials secret
       env:
         MEMGRAPH_USERNAME: ${{ secrets.MEMGRAPH_USERNAME }}
         MEMGRAPH_PASSWORD: ${{ secrets.MEMGRAPH_PASSWORD }}
@@ -121,22 +136,23 @@ jobs:
           --from-literal=password="$MEMGRAPH_PASSWORD" \
           --dry-run=client -o yaml | kubectl apply -f -
 
-    #──────────────────── Apply Kubernetes YAML ─────────────────
-    - name: Apply StorageClass
+    #──────────── StorageClass & Kubernetes manifests ───────────
+    - name: Apply StorageClass (Standard HDD)
       run: kubectl apply -f infra/k8s/storageclass.yaml
 
-    - name: Apply Memgraph manifest
+    - name: Apply Memgraph Deployment & Service
       env:
-        CREDENTIALS_HASH:  ${{ steps.hash.outputs.value }}
-        ENVIRONMENT:       ${{ env.ENVIRONMENT }}
-      run: envsubst < infra/k8s/memgraph.yaml | kubectl apply -f -
+        CREDENTIALS_HASH: ${{ steps.hash.outputs.value }}
+        ENVIRONMENT:      ${{ env.ENVIRONMENT }}
+      run: |
+        envsubst < infra/k8s/memgraph.yaml | kubectl apply -f -
 
-    #──────────────────────── Smoke test ────────────────────────
-    - name: Wait for rollout (with diagnostics)
+    #────────────── Wait for rollout (with logs) ────────────────
+    - name: Wait for Memgraph rollout
       run: |
         set -e
         if kubectl rollout status deployment/memgraph --timeout=10m ; then
-          echo "Memgraph deployment ready ✓"
+          echo "Memgraph deployment is ready ✓"
         else
           echo "::warning::Rollout timed out – printing diagnostics"
           kubectl get pods -o wide
