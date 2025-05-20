@@ -140,6 +140,7 @@ spec:
   selector: { app: memgraph }
   type: LoadBalancer
   ports:
-  - { name: bolt, port: 7687, targetPort: 7687 }
-  - { name: http, port: 7444, targetPort: 7444 }
-  - { name: ui,   port: 3000, targetPort: 3000 }
+  - { name: bolt, port: 7687, targetPort: 7687, protocol: TCP }
+  - { name: http, port: 7444, targetPort: 7444, protocol: TCP }
+  - { name: ui,   port: 3000, targetPort: 3000, protocol: TCP }
+

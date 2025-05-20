@@ -145,7 +145,7 @@ jobs:
           --dry-run=client -o yaml | kubectl apply -f -
 
     #──────────── StorageClass & Kubernetes manifests ───────────
-    - name: Apply StorageClass (Standard HDD)
+    - name: Apply StorageClass (Standard SSD)
       run: kubectl apply -f infra/k8s/storageclass.yaml
 
     - name: Apply Memgraph Deployment & Service
