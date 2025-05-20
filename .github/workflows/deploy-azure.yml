@@ -110,6 +110,35 @@ jobs:
 
         echo "::endgroup::"
 
+    #─────────── Check & abort in-progress operations ───────────
+    - name: Check for in-progress AKS operations
+      run: |
+        set -euo pipefail
+        RG_NAME="rg-aks-memgraph-${{ env.ENVIRONMENT }}"
+        AKS_NAME="aks-memgraph-${{ env.ENVIRONMENT }}"
+        
+        # Check if cluster exists first to avoid errors
+        if az aks show --resource-group "$RG_NAME" --name "$AKS_NAME" &>/dev/null; then
+          echo "Checking for in-progress operations on AKS cluster..."
+          OPERATIONS=$(az aks operation-list --resource-group "$RG_NAME" --name "$AKS_NAME" -o json)
+          IN_PROGRESS=$(echo "$OPERATIONS" | jq '.[] | select(.status == "InProgress") | .name')
+          
+          if [ -n "$IN_PROGRESS" ]; then
+            echo "::warning::Found in-progress operations, attempting to abort them..."
+            echo "$OPERATIONS" | jq -r '.[] | select(.status == "InProgress") | .name' | while read OPERATION_ID; do
+              if [ -n "$OPERATION_ID" ]; then
+                echo "Aborting operation: $OPERATION_ID"
+                az aks operation-abort --resource-group "$RG_NAME" --name "$AKS_NAME" --operation-id "$OPERATION_ID"
+                sleep 10
+              fi
+            done
+          else
+            echo "No in-progress operations found."
+          fi
+        else
+          echo "AKS cluster doesn't exist yet, no operations to abort."
+        fi
+
     #────────────────────── Terraform apply ────────────────────
     - name: Terraform apply
       env: { TF_IN_AUTOMATION: true }
