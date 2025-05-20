@@ -80,7 +80,7 @@ jobs:
         declare -A MAP
 
         # AKS cluster
-        MAP[azurerm_kubernetes_cluster.this]="\/subscriptions/${ARM_SUBSCRIPTION_ID}/resourceGroups/${RG_NAME}/providers/Microsoft.ContainerService/managedClusters/${AKS_NAME}"
+        MAP[azurerm_kubernetes_cluster.this]="/subscriptions/${ARM_SUBSCRIPTION_ID}/resourceGroups/${RG_NAME}/providers/Microsoft.ContainerService/managedClusters/${AKS_NAME}"
 
         # ── Example for future resources (uncomment / adapt) ──
         # MAP[azurerm_key_vault.this]="\
