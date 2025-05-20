@@ -26,7 +26,7 @@ variable "node_vm_size" {
 }
 
 locals {
-  rg_name  = "rg-aks-memgraph-${var.environment}"
+  rg_name  = "nullchimp-ai-agent-${var.environment}"
   aks_name = "aks-memgraph-${var.environment}"
 }
 

@@ -110,74 +110,15 @@ jobs:
 
         echo "::endgroup::"
 
-    #─────────── Check & abort in-progress operations ───────────
-    - name: Check for in-progress AKS operations
-      run: |
-        set -euo pipefail
-        RG_NAME="rg-aks-memgraph-${{ env.ENVIRONMENT }}"
-        AKS_NAME="aks-memgraph-${{ env.ENVIRONMENT }}"
-        
-        # Check if cluster exists first to avoid errors
-        if az aks show --resource-group "$RG_NAME" --name "$AKS_NAME" &>/dev/null; then
-          echo "Checking for in-progress operations on AKS cluster..."
-          
-          # Get cluster provisioning state
-          PROVISIONING_STATE=$(az aks show --resource-group "$RG_NAME" --name "$AKS_NAME" --query "provisioningState" -o tsv)
-          
-          if [[ "$PROVISIONING_STATE" == "InProgress" || "$PROVISIONING_STATE" == "Updating" ]]; then
-            echo "::warning::Found in-progress operations, attempting to abort them..."
-            
-            # Get the operation ID from activity logs (last operation started in the last hour)
-            OPERATION_IDS=$(az monitor activity-log list \
-              --resource-group "$RG_NAME" \
-              --resource-id "/subscriptions/${{ env.ARM_SUBSCRIPTION_ID }}/resourceGroups/$RG_NAME/providers/Microsoft.ContainerService/managedClusters/$AKS_NAME" \
-              --status "Started" \
-              --start-time "$(date -u -d '1 hour ago' '+%Y-%m-%dT%H:%M:%SZ')" \
-              --query "[?properties.statusCode=='Accepted'].correlationId" -o tsv)
-              
-            if [ -n "$OPERATION_IDS" ]; then
-              echo "$OPERATION_IDS" | while read -r OPERATION_ID; do
-                if [ -n "$OPERATION_ID" ]; then
-                  echo "Attempting to abort operation: $OPERATION_ID"
-                  az aks operation-abort --resource-group "$RG_NAME" --name "$AKS_NAME" --operation-id "$OPERATION_ID" || true
-                  sleep 10
-                fi
-              done
-              
-              # Wait for a moment to let operations complete/abort
-              echo "Waiting 30 seconds for operations to settle..."
-              sleep 30
-            else
-              echo "No specific operation IDs found, but cluster is updating. Will attempt Terraform apply with retries."
-            fi
-          else
-            echo "No in-progress operations found. Cluster state: $PROVISIONING_STATE"
-          fi
-        else
-          echo "AKS cluster doesn't exist yet, no operations to abort."
-        fi
-
     #────────────────────── Terraform apply ────────────────────
     - name: Terraform apply
       env: { TF_IN_AUTOMATION: true }
       run: |
-        set -euo pipefail
-        MAX_RETRIES=5
-        RETRY_COUNT=0
-        while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
-          terraform -chdir="$TF_DIR" apply -auto-approve -input=false -no-color \
-            -var="subscription_id=${{ env.ARM_SUBSCRIPTION_ID }}" \
-            -var="location=germanywestcentral" \
-            -var="environment=${{ env.ENVIRONMENT }}" \
-            -var="node_vm_size=${{ env.NODE_VM_SIZE }}" && break
-          RETRY_COUNT=$((RETRY_COUNT + 1))
-          echo "::warning::Retrying Terraform apply due to conflict..."
-          sleep 30
-        done
-        if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
-          echo "::error::Terraform apply failed after retries"
-          exit 1
-        fi
+        terraform -chdir="$TF_DIR" apply -auto-approve -input=false -no-color \
+          -var="subscription_id=${{ env.ARM_SUBSCRIPTION_ID }}" \
+          -var="location=germanywestcentral" \
+          -var="environment=${{ env.ENVIRONMENT }}" \
+          -var="node_vm_size=${{ env.NODE_VM_SIZE }}"
 
     #─────────────── Get AKS kubeconfig (always) ────────────────
     - name: Pull cluster credentials
