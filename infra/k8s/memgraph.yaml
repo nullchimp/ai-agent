@@ -57,17 +57,12 @@ spec:
         args: ["--log-level=INFO", "--also-log-to-stderr"]
 
         ports:
-        - { name: bolt, port: 7687 }
-        - { name: http, port: 7444 }
-        - { name: ui,   port: 3000 }
+        - { name: bolt, containerPort: 7687 }
+        - { name: http, containerPort: 7444 }
+        - { name: ui, containerPort: 3000 }
 
         # ── authentication ────────────────────────────────────
         env:
-        - name: MEMGRAPH_USERNAME
-          valueFrom: { secretKeyRef: { name: memgraph-credentials, key: username } }
-        - name: MEMGRAPH_PASSWORD
-          valueFrom: { secretKeyRef: { name: memgraph-credentials, key: password } }
-
         # Memgraph recognises these and enables auth automatically
         - name: MG_USERNAME
           valueFrom: { secretKeyRef: { name: memgraph-credentials, key: username } }
