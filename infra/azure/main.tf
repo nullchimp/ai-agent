@@ -27,7 +27,7 @@ variable "node_vm_size" {
 }
 
 locals {
-  rg_name  = var.resource_group"
+  rg_name  = var.resource_group
   aks_name = "aks-memgraph-${var.environment}"
 }
 
