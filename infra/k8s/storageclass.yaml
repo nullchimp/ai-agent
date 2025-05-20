@@ -1,0 +1,10 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: disk-standard           # referenced by the PVCs
+provisioner: disk.csi.azure.com
+parameters:
+  skuname: Standard_LRS         # cheapest durable disks
+reclaimPolicy: Retain           # keep the disk even if PVC is deleted
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true

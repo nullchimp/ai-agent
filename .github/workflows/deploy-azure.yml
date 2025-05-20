@@ -1,232 +1,92 @@
-name: Deploy to Azure
+name: Deploy Memgraph on AKS
 
 on:
   push:
-    branches: [ dev ]
+    branches: [ main ]
   workflow_dispatch:
 
 permissions:
-  id-token: write
+  id-token: write   # OIDC login
   contents: read
 
 env:
-  ENVIRONMENT: dev
-  AZURE_RESOURCE_GROUP: GitHub
-  AZURE_LOCATION: germanywestcentral
+  # Azure authentication
+  ARM_SUBSCRIPTION_ID:  ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+  ARM_TENANT_ID:        ${{ secrets.AZURE_TENANT_ID }}
+  ARM_CLIENT_ID:        ${{ secrets.AZURE_CLIENT_ID }}
+
+  # Stack parameters
+  ENVIRONMENT:   dev
+  NODE_VM_SIZE:  Standard_B2ms        # change here if you need a bigger node
 
 jobs:
-  deploy-infrastructure:
+  deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 30  # Add timeout to prevent infinite runs
+    defaults: { run: { shell: bash } }
+
     steps:
-      - uses: actions/checkout@v3
-          
-      - name: Azure Login
-        uses: azure/login@v2
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-          allow-no-subscriptions: false
-          audience: api://AzureADTokenExchange
-          auth-type: SERVICE_PRINCIPAL
-          
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v2
-      
-      - name: Terraform Init
-        run: |
-          cd infra/azure
-          terraform init
-      
-      - name: Import Existing Resources
-        run: |
-          cd infra/azure
-          chmod +x ./import_resources.sh
-          ENVIRONMENT=${{ env.ENVIRONMENT }} \
-          SUBSCRIPTION_ID=${{ secrets.AZURE_SUBSCRIPTION_ID }} \
-          TENANT_ID=${{ secrets.AZURE_TENANT_ID }} \
-          OBJECT_ID=${{ secrets.AZURE_SP_OBJECT_ID }} \
-          CI_MODE=true \
-          ./import_resources.sh
+    #─────────────────────────── repo ───────────────────────────
+    - uses: actions/checkout@v4
 
-      - name: Terraform Apply
-        timeout-minutes: 120  # Increase timeout to 2 hours for AKS node pool operations
-        run: |
-          cd infra/azure
-          # Set TF_PLUGIN_TIMEOUT to increase the timeout for Azure provider operations
-          export TF_PLUGIN_TIMEOUT=120m
-          terraform apply -auto-approve \
-            -var="environment=${{ env.ENVIRONMENT }}" \
-            -var="memgraph_username=${{ secrets.MEMGRAPH_USERNAME }}" \
-            -var="memgraph_password=${{ secrets.MEMGRAPH_PASSWORD }}" \
-            -var="subscription_id=${{ secrets.AZURE_SUBSCRIPTION_ID }}" \
-            -var="tenant_id=${{ secrets.AZURE_TENANT_ID }}" \
-            -var="object_id=${{ secrets.AZURE_SP_OBJECT_ID }}"
-      
-      - name: Get AKS Credentials
-        run: |
-          # Wait for the AKS cluster to be ready
-          echo "Waiting for AKS cluster to be ready..."
-          for i in {1..30}; do
-            if az aks show --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
-                --name aks-ai-agent-${{ env.ENVIRONMENT }} --query "provisioningState" -o tsv | grep -q "Succeeded"; then
-              echo "AKS cluster is ready"
-              break
-            fi
-            echo "Waiting for AKS cluster to be ready (attempt $i)..."
-            sleep 10
-          done
-          
-          # Get credentials
-          az aks get-credentials --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
-            --name aks-ai-agent-${{ env.ENVIRONMENT }}
-      
-      - name: Create K8s Secret for Memgraph
-        run: |
-          # Check if kubectl is working and the cluster is accessible
-          if ! kubectl get nodes &>/dev/null; then
-            echo "Cannot connect to Kubernetes cluster. Waiting for it to become available..."
-            for i in {1..10}; do
-              sleep 15
-              if kubectl get nodes &>/dev/null; then
-                echo "Successfully connected to Kubernetes cluster"
-                break
-              fi
-              echo "Attempt $i: Still waiting for Kubernetes cluster..."
-              if [ $i -eq 10 ]; then
-                echo "Failed to connect to Kubernetes cluster after multiple attempts. Continuing anyway..."
-              fi
-            done
-          fi
-          
-          # Create a credentials hash to force pod restart when credentials change
-          CREDENTIALS_HASH=$(echo -n "${{ secrets.MEMGRAPH_USERNAME }}${{ secrets.MEMGRAPH_PASSWORD }}" | sha256sum | awk '{print $1}')
-          echo "CREDENTIALS_HASH=$CREDENTIALS_HASH" >> $GITHUB_ENV
-          
-          # Create secret directly using kubectl command
-          kubectl create secret generic memgraph-credentials \
-            --from-literal=username="${{ secrets.MEMGRAPH_USERNAME }}" \
-            --from-literal=password="${{ secrets.MEMGRAPH_PASSWORD }}" \
-            --dry-run=client -o yaml | kubectl apply -f -
-          
-          echo "Memgraph credentials secret created successfully"
-      
-      - name: Deploy to AKS
-        run: |
-          # Replace the placeholder with the actual credentials hash and environment
-          cat infra/k8s/memgraph.yaml | \
-            sed "s/\${CREDENTIALS_HASH}/$CREDENTIALS_HASH/g" | \
-            sed "s/\${ENVIRONMENT}/${{ env.ENVIRONMENT }}/g" > memgraph_deploy.yaml
+    #────────────────────── Azure login (OIDC) ──────────────────
+    - name: Azure login
+      uses: azure/login@v2
+      with:
+        client-id:        ${{ env.ARM_CLIENT_ID }}
+        tenant-id:        ${{ env.ARM_TENANT_ID }}
+        subscription-id:  ${{ env.ARM_SUBSCRIPTION_ID }}
+        auth-type: SERVICE_PRINCIPAL
+        audience: api://AzureADTokenExchange
 
-          # Split the manifest into PVC and non-PVC resources
-          csplit -z -f part_ memgraph_deploy.yaml "/^---$/" '{*}'
+    #──────────────────────── Terraform ─────────────────────────
+    - uses: hashicorp/setup-terraform@v2
 
-          # Apply PVCs only if they do not exist
-          for f in part_*; do
-            if grep -q 'kind: PersistentVolumeClaim' "$f"; then
-              PVC_NAME=$(grep 'name:' "$f" | head -1 | awk '{print $2}')
-              if kubectl get pvc "$PVC_NAME" &>/dev/null; then
-                echo "PVC $PVC_NAME already exists, skipping creation."
-              else
-                kubectl apply -f "$f"
-              fi
-            else
-              kubectl apply -f "$f"
-            fi
-          done
+    - name: Terraform init
+      run: terraform -chdir=infra init
 
-          # Force restart if the deployment already exists
-          POD_NAME=$(kubectl get pods -l app=memgraph -o jsonpath="{.items[0].metadata.name}" 2>/dev/null || echo "")
-          if [[ -n "$POD_NAME" ]]; then
-            echo "Forcing restart of existing Memgraph pod..."
-            kubectl delete pod $POD_NAME
-          fi
+    - name: Terraform apply
+      run: |
+        terraform -chdir=infra apply -auto-approve \
+          -var="subscription_id=${{ env.ARM_SUBSCRIPTION_ID }}" \
+          -var="location=germanywestcentral" \
+          -var="environment=${{ env.ENVIRONMENT }}" \
+          -var="node_vm_size=${{ env.NODE_VM_SIZE }}"
 
-          # Remove the temporary files
-          rm memgraph_deploy.yaml part_*
-      
-      - name: Verify Deployment
-        run: |
-          echo "Checking deployment status..."
-          kubectl get pods
-          kubectl get services
-          
-          echo "Waiting for Memgraph pod to be ready (may take up to 10 minutes)..."
-          # Check for failed pods with a simpler approach that doesn't rely on complex jsonpath
-          FAILED_PODS_FAILED=$(kubectl get pods -l app=memgraph --field-selector=status.phase=Failed -o jsonpath="{.items[*].metadata.name}" 2>/dev/null || echo "")
-          FAILED_PODS_CRASH=$(kubectl get pods -l app=memgraph -o jsonpath="{.items[?(@.status.containerStatuses[0].state.waiting.reason=='CrashLoopBackOff')].metadata.name}" 2>/dev/null || echo "")
-          
-          FAILED_PODS="$FAILED_PODS_FAILED $FAILED_PODS_CRASH"
-          if [[ -n "$FAILED_PODS" ]]; then
-            echo "Found failed pods, cleaning up before proceeding:"
-            for pod in $FAILED_PODS; do
-              if [[ -n "$pod" ]]; then
-                echo "Deleting failed pod: $pod"
-                kubectl delete pod $pod
-              fi
-            done
-            echo "Waiting for cleanup to complete..."
-            sleep 30
-          fi
-          
-          # Wait for pod to be ready with increased timeout
-          if ! kubectl wait --for=condition=ready pod -l app=memgraph --timeout=10m; then
-            echo "Error: Memgraph pod did not become ready within the timeout period."
-            echo "Checking Memgraph pod logs:"
-            POD_NAME=$(kubectl get pods -l app=memgraph -o jsonpath="{.items[0].metadata.name}" 2>/dev/null || echo "")
-            
-            if [[ -n "$POD_NAME" ]]; then
-              echo "Pod details:"
-              kubectl describe pod $POD_NAME
-              
-              echo "Pod logs:"
-              kubectl logs $POD_NAME --tail=100
-            else
-              echo "No Memgraph pod found to check logs."
-            fi
-            
-            echo "Checking node resource utilization:"
-            kubectl describe nodes
-            
-            echo "Deployment verification failed! Please check the Kubernetes cluster's resources and capacity."
-            exit 1
-          fi
-          
-          echo "Memgraph deployment successful!"
-          
-          echo "Waiting for LoadBalancer to expose an address..."
-          for i in {1..45}; do
-            EXTERNAL_IP=$(kubectl get service memgraph -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || echo "")
-            DNS_NAME=$(kubectl get service memgraph -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo "")
-            if [[ -n "$EXTERNAL_IP" || -n "$DNS_NAME" ]]; then
-              HOST=${EXTERNAL_IP:-$DNS_NAME}
-              echo "Memgraph is accessible at: ${HOST}:7687"
-              # make host usable by subsequent steps
-              echo "MEMGRAPH_URI=${HOST}" >> $GITHUB_ENV
-              echo "Performing basic connectivity test..."
-              if nc -z -w 5 ${HOST} 7687; then
-                echo "Successfully connected to Memgraph on port 7687!"
-              else
-                echo "Warning: Could not connect to Memgraph on port 7687. The service may not be fully ready yet."
-              fi
-              break
-            fi
-            echo "Waiting for address (attempt $i)..."
-            sleep 10
-          done
-          
-          if [[ -z "$EXTERNAL_IP" && -z "$DNS_NAME" ]]; then
-            echo "Warning: LoadBalancer address not available within timeout."
-            kubectl describe service memgraph
-          else
-            MEMGRAPH_HOST=${EXTERNAL_IP:-$DNS_NAME}
-            echo "=========================================================="
-            echo "Memgraph Connection Information:"
-            echo "Host: $MEMGRAPH_HOST"
-            echo "Port: 7687 (Bolt), 7444 (HTTP API), 3000 (UI)"
-            echo "Username: ${{ secrets.MEMGRAPH_USERNAME }}"
-            echo "Password: [Configured in secrets]"
-            echo "Connection URL: bolt://${{ secrets.MEMGRAPH_USERNAME }}@$MEMGRAPH_HOST:7687"
-            echo "=========================================================="
-          fi
+    #─────────────────── Get AKS kubeconfig ─────────────────────
+    - name: Pull cluster credentials
+      run: |
+        az aks get-credentials \
+          --resource-group rg-aks-memgraph-${{ env.ENVIRONMENT }} \
+          --name          aks-memgraph-${{ env.ENVIRONMENT }} \
+          --overwrite-existing
+
+    #────────────────── Build / store credentials ──────────────
+    - name: Build credentials hash
+      id: hash
+      run: |
+        echo "value=$(echo -n '${{ secrets.MEMGRAPH_USERNAME }}${{ secrets.MEMGRAPH_PASSWORD }}' \
+              | sha256sum | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+
+    - name: Create / update K8s secret
+      env:
+        MEMGRAPH_USERNAME: ${{ secrets.MEMGRAPH_USERNAME }}
+        MEMGRAPH_PASSWORD: ${{ secrets.MEMGRAPH_PASSWORD }}
+      run: |
+        kubectl create secret generic memgraph-credentials \
+          --from-literal=username="$MEMGRAPH_USERNAME" \
+          --from-literal=password="$MEMGRAPH_PASSWORD" \
+          --dry-run=client -o yaml | kubectl apply -f -
+
+    #──────────────────── Apply Kubernetes YAML ─────────────────
+    - name: Apply StorageClass
+      run: kubectl apply -f infra/k8s/storageclass.yaml
+
+    - name: Apply Memgraph manifest
+      env:
+        CREDENTIALS_HASH:  ${{ steps.hash.outputs.value }}
+        ENVIRONMENT:       ${{ env.ENVIRONMENT }}
+      run: envsubst < infra/k8s/memgraph.yaml | kubectl apply -f -
+
+    #──────────────────────── Smoke test ────────────────────────
+    - name: Wait for rollout
+      run: kubectl rollout status deployment/memgraph --timeout=5m
