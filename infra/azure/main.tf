@@ -161,6 +161,15 @@ resource "null_resource" "cleanup_unmanaged_resources" {
 set -e
 echo "Starting cleanup of unmanaged resources in ${data.azurerm_resource_group.github.name} resource group..."
 
+# Check if there are any ongoing operations on the AKS cluster
+AKS_NAME="aks-ai-agent-${var.environment}"
+AKS_PROVISIONING_STATE=$(az aks show --name $AKS_NAME --resource-group ${data.azurerm_resource_group.github.name} --query "provisioningState" -o tsv 2>/dev/null || echo "NotFound")
+
+if [[ "$AKS_PROVISIONING_STATE" != "Succeeded" && "$AKS_PROVISIONING_STATE" != "NotFound" ]]; then
+  echo "AKS cluster is currently in $AKS_PROVISIONING_STATE state. Skipping cleanup to avoid conflicts."
+  exit 0
+fi
+
 # Get all resources in the resource group
 ALL_RESOURCES=$(az resource list --resource-group ${data.azurerm_resource_group.github.name} --query "[].id" -o tsv)
 

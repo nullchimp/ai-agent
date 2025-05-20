@@ -51,8 +51,11 @@ jobs:
           ./import_resources.sh
 
       - name: Terraform Apply
+        timeout-minutes: 120  # Increase timeout to 2 hours for AKS node pool operations
         run: |
           cd infra/azure
+          # Set TF_PLUGIN_TIMEOUT to increase the timeout for Azure provider operations
+          export TF_PLUGIN_TIMEOUT=120m
           terraform apply -auto-approve \
             -var="environment=${{ env.ENVIRONMENT }}" \
             -var="memgraph_username=${{ secrets.MEMGRAPH_USERNAME }}" \
