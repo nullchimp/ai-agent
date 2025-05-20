@@ -7,5 +7,5 @@ provisioner: disk.csi.azure.com
 parameters:
   skuname: StandardSSD_LRS       # ← Standard SSD (ZRS and Premium cost more)
 reclaimPolicy: Retain
-volumeBindingMode: WaitForFirstConsumer
+volumeBindingMode: Immediate
 allowVolumeExpansion: true
