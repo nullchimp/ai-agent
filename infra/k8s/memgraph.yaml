@@ -47,7 +47,8 @@ spec:
       - key: "node.kubernetes.io/memory-pressure"
         operator: "Exists"
         effect: "NoSchedule"
-
+      securityContext:
+        fsGroup: 1000
       containers:
       - name: memgraph
         image: memgraph/memgraph-mage:latest
