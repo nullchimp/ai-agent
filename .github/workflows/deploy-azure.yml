@@ -33,7 +33,7 @@ env:
   # if you move Terraform to another folder)
   ############################################################
   TF_DIR: infra/azure
-  RESOURCE_GROUP: "nullchimp-ai-agent"
+  RESOURCE_GROUP: "ai-agent"
   AKS_NAME: aks-memgraph
 
 jobs:
