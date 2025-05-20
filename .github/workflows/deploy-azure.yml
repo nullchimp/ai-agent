@@ -18,6 +18,7 @@ env:
   # Stack parameters
   ENVIRONMENT:   dev
   NODE_VM_SIZE:  Standard_B2ms        # change here if you need a bigger node
+  TF_DIR: infra/azure
 
 jobs:
   deploy:
@@ -42,36 +43,54 @@ jobs:
     - uses: hashicorp/setup-terraform@v2
 
     - name: Terraform init
-      env: { TF_IN_AUTOMATION: true }            # disables interactive prompts
-      run: terraform -chdir=infra/azure init -input=false -no-color
+      env: { TF_IN_AUTOMATION: true }
+      run: terraform -chdir=$TF_DIR init -input=false -no-color
 
-    # TRY TO IMPORT THE RG IF IT ALREADY EXISTS
-    - name: Import existing resource-group (if any)
+    # TRY TO IMPORT *EVERY* PRE-EXISTING RESOURCE  ─────────────────
+    - name: Import any pre-existing resources
       env:
         TF_IN_AUTOMATION: true
-        RG_NAME: rg-aks-memgraph-${{ env.ENVIRONMENT }}
+        RG_NAME:  rg-aks-memgraph-${{ env.ENVIRONMENT }}
+        AKS_NAME: aks-memgraph-${{ env.ENVIRONMENT }}
       run: |
-        set -e
-        if az group exists --name "$RG_NAME" | grep -q true; then
-          echo "Resource-group $RG_NAME exists – importing"
-          terraform -chdir=infra/azure \
-            import \
-            -input=false -lock=false -no-color \
-            azurerm_resource_group.this \
-            "/subscriptions/${ARM_SUBSCRIPTION_ID}/resourceGroups/$RG_NAME" \
-            || true      # ignore “already in state”
-        else
-          echo "Resource-group $RG_NAME not found – will be created"
-        fi
+        set -euo pipefail
+
+        # ------------------------------------------------------------------
+        # Map Terraform addresses ➜ Azure IDs (bash associative array)
+        # ------------------------------------------------------------------
+        declare -A IMPORT_MAP
+
+        # 1) Resource-Group
+        IMPORT_MAP[azurerm_resource_group.this]="/subscriptions/${ARM_SUBSCRIPTION_ID}/resourceGroups/${RG_NAME}"
+
+        # 2) AKS Cluster
+        IMPORT_MAP[azurerm_kubernetes_cluster.this]="/subscriptions/${ARM_SUBSCRIPTION_ID}/resourceGroups/${RG_NAME}/providers/Microsoft.ContainerService/managedClusters/${AKS_NAME}"
+
+        # ------------------------------------------------------------------
+        # Loop over the map, import each resource if it actually exists
+        # ------------------------------------------------------------------
+        for TF_ADDRESS in "${!IMPORT_MAP[@]}"; do
+          AZ_ID="${IMPORT_MAP[$TF_ADDRESS]}"
+
+          # Does the resource exist in Azure?
+          if az resource show --ids "$AZ_ID" --query "id" -o tsv &>/dev/null; then
+            echo "Importing $TF_ADDRESS → $AZ_ID"
+            terraform -chdir="$TF_DIR" import -no-color -input=false -lock=false \
+                    "$TF_ADDRESS" "$AZ_ID" || true    # ignore “already managed”
+          else
+            echo "Azure resource not found → $AZ_ID (skipping import)"
+          fi
+        done
 
     - name: Terraform apply
       env: { TF_IN_AUTOMATION: true }
       run: |
-        terraform -chdir=infra/azure apply -auto-approve -input=false -no-color \
+        terraform -chdir=$TF_DIR apply -auto-approve -input=false -no-color \
           -var="subscription_id=${{ env.ARM_SUBSCRIPTION_ID }}" \
           -var="location=germanywestcentral" \
           -var="environment=${{ env.ENVIRONMENT }}" \
           -var="node_vm_size=${{ env.NODE_VM_SIZE }}"
+
 
     #─────────────────── Get AKS kubeconfig ─────────────────────
     - name: Pull cluster credentials
