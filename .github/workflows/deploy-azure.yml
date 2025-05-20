@@ -42,11 +42,11 @@ jobs:
     - uses: hashicorp/setup-terraform@v2
 
     - name: Terraform init
-      run: terraform -chdir=infra init
+      run: terraform -chdir=infra/azure init
 
     - name: Terraform apply
       run: |
-        terraform -chdir=infra apply -auto-approve \
+        terraform -chdir=infra/azure apply -auto-approve \
           -var="subscription_id=${{ env.ARM_SUBSCRIPTION_ID }}" \
           -var="location=germanywestcentral" \
           -var="environment=${{ env.ENVIRONMENT }}" \
