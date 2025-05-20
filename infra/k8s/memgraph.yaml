@@ -1,12 +1,19 @@
+################################################################
+#  Memgraph - all-in-one manifest
+#  ▸ Auth enabled (via MG_USERNAME / MG_PASSWORD)
+#  ▸ Empty passwords explicitly disallowed
+#  ▸ Log level set to INFO (TRACE is too noisy for prod)
+################################################################
+
 ###############################################################
-#  ConfigMap
+#  ConfigMap – runtime flags
 ###############################################################
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: memgraph-config
 data:
-  MG_LOG_LEVEL: "TRACE"
+  MG_LOG_LEVEL: "INFO"            # change to DEBUG/TRACE only when troubleshooting
 ---
 ###############################################################
 #  Deployment
@@ -18,66 +25,70 @@ metadata:
 spec:
   replicas: 1
   selector:
-    matchLabels:
-      app: memgraph
+    matchLabels: { app: memgraph }
   template:
     metadata:
-      labels:
-        app: memgraph
+      labels: { app: memgraph }
       annotations:
+        # forces rolling restart when credentials change
         credentials-hash: "${CREDENTIALS_HASH}"
     spec:
-      # ── sysctl without privileged container ──────────────────
+      # ── kernel tunable without privileged init-container ─────
       securityContext:
+        fsGroup: 1000                       # proper perms for mounted volumes
         sysctls:
-        - name: vm.max_map_count
-          value: "262144"
+        - { name: vm.max_map_count, value: "262144" }
 
-      # node-affinity & tolerations (unchanged) …
+      # schedule on B2ms nodes if available
       affinity:
         nodeAffinity:
           preferredDuringSchedulingIgnoredDuringExecution:
           - weight: 100
             preference:
               matchExpressions:
-              - key: beta.kubernetes.io/instance-type
-                operator: In
-                values: [ Standard_B2ms ]
+              - { key: beta.kubernetes.io/instance-type, operator: In, values: [ Standard_B2ms ] }
+
       tolerations:
-      - key: "node.kubernetes.io/memory-pressure"
-        operator: "Exists"
-        effect: "NoSchedule"
-      securityContext:
-        fsGroup: 1000
+      - { key: "node.kubernetes.io/memory-pressure", operator: "Exists", effect: "NoSchedule" }
+
       containers:
       - name: memgraph
         image: memgraph/memgraph-mage:latest
-        args: ["--log-level=TRACE", "--also-log-to-stderr"]
-        ports:
-        - { containerPort: 7687, name: bolt }
-        - { containerPort: 7444, name: http }
-        - { containerPort: 3000, name: ui }
+        args: ["--log-level=INFO", "--also-log-to-stderr"]
 
+        ports:
+        - { name: bolt, port: 7687 }
+        - { name: http, port: 7444 }
+        - { name: ui,   port: 3000 }
+
+        # ── authentication ────────────────────────────────────
         env:
         - name: MEMGRAPH_USERNAME
           valueFrom: { secretKeyRef: { name: memgraph-credentials, key: username } }
         - name: MEMGRAPH_PASSWORD
           valueFrom: { secretKeyRef: { name: memgraph-credentials, key: password } }
+
+        # Memgraph recognises these and enables auth automatically
         - name: MG_USERNAME
           valueFrom: { secretKeyRef: { name: memgraph-credentials, key: username } }
         - name: MG_PASSWORD
           valueFrom: { secretKeyRef: { name: memgraph-credentials, key: password } }
 
-        envFrom:
-        - configMapRef: { name: memgraph-config }
+        # Prevent accidental empty password
+        - { name: MG_ALLOW_EMPTY_PASSWORD, value: "false" }
 
+        # Load any future flags from the ConfigMap
+        envFrom:
+        - { configMapRef: { name: memgraph-config } }
+
+        # persistent storage
         volumeMounts:
         - { name: data, mountPath: /data }
         - { name: logs, mountPath: /var/log/memgraph }
 
         resources:
-          requests: { memory: "1Gi", cpu: "500m" }
-          limits:   { memory: "2Gi", cpu: "1000m" }
+          requests: { cpu: "500m", memory: "1Gi" }
+          limits:   { cpu: "1000m", memory: "2Gi" }
 
         livenessProbe:
           tcpSocket: { port: 7687 }
@@ -92,20 +103,18 @@ spec:
           timeoutSeconds: 3
 
       volumes:
-      - name: data
-        persistentVolumeClaim: { claimName: memgraph-data }
-      - name: logs
-        persistentVolumeClaim: { claimName: memgraph-logs }
+      - { name: data, persistentVolumeClaim: { claimName: memgraph-data } }
+      - { name: logs, persistentVolumeClaim: { claimName: memgraph-logs } }
 ---
 ###############################################################
-#  PVCs
+#  Persistent Volume Claims – Standard HDD (change if needed)
 ###############################################################
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: memgraph-data
 spec:
-  storageClassName: disk-standard
+  storageClassName: disk-ssd
   accessModes: [ ReadWriteOnce ]
   resources: { requests: { storage: 10Gi } }
 ---
@@ -114,12 +123,12 @@ kind: PersistentVolumeClaim
 metadata:
   name: memgraph-logs
 spec:
-  storageClassName: disk-standard
+  storageClassName: disk-ssd
   accessModes: [ ReadWriteOnce ]
   resources: { requests: { storage: 5Gi } }
 ---
 ###############################################################
-#  Service
+#  Service – public LoadBalancer
 ###############################################################
 apiVersion: v1
 kind: Service
@@ -128,8 +137,7 @@ metadata:
   annotations:
     service.beta.kubernetes.io/azure-dns-label-name: "memgraph-aiagent-${ENVIRONMENT}"
 spec:
-  selector:
-    app: memgraph
+  selector: { app: memgraph }
   type: LoadBalancer
   ports:
   - { name: bolt, port: 7687, targetPort: 7687 }

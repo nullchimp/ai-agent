@@ -1,10 +1,11 @@
+# infra/k8s/storageclass-ssd.yaml
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
-  name: disk-standard           # referenced by the PVCs
+  name: disk-ssd                 # new name
 provisioner: disk.csi.azure.com
 parameters:
-  skuname: Standard_LRS         # cheapest durable disks
-reclaimPolicy: Retain           # keep the disk even if PVC is deleted
+  skuname: StandardSSD_LRS       # ← Standard SSD (ZRS and Premium cost more)
+reclaimPolicy: Retain
 volumeBindingMode: WaitForFirstConsumer
 allowVolumeExpansion: true

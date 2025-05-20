@@ -11,7 +11,7 @@ import asyncio
 import os
 
 db = MemGraphClient(
-    host="localhost" or os.environ.get("MEMGRAPH_URI", "localhost"),
+    host=os.environ.get("MEMGRAPH_URI", "localhost"),
     port=int(os.environ.get("MEMGRAPH_PORT", 7687)),
     username=os.environ.get("MEMGRAPH_USERNAME", "memgraph"),
     password=os.environ.get("MEMGRAPH_PASSWORD", "memgraph"),
