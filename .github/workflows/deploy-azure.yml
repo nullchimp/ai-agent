@@ -46,41 +46,45 @@ jobs:
       env: { TF_IN_AUTOMATION: true }
       run: terraform -chdir=$TF_DIR init -input=false -no-color
 
-    # TRY TO IMPORT *EVERY* PRE-EXISTING RESOURCE  ─────────────────
-    - name: Import any pre-existing resources
+    # TRY TO IMPORT ALL PRE-EXISTING RESOURCES  ───────────────────
+    - name: Import pre-existing resources (generic)
       env:
         TF_IN_AUTOMATION: true
         RG_NAME:  rg-aks-memgraph-${{ env.ENVIRONMENT }}
         AKS_NAME: aks-memgraph-${{ env.ENVIRONMENT }}
       run: |
         set -euo pipefail
+        echo "::group::Import resources"
 
-        # ------------------------------------------------------------------
-        # Map Terraform addresses ➜ Azure IDs (bash associative array)
-        # ------------------------------------------------------------------
+        # 1) Always import the resource-group if it exists
+        if az group exists --name "$RG_NAME" | grep -q true; then
+          terraform -chdir="$TF_DIR" import -no-color -input=false -lock=false \
+            azurerm_resource_group.this \
+            "/subscriptions/${ARM_SUBSCRIPTION_ID}/resourceGroups/${RG_NAME}" \
+            || true
+        else
+          echo "RG $RG_NAME not found – will be created"
+        fi
+
+        # 2) Generic map for everything else
         declare -A IMPORT_MAP
 
-        # 1) Resource-Group
-        IMPORT_MAP[azurerm_resource_group.this]="/subscriptions/${ARM_SUBSCRIPTION_ID}/resourceGroups/${RG_NAME}"
+        # ── AKS cluster
+        IMPORT_MAP[azurerm_kubernetes_cluster.this]="\/subscriptions/${ARM_SUBSCRIPTION_ID}/resourceGroups/${RG_NAME}/providers/Microsoft.ContainerService/managedClusters/${AKS_NAME}"
 
-        # 2) AKS Cluster
-        IMPORT_MAP[azurerm_kubernetes_cluster.this]="/subscriptions/${ARM_SUBSCRIPTION_ID}/resourceGroups/${RG_NAME}/providers/Microsoft.ContainerService/managedClusters/${AKS_NAME}"
+        # ── ADD FUTURE RESOURCES HERE -----------------------------------
+        # Example for a Key Vault called kv-ai-agent:
+        # IMPORT_MAP[azurerm_key_vault.this]="\
+        # /subscriptions/${ARM_SUBSCRIPTION_ID}/resourceGroups/${RG_NAME}/providers/Microsoft.KeyVault/vaults/kv-ai-agent"
 
-        # ------------------------------------------------------------------
-        # Loop over the map, import each resource if it actually exists
-        # ------------------------------------------------------------------
-        for TF_ADDRESS in "${!IMPORT_MAP[@]}"; do
-          AZ_ID="${IMPORT_MAP[$TF_ADDRESS]}"
-
-          # Does the resource exist in Azure?
-          if az resource show --ids "$AZ_ID" --query "id" -o tsv &>/dev/null; then
-            echo "Importing $TF_ADDRESS → $AZ_ID"
-            terraform -chdir="$TF_DIR" import -no-color -input=false -lock=false \
-                    "$TF_ADDRESS" "$AZ_ID" || true    # ignore “already managed”
-          else
-            echo "Azure resource not found → $AZ_ID (skipping import)"
-          fi
+        for TF_ADDR in "${!IMPORT_MAP[@]}"; do
+          AZ_ID="${IMPORT_MAP[$TF_ADDR]}"
+          echo "Attempting import: $TF_ADDR → $AZ_ID"
+          terraform -chdir="$TF_DIR" import -no-color -input=false -lock=false \
+            "$TF_ADDR" "$AZ_ID" || echo "Import skipped/not found"
         done
+
+        echo "::endgroup::"
 
     - name: Terraform apply
       env: { TF_IN_AUTOMATION: true }
