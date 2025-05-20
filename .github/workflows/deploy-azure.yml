@@ -42,27 +42,32 @@ jobs:
     - uses: hashicorp/setup-terraform@v2
 
     - name: Terraform init
-      run: terraform -chdir=infra/azure init
+      env: { TF_IN_AUTOMATION: true }            # disables interactive prompts
+      run: terraform -chdir=infra/azure init -input=false -no-color
 
-    # NEW · Import RG if it already exists
+    # TRY TO IMPORT THE RG IF IT ALREADY EXISTS
     - name: Import existing resource-group (if any)
       env:
+        TF_IN_AUTOMATION: true
         RG_NAME: rg-aks-memgraph-${{ env.ENVIRONMENT }}
       run: |
         set -e
-        if az group show --name "$RG_NAME" &>/dev/null; then
-          echo "Resource-group $RG_NAME exists – importing into state"
-          terraform -chdir=infra/azure import \
+        if az group exists --name "$RG_NAME" | grep -q true; then
+          echo "Resource-group $RG_NAME exists – importing"
+          terraform -chdir=infra/azure \
+            import \
+            -input=false -lock=false -no-color \
             azurerm_resource_group.this \
             "/subscriptions/${ARM_SUBSCRIPTION_ID}/resourceGroups/$RG_NAME" \
-            || true        # ignore if already in state
+            || true      # ignore “already in state”
         else
           echo "Resource-group $RG_NAME not found – will be created"
         fi
 
     - name: Terraform apply
+      env: { TF_IN_AUTOMATION: true }
       run: |
-        terraform -chdir=infra/azure apply -auto-approve \
+        terraform -chdir=infra/azure apply -auto-approve -input=false -no-color \
           -var="subscription_id=${{ env.ARM_SUBSCRIPTION_ID }}" \
           -var="location=germanywestcentral" \
           -var="environment=${{ env.ENVIRONMENT }}" \
