@@ -78,6 +78,7 @@ jobs:
           terraform -chdir="$TF_DIR" import -no-color -input=false \
             -var="subscription_id=${{ env.ARM_SUBSCRIPTION_ID }}" \
             -var="location=${{env.LOCATION}}" \
+            -var="resource_group=${{ env.RESOURCE_GROUP }}-${{ env.ENVIRONMENT }}" \
             -var="environment=${{ env.ENVIRONMENT }}" \
             -var="node_vm_size=${{ env.NODE_VM_SIZE }}" \
             azurerm_resource_group.this \
@@ -106,6 +107,7 @@ jobs:
             terraform -chdir="$TF_DIR" import -no-color -input=false \
               -var="subscription_id=${{ env.ARM_SUBSCRIPTION_ID }}" \
               -var="location=${{env.LOCATION}}" \
+              -var="resource_group=${{ env.RESOURCE_GROUP }}-${{ env.ENVIRONMENT }}" \
               -var="environment=${{ env.ENVIRONMENT }}" \
               -var="node_vm_size=${{ env.NODE_VM_SIZE }}" \
               "$TF_ADDR" "$AZ_ID"
