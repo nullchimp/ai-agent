@@ -70,6 +70,10 @@ jobs:
         ### 1) Resource-group (special-case test) ###############
         if az group exists --name "$RG_NAME" | grep -q true; then
           terraform -chdir="$TF_DIR" import -no-color -input=false \
+            -var="subscription_id=${{ env.ARM_SUBSCRIPTION_ID }}" \
+            -var="location=germanywestcentral" \
+            -var="environment=${{ env.ENVIRONMENT }}" \
+            -var="node_vm_size=${{ env.NODE_VM_SIZE }}" \
             azurerm_resource_group.this \
             "/subscriptions/${ARM_SUBSCRIPTION_ID}/resourceGroups/${RG_NAME}"
         else
@@ -94,6 +98,10 @@ jobs:
           if az resource show --ids "$AZ_ID" --query "id" -o tsv &>/dev/null; then
             echo "Importing $TF_ADDR"
             terraform -chdir="$TF_DIR" import -no-color -input=false \
+              -var="subscription_id=${{ env.ARM_SUBSCRIPTION_ID }}" \
+              -var="location=germanywestcentral" \
+              -var="environment=${{ env.ENVIRONMENT }}" \
+              -var="node_vm_size=${{ env.NODE_VM_SIZE }}" \
               "$TF_ADDR" "$AZ_ID"
           else
             echo "Azure object not found → $AZ_ID (skipping)"
