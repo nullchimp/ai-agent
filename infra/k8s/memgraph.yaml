@@ -51,16 +51,17 @@ spec:
 
       containers:
       - name: memgraph
-        image: memgraph/memgraph-mage:latest
+        image: memgraph/memgraph:latest  # Use the base Memgraph image instead of MAGE
         args: [
           "--log-level=INFO", 
           "--also-log-to-stderr",
           "--memory-limit=1024",
           "--query-execution-timeout-sec=60",
-          # enforce auth
+          "--bolt-server-name-for-init=Memgraph DB",
+          # enforce authentication strongly
           "--auth-enabled=true",
-          "--auth-require-existing-user=true",
-          "--auth-password-permit-empty=false"
+          "--auth-user-or-role-name-required=true",
+          "--auth-password-required=true"
         ]
 
         ports:
