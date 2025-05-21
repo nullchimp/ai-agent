@@ -20,7 +20,7 @@ if [ -n "$POD_NAMES" ]; then
     
     # Check if pods are still terminating
     TERMINATING_PODS=$(kubectl get pods -l app=memgraph --no-headers 2>/dev/null | grep -c "Terminating" || echo "0")
-    if [ "$TERMINATING_PODS" -gt 0 ]; then
+    if [ $TERMINATING_PODS -gt 0 ]; then
         echo "Some pods still terminating, forcing immediate deletion..."
         kubectl delete pods -l app=memgraph --grace-period=0 --force --timeout=10s || true
     fi
