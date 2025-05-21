@@ -33,17 +33,9 @@ spec:
         # forces rolling restart when credentials change
         credentials-hash: "${CREDENTIALS_HASH}"
     spec:
-      # ── kernel tunable with privileged init-container ─────
+      # ── pod security context for mounted volumes ─────
       securityContext:
         fsGroup: 1000                       # proper perms for mounted volumes
-      
-      # Use init container to set sysctl value instead of pod securityContext
-      initContainers:
-      - name: sysctl-init
-        image: busybox
-        command: ["sysctl", "-w", "vm.max_map_count=262144"]
-        securityContext:
-          privileged: true
 
       # schedule on B2ms nodes if available
       affinity:
@@ -60,7 +52,12 @@ spec:
       containers:
       - name: memgraph
         image: memgraph/memgraph-mage:latest
-        args: ["--log-level=INFO", "--also-log-to-stderr"]
+        args: [
+          "--log-level=INFO", 
+          "--also-log-to-stderr",
+          "--memory-limit=1024",
+          "--query-execution-timeout-sec=60"
+        ]
 
         ports:
         - { name: bolt, containerPort: 7687 }
@@ -77,6 +74,8 @@ spec:
 
         # Prevent accidental empty password
         - { name: MG_ALLOW_EMPTY_PASSWORD, value: "false" }
+        # Configure Memgraph to work with default system limits
+        - { name: MG_DURABILITY, value: "true" }
 
         # Load any future flags from the ConfigMap
         envFrom:
