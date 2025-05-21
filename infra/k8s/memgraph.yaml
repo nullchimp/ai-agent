@@ -33,11 +33,17 @@ spec:
         # forces rolling restart when credentials change
         credentials-hash: "${CREDENTIALS_HASH}"
     spec:
-      # ── kernel tunable without privileged init-container ─────
+      # ── kernel tunable with privileged init-container ─────
       securityContext:
         fsGroup: 1000                       # proper perms for mounted volumes
-        sysctls:
-        - { name: vm.max_map_count, value: "262144" }
+      
+      # Use init container to set sysctl value instead of pod securityContext
+      initContainers:
+      - name: sysctl-init
+        image: busybox
+        command: ["sysctl", "-w", "vm.max_map_count=262144"]
+        securityContext:
+          privileged: true
 
       # schedule on B2ms nodes if available
       affinity:
