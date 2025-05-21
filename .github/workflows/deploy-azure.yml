@@ -164,50 +164,6 @@ jobs:
       run: |
         envsubst < infra/k8s/memgraph.yaml | kubectl apply -f -
 
-    #────────────── Wait for rollout (with logs) ────────────────
-    - name: Wait for Memgraph rollout
-      run: |
-        set -e
-        # Check for SysctlForbidden errors first - fail fast if detected
-        echo "Checking for pod errors before waiting for rollout..."
-        sleep 10  # Give kubernetes a moment to create the pods
-        
-        POD=$(kubectl get pods -l app=memgraph -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
-        if [ -n "$POD" ]; then
-          POD_STATUS=$(kubectl get pod "$POD" -o jsonpath='{.status.phase}')
-          POD_REASON=$(kubectl get pod "$POD" -o jsonpath='{.status.reason}' 2>/dev/null || echo "")
-          
-          if [ "$POD_REASON" == "SysctlForbidden" ]; then
-            echo "::error::Pod has SysctlForbidden error. Check the securityContext and sysctl settings."
-            kubectl describe pod "$POD"
-            exit 1
-          fi
-        fi
-        
-        # Continue with rollout status check
-        if kubectl rollout status deployment/memgraph --timeout=10m ; then
-          echo "Memgraph deployment is ready ✓"
-        else
-          echo "::warning::Rollout timed out – printing diagnostics"
-          kubectl get pods -o wide
-          kubectl describe deployment memgraph || true
-          
-          if [ -n "$POD" ]; then
-            echo "::group::Pod description"
-            kubectl describe pod "$POD" || true
-            echo "::endgroup::"
-            
-            echo "::group::Pod logs"
-            kubectl logs "$POD" --all-containers --tail=100 || true
-            echo "::endgroup::"
-            
-            echo "::group::Pod events"
-            kubectl get events --field-selector involvedObject.name="$POD" || true
-            echo "::endgroup::"
-          fi
-          exit 1
-        fi
-
     #─────────────── Verify Memgraph connectivity ─────────────────
     - name: Set up Python for Memgraph verification
       uses: actions/setup-python@v4
