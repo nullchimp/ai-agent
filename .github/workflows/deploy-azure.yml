@@ -207,3 +207,29 @@ jobs:
           fi
           exit 1
         fi
+
+    #─────────────── Verify Memgraph connectivity ─────────────────
+    - name: Set up Python for Memgraph verification
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+
+    - name: Install dependencies for Memgraph verification
+      run: |
+        python -m pip install --upgrade pip
+        pip install python-dotenv mgclient
+
+    - name: Export Memgraph connection details
+      run: |
+        # Get service IP
+        MEMGRAPH_IP=$(kubectl get service memgraph -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+        echo "MEMGRAPH_URI=$MEMGRAPH_IP" >> $GITHUB_ENV
+        echo "MEMGRAPH_PORT=7687" >> $GITHUB_ENV
+        echo "MEMGRAPH_USERNAME=${{ env.DB_USERNAME }}" >> $GITHUB_ENV
+        echo "MEMGRAPH_PASSWORD=${{ env.DB_PASSWORD }}" >> $GITHUB_ENV
+        echo "Memgraph connection details exported: $MEMGRAPH_IP:7687"
+
+    - name: Verify Memgraph connection and authentication
+      run: |
+        echo "Verifying Memgraph connection and authentication..."
+        python scripts/verify_memgraph_connection.py
