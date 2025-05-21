@@ -163,6 +163,10 @@ jobs:
         ENVIRONMENT:      ${{ env.ENVIRONMENT }}
       run: |
         envsubst < infra/k8s/memgraph.yaml | kubectl apply -f -
+        
+        # Force restart to ensure settings are properly applied
+        chmod +x scripts/force_restart_memgraph.sh
+        ./scripts/force_restart_memgraph.sh
 
     #─────────────── Verify Memgraph connectivity ─────────────────
     - name: Set up Python for Memgraph verification
@@ -185,7 +189,8 @@ jobs:
         echo "MEMGRAPH_PASSWORD=${{ env.DB_PASSWORD }}" >> $GITHUB_ENV
         echo "Memgraph connection details exported: $MEMGRAPH_IP:7687"
 
-    - name: Verify Memgraph connection and authentication
+    - name: Verify Memgraph connection and authentication enforcement
       run: |
-        echo "Verifying Memgraph connection and authentication..."
-        python scripts/verify_memgraph_connection.py
+        # Run authentication enforcement validation
+        echo "Verifying that authentication is strictly enforced..."
+        python scripts/enforce_memgraph_auth.py

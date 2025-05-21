@@ -77,10 +77,12 @@ spec:
         - name: MG_PASSWORD
           valueFrom: { secretKeyRef: { name: memgraph-credentials, key: password } }
 
-        # strict authentication ───────────────────────────
-        - { name: MG_AUTH_ENABLED,                value: "true" }
-        - { name: MG_AUTH_REQUIRE_EXISTING_USER,  value: "true" }
-        - { name: MG_AUTH_PASSWORD_PERMIT_EMPTY,  value: "false" }
+        # strict authentication - explicitly set direct env vars
+        - { name: MG_AUTH_ENABLED,                      value: "true" }
+        - { name: MG_AUTH_REQUIRE_EXISTING_USER,        value: "true" }
+        - { name: MG_AUTH_PASSWORD_PERMIT_EMPTY,        value: "false" }
+        - { name: MG_BOLT_SERVER_AUTH_ENABLED,          value: "true" }
+        - { name: MG_BOLT_SERVER_AUTH_FORCE_REQUIRED,   value: "true" }
         # Configure Memgraph to work with default system limits
         - { name: MG_DURABILITY, value: "true" }
 

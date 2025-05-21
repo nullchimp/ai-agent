@@ -12,6 +12,9 @@ def test_memgraph_connection(max_retries=3, retry_delay=5) -> bool:
     username = os.environ.get("MEMGRAPH_USERNAME", "memgraph")
     password = os.environ.get("MEMGRAPH_PASSWORD", "memgraph")
     
+    # For testing authentication, uncomment this line:
+    # password = "wrong_password" # Should fail if auth is properly enforced
+
     print(f"Testing connection to Memgraph at {host}:{port} with username: {username}")
 
     # Convert localhost to IP if needed
