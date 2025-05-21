@@ -8,10 +8,10 @@ from typing import Tuple, Optional
 def verify_memgraph_connection(max_retries: int = 5, retry_delay: int = 5) -> Tuple[bool, Optional[str]]:
     host = os.environ.get("MEMGRAPH_URI", "127.0.0.1")
     port = int(os.environ.get("MEMGRAPH_PORT", "7687"))
-    username = "test" or os.environ.get("MEMGRAPH_USERNAME", "memgraph")
+    username = os.environ.get("MEMGRAPH_USERNAME", "memgraph")
     password = os.environ.get("MEMGRAPH_PASSWORD", "memgraph")
     
-    print(f"Verifying connection to Memgraph at {host}:{port}")
+    print(f"Verifying connection to Memgraph at {host}:{port} with username: {username}")
 
     if host == "localhost":
         host = "127.0.0.1"

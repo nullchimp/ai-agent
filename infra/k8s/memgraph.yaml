@@ -56,7 +56,8 @@ spec:
           "--log-level=INFO", 
           "--also-log-to-stderr",
           "--memory-limit=1024",
-          "--query-execution-timeout-sec=60"
+          "--query-execution-timeout-sec=60",
+          "--bolt-server-auth-enabled=true"
         ]
 
         ports:
