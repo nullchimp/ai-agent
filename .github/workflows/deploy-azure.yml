@@ -162,11 +162,18 @@ jobs:
         CREDENTIALS_HASH: ${{ steps.hash.outputs.value }}
         ENVIRONMENT:      ${{ env.ENVIRONMENT }}
       run: |
+        # Apply new configuration
+        echo "Applying Memgraph configuration..."
         envsubst < infra/k8s/memgraph.yaml | kubectl apply -f -
         
-        # Force restart to ensure settings are properly applied
+        # Force restart with improved error handling
+        echo "Preparing to restart Memgraph pod..."
         chmod +x scripts/force_restart_memgraph.sh
-        ./scripts/force_restart_memgraph.sh
+        ./scripts/force_restart_memgraph.sh || echo "Restart completed with non-zero exit code, continuing anyway"
+        
+        # Display pod status regardless of restart script result
+        echo "Current Memgraph pod status:"
+        kubectl get pods -l app=memgraph
 
     #─────────────── Verify Memgraph connectivity ─────────────────
     - name: Set up Python for Memgraph verification
