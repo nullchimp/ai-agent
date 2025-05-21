@@ -57,8 +57,9 @@ spec:
           "--also-log-to-stderr",
           "--memory-limit=1024",
           "--query-execution-timeout-sec=60",
-          "--bolt-server-auth-enabled=true",
-          "--auth-module-files=auth",
+          # enforce auth
+          "--auth-enabled=true",
+          "--auth-require-existing-user=true",
           "--auth-password-permit-empty=false"
         ]
 
