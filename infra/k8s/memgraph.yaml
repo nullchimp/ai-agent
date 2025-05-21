@@ -76,10 +76,10 @@ spec:
         - name: MG_PASSWORD
           valueFrom: { secretKeyRef: { name: memgraph-credentials, key: password } }
 
-        # Ensure authentication is required and strictly enforced
-        - { name: MG_ALLOW_EMPTY_PASSWORD, value: "false" }
-        - { name: MG_REQUIRE_AUTHENTICATION, value: "true" }
-        - { name: MG_AUTH_MODULE_ENABLED, value: "true" }
+        # strict authentication ───────────────────────────
+        - { name: MG_AUTH_ENABLED,                value: "true" }
+        - { name: MG_AUTH_REQUIRE_EXISTING_USER,  value: "true" }
+        - { name: MG_AUTH_PASSWORD_PERMIT_EMPTY,  value: "false" }
         # Configure Memgraph to work with default system limits
         - { name: MG_DURABILITY, value: "true" }
 
