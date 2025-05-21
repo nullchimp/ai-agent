@@ -57,7 +57,9 @@ spec:
           "--also-log-to-stderr",
           "--memory-limit=1024",
           "--query-execution-timeout-sec=60",
-          "--bolt-server-auth-enabled=true"
+          "--bolt-server-auth-enabled=true",
+          "--auth-module-files=auth",
+          "--auth-password-permit-empty=false"
         ]
 
         ports:
@@ -73,8 +75,10 @@ spec:
         - name: MG_PASSWORD
           valueFrom: { secretKeyRef: { name: memgraph-credentials, key: password } }
 
-        # Prevent accidental empty password
+        # Ensure authentication is required and strictly enforced
         - { name: MG_ALLOW_EMPTY_PASSWORD, value: "false" }
+        - { name: MG_REQUIRE_AUTHENTICATION, value: "true" }
+        - { name: MG_AUTH_MODULE_ENABLED, value: "true" }
         # Configure Memgraph to work with default system limits
         - { name: MG_DURABILITY, value: "true" }
 
