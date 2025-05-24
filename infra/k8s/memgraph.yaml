@@ -1,20 +1,11 @@
 ################################################################
-#  Memgraph - all-in-one manifest
-#  ▸ Auth enabled (via MG_USERNAME / MG_PASSWORD)
-#  ▸ Empty passwords explicitly disallowed
-#  ▸ Log level set to INFO (TRACE is too noisy for prod)
+#  Memgraph - Optimized deployment matching docker-compose.yml
+#  ▸ Uses memgraph-mage image like docker-compose
+#  ▸ Authentication enforced via MEMGRAPH_USER/MEMGRAPH_PASSWORD  
+#  ▸ Minimal cost configuration with persistent storage
+#  ▸ External LoadBalancer access
 ################################################################
 
-###############################################################
-#  ConfigMap – runtime flags
-###############################################################
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: memgraph-config
-data:
-  MG_LOG_LEVEL: "INFO"            # change to DEBUG/TRACE only when troubleshooting
----
 ###############################################################
 #  Deployment
 ###############################################################
@@ -22,6 +13,8 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: memgraph
+  labels:
+    app: memgraph
 spec:
   replicas: 1
   selector:
@@ -30,103 +23,66 @@ spec:
     metadata:
       labels: { app: memgraph }
       annotations:
-        # forces rolling restart when credentials change
         credentials-hash: "${CREDENTIALS_HASH}"
     spec:
-      # ── pod security context for mounted volumes ─────
       securityContext:
-        fsGroup: 1000                       # proper perms for mounted volumes
-
-      # schedule on B2ms nodes if available
-      affinity:
-        nodeAffinity:
-          preferredDuringSchedulingIgnoredDuringExecution:
-          - weight: 100
-            preference:
-              matchExpressions:
-              - { key: node.kubernetes.io/instance-type, operator: In, values: [ Standard_B2ms ] }
-
-      tolerations:
-      - { key: "node.kubernetes.io/memory-pressure", operator: "Exists", effect: "NoSchedule" }
+        fsGroup: 1000
 
       containers:
       - name: memgraph
-        image: memgraph/memgraph:latest  # Use the base Memgraph image instead of MAGE
-        args: [
-          "--log-level=INFO", 
-          "--also-log-to-stderr",
-          "--memory-limit=1024",
-          "--query-execution-timeout-sec=60",
-          "--bolt-server-name-for-init=Memgraph DB",
-          # enforce authentication strongly - all must be true for security
-          "--auth-enabled=true",
-          "--auth-user-or-role-name-required=true", 
-          "--auth-password-required=true",
-          "--auth-password-permit-empty=false",
-          "--auth-password-strength-regex=^.{8,}$",
-          # ensure bolt server enforces authentication
-          "--bolt-server-auth-enabled=true",
-          # disable anonymous access completely
-          "--init-data-file="
-        ]
-
+        # Use memgraph-mage like in docker-compose
+        image: memgraph/memgraph-mage:latest
+        
+        # Match docker-compose command exactly
+        command: ["--log-level=TRACE", "--also-log-to-stderr"]
+        
         ports:
         - { name: bolt, containerPort: 7687 }
         - { name: http, containerPort: 7444 }
         - { name: ui, containerPort: 3000 }
 
-        # ── authentication ────────────────────────────────────
+        # Environment variables matching docker-compose exactly
         env:
-        # Memgraph recognises these and enables auth automatically
-        - name: MG_USERNAME
+        - name: MEMGRAPH_USER
           valueFrom: { secretKeyRef: { name: memgraph-credentials, key: username } }
-        - name: MG_PASSWORD
+        - name: MEMGRAPH_PASSWORD
           valueFrom: { secretKeyRef: { name: memgraph-credentials, key: password } }
 
-        # strict authentication - explicitly set direct env vars for extra security
-        - { name: MG_AUTH_ENABLED,                      value: "true" }
-        - { name: MG_AUTH_REQUIRE_EXISTING_USER,        value: "true" }
-        - { name: MG_AUTH_PASSWORD_PERMIT_EMPTY,        value: "false" }
-        - { name: MG_AUTH_PASSWORD_REQUIRED,            value: "true" }
-        - { name: MG_BOLT_SERVER_AUTH_ENABLED,          value: "true" }
-        - { name: MG_BOLT_SERVER_AUTH_FORCE_REQUIRED,   value: "true" }
-        # prevent unauthenticated access via environment  
-        - { name: MG_ALLOW_ANONYMOUS_ACCESS,            value: "false" }
-        - { name: MG_INIT_DATA_FILE,                    value: "" }
-        # Configure Memgraph to work with default system limits
-        - { name: MG_DURABILITY, value: "true" }
-
-        # Load any future flags from the ConfigMap
-        envFrom:
-        - { configMapRef: { name: memgraph-config } }
-
-        # persistent storage
+        # Persistent storage matching docker-compose volumes
         volumeMounts:
         - { name: data, mountPath: /data }
         - { name: logs, mountPath: /var/log/memgraph }
+        - { name: conf, mountPath: /etc/memgraph }
 
+        # Minimal resource limits for cost optimization
         resources:
-          requests: { cpu: "500m", memory: "1Gi" }
-          limits:   { cpu: "1000m", memory: "2Gi" }
+          requests: { cpu: "100m", memory: "256Mi" }
+          limits:   { cpu: "500m", memory: "1Gi" }
 
+        # Health checks matching docker-compose
         livenessProbe:
-          tcpSocket: { port: 7687 }
+          httpGet:
+            path: /api/v1/storage/status
+            port: 7444
           initialDelaySeconds: 30
-          periodSeconds: 15
-          timeoutSeconds: 5
+          periodSeconds: 30
+          timeoutSeconds: 10
 
         readinessProbe:
-          tcpSocket: { port: 7687 }
+          httpGet:
+            path: /api/v1/storage/status  
+            port: 7444
           initialDelaySeconds: 10
-          periodSeconds: 10
-          timeoutSeconds: 3
+          periodSeconds: 5
+          timeoutSeconds: 5
 
       volumes:
       - { name: data, persistentVolumeClaim: { claimName: memgraph-data } }
       - { name: logs, persistentVolumeClaim: { claimName: memgraph-logs } }
+      - { name: conf, persistentVolumeClaim: { claimName: memgraph-conf } }
 ---
 ###############################################################
-#  Persistent Volume Claims – Standard HDD (change if needed)
+#  Persistent Volume Claims - Cost-optimized Standard SSD
 ###############################################################
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -135,7 +91,7 @@ metadata:
 spec:
   storageClassName: disk-ssd
   accessModes: [ ReadWriteOnce ]
-  resources: { requests: { storage: 10Gi } }
+  resources: { requests: { storage: 8Gi } }
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -144,10 +100,19 @@ metadata:
 spec:
   storageClassName: disk-ssd
   accessModes: [ ReadWriteOnce ]
-  resources: { requests: { storage: 5Gi } }
+  resources: { requests: { storage: 2Gi } }
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: memgraph-conf
+spec:
+  storageClassName: disk-ssd
+  accessModes: [ ReadWriteOnce ]
+  resources: { requests: { storage: 1Gi } }
 ---
 ###############################################################
-#  Service – public LoadBalancer
+#  Service – External LoadBalancer for public access
 ###############################################################
 apiVersion: v1
 kind: Service

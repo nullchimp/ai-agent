@@ -1,11 +1,12 @@
-# infra/k8s/storageclass-ssd.yaml
+# Cost-optimized storage class for minimal Azure costs
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
-  name: disk-ssd                 # new name
+  name: disk-ssd
 provisioner: disk.csi.azure.com
 parameters:
-  skuname: StandardSSD_LRS       # ← Standard SSD (ZRS and Premium cost more)
-reclaimPolicy: Retain
-volumeBindingMode: Immediate
-allowVolumeExpansion: true
+  skuname: StandardSSD_LRS       # Standard SSD - cheapest option with good performance
+  location: germanywestcentral   # Match your deployment location
+reclaimPolicy: Retain            # Retain data when PVC is deleted
+volumeBindingMode: Immediate     # Bind volumes immediately
+allowVolumeExpansion: true       # Allow volume expansion if needed

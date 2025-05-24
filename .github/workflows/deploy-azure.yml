@@ -22,11 +22,11 @@ env:
   DB_PASSWORD:        ${{ secrets.MEMGRAPH_PASSWORD }}
 
   ############################################################
-  # Stack parameters
+  # Stack parameters - COST OPTIMIZED
   ############################################################
   ENVIRONMENT:  dev
   LOCATION: germanywestcentral
-  NODE_VM_SIZE: Standard_B2ms
+  NODE_VM_SIZE: Standard_B1s     # Minimal cost VM size
 
   ############################################################
   # Location of your *.tf files (change only this line
@@ -123,6 +123,11 @@ jobs:
       env: { TF_IN_AUTOMATION: true }
       run: |
         terraform -chdir="$TF_DIR" apply -auto-approve -input=false -no-color \
+          -var="subscription_id=${ARM_SUBSCRIPTION_ID}" \
+          -var="location=${LOCATION}" \
+          -var="environment=${ENVIRONMENT}" \
+          -var="resource_group=${RESOURCE_GROUP}" \
+          -var="node_vm_size=${NODE_VM_SIZE}"
           -var="subscription_id=${{ env.ARM_SUBSCRIPTION_ID }}" \
           -var="location=${{env.LOCATION}}" \
           -var="resource_group=${{ env.RESOURCE_GROUP }}-${{ env.ENVIRONMENT }}" \
@@ -133,6 +138,9 @@ jobs:
     - name: Pull cluster credentials
       run: |
         az aks get-credentials \
+          --resource-group "${RESOURCE_GROUP}-${ENVIRONMENT}" \
+          --name "${AKS_NAME}-${ENVIRONMENT}" \
+          --overwrite-existing
           --resource-group "${{env.RESOURCE_GROUP}}-${{ env.ENVIRONMENT }}" \
           --name          "${{env.AKS_NAME}}-${{ env.ENVIRONMENT }}" \
           --overwrite-existing
@@ -178,13 +186,13 @@ jobs:
         CREDENTIALS_HASH: ${{ steps.hash.outputs.value }}
         ENVIRONMENT:      ${{ env.ENVIRONMENT }}
       run: |
-        # Apply new configuration
+        # Force restart with simplified approach
         echo "Applying Memgraph configuration..."
         envsubst < infra/k8s/memgraph.yaml | kubectl apply -f -
         
-        # Force restart with improved error handling
-        echo "Preparing to restart Memgraph pod..."
-        chmod +x scripts/force_restart_memgraph.sh
+        # Simple restart to ensure new credentials are loaded
+        kubectl rollout restart deployment/memgraph
+        kubectl rollout status deployment/memgraph --timeout=300s
         ./scripts/force_restart_memgraph.sh || echo "Restart completed with non-zero exit code, continuing anyway"
         
         # Wait for deployment to be ready
@@ -195,37 +203,46 @@ jobs:
         echo "Waiting for Memgraph pod to be ready..."
         kubectl wait --for=condition=ready pod -l app=memgraph --timeout=10m
         
-        # Display pod status regardless of restart script result
+        # Display deployment status
+        echo "✅ Deployment completed successfully!"
         echo "Current Memgraph pod status:"
         kubectl get pods -l app=memgraph -o wide
         
-        # Display service status
         echo "Current Memgraph service status:"
         kubectl get service memgraph -o wide
+        
+        # Get external IP for connection
+        echo "🌐 External access information:"
+        EXTERNAL_IP=$(kubectl get service memgraph -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+        if [ -n "$EXTERNAL_IP" ]; then
+          echo "Memgraph is accessible at:"
+          echo "  Bolt Protocol: $EXTERNAL_IP:7687"
+          echo "  HTTP API: $EXTERNAL_IP:7444"
+          echo "  Memgraph Lab UI: $EXTERNAL_IP:3000"
+          echo "  Username: ${{ env.DB_USERNAME }}"
+          echo "  Password: [PROTECTED]"
+        else
+          echo "⏳ LoadBalancer IP assignment pending - check Azure portal"
+        fi
 
-    #─────────────── Verify Memgraph connectivity ─────────────────
-    - name: Set up Python for Memgraph verification
-      uses: actions/setup-python@v4
+    #─────────── Validate Connection & Authentication ───────────
+    - name: Set up Python environment for validation
+      uses: actions/setup-python@v5
       with:
-        python-version: '3.13'
+        python-version: '3.11'
+        cache: 'pip'
 
-    - name: Install dependencies for Memgraph verification
+    - name: Install Python dependencies for validation
       run: |
-        python -m pip install --upgrade pip
-        pip install python-dotenv pymgclient
+        python -m venv .venv-validation
+        source .venv-validation/bin/activate
+        pip install --upgrade pip
+        pip install pymgclient python-dotenv
 
-    - name: Export Memgraph connection details
+    - name: Validate Memgraph connection and authentication
+      env:
+        DB_USERNAME: ${{ env.DB_USERNAME }}
+        DB_PASSWORD: ${{ env.DB_PASSWORD }}
       run: |
-        # Get service IP
-        MEMGRAPH_IP=$(kubectl get service memgraph -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
-        echo "MEMGRAPH_URI=$MEMGRAPH_IP" >> $GITHUB_ENV
-        echo "MEMGRAPH_PORT=7687" >> $GITHUB_ENV
-        echo "MEMGRAPH_USERNAME=${{ env.DB_USERNAME }}" >> $GITHUB_ENV
-        echo "MEMGRAPH_PASSWORD=${{ env.DB_PASSWORD }}" >> $GITHUB_ENV
-        echo "Memgraph connection details exported: $MEMGRAPH_IP:7687"
-
-    - name: Verify Memgraph connection and authentication enforcement
-      run: |
-        # Run authentication enforcement validation
-        echo "Verifying that authentication is strictly enforced..."
-        python scripts/enforce_memgraph_auth.py
+        source .venv-validation/bin/activate
+        python scripts/validate_memgraph_deployment.py
