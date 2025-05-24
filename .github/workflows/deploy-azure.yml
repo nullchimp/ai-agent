@@ -148,10 +148,26 @@ jobs:
         MEMGRAPH_USERNAME: ${{ env.DB_USERNAME }}
         MEMGRAPH_PASSWORD: ${{ env.DB_PASSWORD }}
       run: |
+        # Validate credentials are not empty
+        if [ -z "$MEMGRAPH_USERNAME" ] || [ -z "$MEMGRAPH_PASSWORD" ]; then
+          echo "❌ ERROR: MEMGRAPH_USERNAME and MEMGRAPH_PASSWORD must not be empty"
+          exit 1
+        fi
+        
+        # Validate password strength (minimum 8 characters)
+        if [ ${#MEMGRAPH_PASSWORD} -lt 8 ]; then
+          echo "❌ ERROR: MEMGRAPH_PASSWORD must be at least 8 characters long"
+          exit 1
+        fi
+        
+        echo "✅ Credentials validation passed"
+        
         kubectl create secret generic memgraph-credentials \
           --from-literal=username="$MEMGRAPH_USERNAME" \
           --from-literal=password="$MEMGRAPH_PASSWORD" \
           --dry-run=client -o yaml | kubectl apply -f -
+          
+        echo "✅ Memgraph credentials secret updated"
 
     #──────────── StorageClass & Kubernetes manifests ───────────
     - name: Apply StorageClass (Standard SSD)
@@ -171,9 +187,21 @@ jobs:
         chmod +x scripts/force_restart_memgraph.sh
         ./scripts/force_restart_memgraph.sh || echo "Restart completed with non-zero exit code, continuing anyway"
         
+        # Wait for deployment to be ready
+        echo "Waiting for Memgraph deployment to be ready..."
+        kubectl wait --for=condition=available deployment/memgraph --timeout=10m
+        
+        # Wait for pod to be ready
+        echo "Waiting for Memgraph pod to be ready..."
+        kubectl wait --for=condition=ready pod -l app=memgraph --timeout=10m
+        
         # Display pod status regardless of restart script result
         echo "Current Memgraph pod status:"
-        kubectl get pods -l app=memgraph
+        kubectl get pods -l app=memgraph -o wide
+        
+        # Display service status
+        echo "Current Memgraph service status:"
+        kubectl get service memgraph -o wide
 
     #─────────────── Verify Memgraph connectivity ─────────────────
     - name: Set up Python for Memgraph verification

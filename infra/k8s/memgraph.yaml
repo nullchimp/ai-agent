@@ -58,10 +58,16 @@ spec:
           "--memory-limit=1024",
           "--query-execution-timeout-sec=60",
           "--bolt-server-name-for-init=Memgraph DB",
-          # enforce authentication strongly
+          # enforce authentication strongly - all must be true for security
           "--auth-enabled=true",
-          "--auth-user-or-role-name-required=true",
-          "--auth-password-required=true"
+          "--auth-user-or-role-name-required=true", 
+          "--auth-password-required=true",
+          "--auth-password-permit-empty=false",
+          "--auth-password-strength-regex=^.{8,}$",
+          # ensure bolt server enforces authentication
+          "--bolt-server-auth-enabled=true",
+          # disable anonymous access completely
+          "--init-data-file="
         ]
 
         ports:
@@ -77,12 +83,16 @@ spec:
         - name: MG_PASSWORD
           valueFrom: { secretKeyRef: { name: memgraph-credentials, key: password } }
 
-        # strict authentication - explicitly set direct env vars
+        # strict authentication - explicitly set direct env vars for extra security
         - { name: MG_AUTH_ENABLED,                      value: "true" }
         - { name: MG_AUTH_REQUIRE_EXISTING_USER,        value: "true" }
         - { name: MG_AUTH_PASSWORD_PERMIT_EMPTY,        value: "false" }
+        - { name: MG_AUTH_PASSWORD_REQUIRED,            value: "true" }
         - { name: MG_BOLT_SERVER_AUTH_ENABLED,          value: "true" }
         - { name: MG_BOLT_SERVER_AUTH_FORCE_REQUIRED,   value: "true" }
+        # prevent unauthenticated access via environment  
+        - { name: MG_ALLOW_ANONYMOUS_ACCESS,            value: "false" }
+        - { name: MG_INIT_DATA_FILE,                    value: "" }
         # Configure Memgraph to work with default system limits
         - { name: MG_DURABILITY, value: "true" }
 
