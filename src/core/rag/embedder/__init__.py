@@ -1,7 +1,7 @@
 from typing import List
 import asyncio
 
-from core.rag.schema import DocumentChunk, Vector
+from src.core.rag.schema import DocumentChunk, Vector
 from core.llm.client import *
 
 class EmbeddingService:
@@ -62,15 +62,18 @@ class EmbeddingService:
     async def _make_embedding_request(self, text: str, retry = 3) -> List[float]:
         try:
             response = await self._client.make_request([text])
+            
+            # Extract embedding from response
+            if response and "data" in response and len(response["data"]):
+                return response["data"][0]["embedding"]
+            
+            raise ValueError("Failed to get embedding from Azure OpenAI")
         except Exception as e:
-            if "429" in str(e):
+            if "429" in str(e) and retry > 1:
                 await asyncio.sleep(60) # Wait for 1 minute before retrying
                 return await self._make_embedding_request(text, retry=retry-1)
-
-        # Extract embedding from response
-        if response and "data" in response and len(response["data"]):
-            return response["data"][0]["embedding"]
-        
-        raise ValueError("Failed to get embedding from Azure OpenAI")
+            
+            # Re-raise the exception if it's not a 429 error or if retries are exhausted
+            raise
     
 from core.rag.embedder.text_embedding_3_small import TextEmbedding3Small
