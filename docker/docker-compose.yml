@@ -21,6 +21,18 @@ services:
     restart: unless-stopped
     command: ["--log-level=TRACE", "--also-log-to-stderr"]
 
+  neo4j-browser:
+    image: neo4j:5.15-community
+    container_name: ai-agent-neo4j-browser
+    ports:
+      - "3330:7474"  # Neo4j Browser HTTP
+      - "3335:7473"  # Neo4j Browser HTTPS
+    environment:
+      - NEO4J_dbms_connector_bolt_enabled=false  # Disable Neo4j's own bolt
+      - NEO4J_dbms_connector_http_enabled=true
+      - NEO4J_dbms_connector_https_enabled=true
+    restart: unless-stopped
+
 volumes:
   memgraph_data:
   memgraph_logs:
