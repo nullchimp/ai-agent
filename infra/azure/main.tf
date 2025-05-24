@@ -22,8 +22,8 @@ variable "environment"     { type = string }
 variable "resource_group"  { type = string }
 variable "node_vm_size" {
   type        = string
-  description = "VM size of the default AKS node-pool - using B1s for minimal cost"
-  default     = "Standard_B1s"
+  description = "VM size of the default AKS node-pool - must have 2+ cores and 4GB+ RAM for system pool"
+  default     = "Standard_B2s"
 }
 
 locals {

@@ -26,7 +26,7 @@ env:
   ############################################################
   ENVIRONMENT:  dev
   LOCATION: germanywestcentral
-  NODE_VM_SIZE: Standard_B1s     # Minimal cost VM size
+  NODE_VM_SIZE: Standard_B2s     # Minimal cost VM size meeting AKS requirements (2 vCPUs, 4GB RAM)
 
   ############################################################
   # Location of your *.tf files (change only this line
@@ -123,14 +123,9 @@ jobs:
       env: { TF_IN_AUTOMATION: true }
       run: |
         terraform -chdir="$TF_DIR" apply -auto-approve -input=false -no-color \
-          -var="subscription_id=${ARM_SUBSCRIPTION_ID}" \
-          -var="location=${LOCATION}" \
-          -var="environment=${ENVIRONMENT}" \
-          -var="resource_group=${RESOURCE_GROUP}" \
-          -var="node_vm_size=${NODE_VM_SIZE}"
           -var="subscription_id=${{ env.ARM_SUBSCRIPTION_ID }}" \
-          -var="location=${{env.LOCATION}}" \
-          -var="resource_group=${{ env.RESOURCE_GROUP }}-${{ env.ENVIRONMENT }}" \
+          -var="location=${{ env.LOCATION }}" \
+          -var="resource_group=${{ env.RESOURCE_GROUP }}" \
           -var="environment=${{ env.ENVIRONMENT }}" \
           -var="node_vm_size=${{ env.NODE_VM_SIZE }}"
 
@@ -138,11 +133,8 @@ jobs:
     - name: Pull cluster credentials
       run: |
         az aks get-credentials \
-          --resource-group "${RESOURCE_GROUP}-${ENVIRONMENT}" \
-          --name "${AKS_NAME}-${ENVIRONMENT}" \
-          --overwrite-existing
-          --resource-group "${{env.RESOURCE_GROUP}}-${{ env.ENVIRONMENT }}" \
-          --name          "${{env.AKS_NAME}}-${{ env.ENVIRONMENT }}" \
+          --resource-group "${{ env.RESOURCE_GROUP }}-${{ env.ENVIRONMENT }}" \
+          --name "${{ env.AKS_NAME }}-${{ env.ENVIRONMENT }}" \
           --overwrite-existing
 
     #────────── Secret (username / password) in K8s ────────────
@@ -245,4 +237,35 @@ jobs:
         DB_PASSWORD: ${{ env.DB_PASSWORD }}
       run: |
         source .venv-validation/bin/activate
+        
+        # Wait for LoadBalancer IP to be assigned (up to 10 minutes)
+        echo "⏳ Waiting for LoadBalancer IP assignment..."
+        for i in {1..60}; do
+          EXTERNAL_IP=$(kubectl get service memgraph -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || echo "")
+          if [ -n "$EXTERNAL_IP" ] && [ "$EXTERNAL_IP" != "null" ]; then
+            echo "✅ LoadBalancer IP assigned: $EXTERNAL_IP"
+            break
+          fi
+          echo "  Attempt $i/60: Waiting for IP assignment..."
+          sleep 10
+        done
+        
+        if [ -z "$EXTERNAL_IP" ] || [ "$EXTERNAL_IP" = "null" ]; then
+          echo "❌ LoadBalancer IP not assigned after 10 minutes"
+          echo "🔍 Service status:"
+          kubectl describe service memgraph
+          exit 1
+        fi
+        
+        # Set environment variable for the validation script
+        export MEMGRAPH_HOST="$EXTERNAL_IP"
+        
+        # Run comprehensive validation
+        echo "🚀 Running Memgraph deployment validation..."
         python scripts/validate_memgraph_deployment.py
+        
+        echo "✅ Memgraph deployment validation completed successfully!"
+        echo "🌐 Memgraph is accessible at:"
+        echo "  Bolt Protocol: $EXTERNAL_IP:7687"
+        echo "  HTTP API: $EXTERNAL_IP:7444"
+        echo "  Memgraph Lab UI: $EXTERNAL_IP:3000"
