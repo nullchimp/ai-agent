@@ -43,6 +43,7 @@ exclude = [".venv", "tests/"]
 [tool.pytest.ini_options]
 addopts = "--cov=src --cov-report=term-missing"
 testpaths = ["tests"]
+asyncio_default_fixture_loop_scope = "function"
 
 [tool.bandit]
 target = "src"

@@ -28,12 +28,6 @@ jobs:
           pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Set environment variables
-        run: |
-          cp .env.test .env
-          set -a && source .env && set +a
-          echo "PYTHONPATH=$PYTHONPATH:$(pwd):$(pwd)/src" >> $GITHUB_ENV
-
       - name: Run tests with coverage
         run: |
           source .venv/bin/activate

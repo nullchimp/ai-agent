@@ -22,14 +22,28 @@ class TestChat:
     def setup_method(self):
         self.mock_tool = MockTool()
         self.tools = [self.mock_tool]
+        self.test_env = {
+            "AZURE_OPENAI_API_KEY": "test_key",
+            "AZURE_OPENAI_CHAT_MODEL": "test_model",
+            "AZURE_OPENAI_CHAT_ENDPOINT": "https://test.endpoint.com"
+        }
 
-    @patch.dict(os.environ, {"AZURE_OPENAI_API_KEY": "test_key"})
+    @patch.dict(os.environ, {
+        "AZURE_OPENAI_API_KEY": "test_key",
+        "AZURE_OPENAI_CHAT_MODEL": "test_model", 
+        "AZURE_OPENAI_CHAT_ENDPOINT": "https://test.endpoint.com"
+    })
     def test_chat_init(self):
         chat = Chat(self.tools)
         assert len(chat.tool_map) == 1
         assert "test_tool" in chat.tool_map
         assert len(chat.tools) == 1
 
+    @patch.dict(os.environ, {
+        "AZURE_OPENAI_API_KEY": "test_key",
+        "AZURE_OPENAI_CHAT_MODEL": "test_model",
+        "AZURE_OPENAI_CHAT_ENDPOINT": "https://test.endpoint.com"
+    })
     def test_add_tool(self):
         chat = Chat()
         new_tool = MockTool("new_tool")
@@ -38,7 +52,11 @@ class TestChat:
         assert "new_tool" in chat.tool_map
         assert len(chat.tools) == 1
 
-    @patch.dict(os.environ, {"AZURE_OPENAI_API_KEY": "test_key"})
+    @patch.dict(os.environ, {
+        "AZURE_OPENAI_API_KEY": "test_key",
+        "AZURE_OPENAI_CHAT_MODEL": "test_model",
+        "AZURE_OPENAI_CHAT_ENDPOINT": "https://test.endpoint.com"
+    })
     def test_create_chat_success(self):
         chat = Chat.create(self.tools)
         assert isinstance(chat, Chat)
@@ -49,6 +67,11 @@ class TestChat:
             with pytest.raises(ValueError, match="AZURE_OPENAI_API_KEY"):
                 Chat.create(self.tools)
 
+    @patch.dict(os.environ, {
+        "AZURE_OPENAI_API_KEY": "test_key",
+        "AZURE_OPENAI_CHAT_MODEL": "test_model",
+        "AZURE_OPENAI_CHAT_ENDPOINT": "https://test.endpoint.com"
+    })
     @pytest.mark.asyncio
     async def test_send_messages(self):
         chat = Chat()
@@ -61,6 +84,11 @@ class TestChat:
             assert result == mock_response
             mock_request.assert_called_once()
 
+    @patch.dict(os.environ, {
+        "AZURE_OPENAI_API_KEY": "test_key",
+        "AZURE_OPENAI_CHAT_MODEL": "test_model",
+        "AZURE_OPENAI_CHAT_ENDPOINT": "https://test.endpoint.com"
+    })
     @pytest.mark.asyncio
     async def test_process_tool_calls_with_valid_tool(self):
         chat = Chat(self.tools)
@@ -81,6 +109,11 @@ class TestChat:
         assert messages[0]["role"] == "tool"
         assert messages[0]["tool_call_id"] == "test_id"
 
+    @patch.dict(os.environ, {
+        "AZURE_OPENAI_API_KEY": "test_key",
+        "AZURE_OPENAI_CHAT_MODEL": "test_model",
+        "AZURE_OPENAI_CHAT_ENDPOINT": "https://test.endpoint.com"
+    })
     @pytest.mark.asyncio
     async def test_process_tool_calls_with_unknown_tool(self):
         chat = Chat()
@@ -102,6 +135,11 @@ class TestChat:
         assert "error" in tool_result
         assert "not found" in tool_result["error"]
 
+    @patch.dict(os.environ, {
+        "AZURE_OPENAI_API_KEY": "test_key",
+        "AZURE_OPENAI_CHAT_MODEL": "test_model",
+        "AZURE_OPENAI_CHAT_ENDPOINT": "https://test.endpoint.com"
+    })
     @pytest.mark.asyncio
     async def test_process_tool_calls_with_exception(self):
         failing_tool = MockTool("failing_tool")
@@ -129,6 +167,11 @@ class TestChat:
         tool_result = json.loads(messages[0]["content"])
         assert "error" in tool_result
 
+    @patch.dict(os.environ, {
+        "AZURE_OPENAI_API_KEY": "test_key",
+        "AZURE_OPENAI_CHAT_MODEL": "test_model",
+        "AZURE_OPENAI_CHAT_ENDPOINT": "https://test.endpoint.com"
+    })
     @pytest.mark.asyncio
     async def test_process_tool_calls_with_no_tool_calls(self):
         chat = Chat()
@@ -139,6 +182,11 @@ class TestChat:
         
         assert len(messages) == 0
 
+    @patch.dict(os.environ, {
+        "AZURE_OPENAI_API_KEY": "test_key",
+        "AZURE_OPENAI_CHAT_MODEL": "test_model",
+        "AZURE_OPENAI_CHAT_ENDPOINT": "https://test.endpoint.com"
+    })
     @pytest.mark.asyncio
     async def test_process_tool_calls_invalid_json_arguments(self):
         chat = Chat(self.tools)
