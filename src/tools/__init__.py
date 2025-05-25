@@ -14,12 +14,12 @@ class Tool:
     def __init__(self, 
         name: str = None, 
         description: str = None, 
-        parameters: dict = {}, 
+        parameters: dict = None, 
         session = None
     ):
         self._name = name
         self._description = description
-        self._parameters = parameters
+        self._parameters = parameters if parameters is not None else {}
         self._session = session
 
     def define(self):
@@ -45,3 +45,5 @@ class Tool:
                 continue
 
             return tool_data[1]
+        
+        return {}

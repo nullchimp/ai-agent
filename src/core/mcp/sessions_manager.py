@@ -55,7 +55,8 @@ class MCPSessionManager:
         for server_name, session in self._sessions.items():
             try:
                 tools = await session.list_tools()
-                self._tools += tools
+                if tools:
+                    self._tools += tools
             except Exception as e:
                 print(f"Error listing tools for server {server_name}: {e}")
                 
