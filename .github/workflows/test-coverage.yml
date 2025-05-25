@@ -30,7 +30,8 @@ jobs:
 
       - name: Set environment variables
         run: |
-          echo "AZURE_OPENAI_API_KEY=dummy-key-for-testing" >> $GITHUB_ENV
+          cp .env.test .env
+          set -a && source .env && set +a
           echo "PYTHONPATH=$PYTHONPATH:$(pwd):$(pwd)/src" >> $GITHUB_ENV
 
       - name: Run tests with coverage
