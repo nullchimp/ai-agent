@@ -1,9 +1,16 @@
 __pycache__
+*.egg-info
 
 .env
 .venv
 .coverage
 .pytest_cache
+
+.planning
+.terraform*
+terraform.tfvars
+
+docker/plugins
 
 config/*
 !config/mcp.template.json

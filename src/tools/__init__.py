@@ -1,21 +1,36 @@
 class Tool:
-    def __init__(self, name: str, description: str = None, parameters: dict = None, session = None):
-        self.name = name
-        self._structure = None
-        if name and description and parameters:
-            self._structure = {
-                "type": "function",
-                "function": {
-                    "name": name,
-                    "description": description,
-                    "parameters": parameters
-                }
-            }
-        
+    @property
+    def name(self) -> str:
+        return self._name
+
+    @property
+    def description(self) -> str:
+        return self._description
+
+    @property
+    def parameters(self) -> dict:
+        return self._parameters
+
+    def __init__(self, 
+        name: str = None, 
+        description: str = None, 
+        parameters: dict = None, 
+        session = None
+    ):
+        self._name = name
+        self._description = description
+        self._parameters = parameters if parameters is not None else {}
         self._session = session
 
     def define(self):
-        return self._structure
+        return {
+            "type": "function",
+            "function": {
+                "name": self.name,
+                "description": self.description,
+                "parameters": self.parameters
+            }
+        }
 
     async def run(self, *args, **kwargs):
         if not self._session:
@@ -28,9 +43,7 @@ class Tool:
         for tool_data in data:
             if tool_data[0] != "content":
                 continue
-            results = []
-            for t in tool_data[1]:
-                results.append({
-                    "content": t.text,
-                })
-            return results
+
+            return tool_data[1]
+        
+        return {}

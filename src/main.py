@@ -1,12 +1,12 @@
-from utils import set_debug
+from core import set_debug
 set_debug(True)
 
 import asyncio
 import agent
 import os
 
-from utils import graceful_exit, mainloop
-from utils.mcpclient.sessions_manager import MCPSessionManager
+from core import graceful_exit, mainloop
+from core.mcp.sessions_manager import MCPSessionManager
 
 session_manager = MCPSessionManager()
 

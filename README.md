@@ -5,6 +5,7 @@ An intelligent AI agent framework written in Python, designed to facilitate seam
 ## Table of Contents
 - [Features](#features)
 - [Architecture](#architecture)
+- [RAG Implementation](#rag-implementation)
 - [Installation](#installation)
 - [Usage](#usage)
 - [Development](#development)
@@ -18,8 +19,22 @@ An intelligent AI agent framework written in Python, designed to facilitate seam
 - Modular file operations (read, write, list)
 - Web fetching and conversion utilities
 - Search client with pluggable backends
-- Tooling for codegen workflows
-- Configurable via environment variables and JSON configuration files
+- Azure-based deployment with secure secret management
+
+## Azure Deployment
+The AI Agent can be deployed to Azure using Kubernetes (AKS) with the following features:
+- Infrastructure as code using Terraform
+- Secrets managed securely in Azure Key Vault
+- Continuous deployment with GitHub Actions
+- Persistent storage for Memgraph data
+
+To deploy to Azure:
+1. Run the setup script: `./scripts/setup_azure.sh`
+2. Add the generated service principal credentials to GitHub secrets as `AZURE_CREDENTIALS`
+3. Add `MEMGRAPH_USERNAME` and `MEMGRAPH_PASSWORD` to GitHub secrets
+4. Push to main branch to trigger deployment or manually trigger the workflow
+
+If you encounter issues connecting to Memgraph after deployment, see [Memgraph Troubleshooting Guide](docs/memgraph-troubleshooting.md).
 
 ## Architecture
 The project follows a component-based architecture where the AI Agent orchestrates interactions between users, language models, local tools, and MCP servers.
@@ -38,9 +53,58 @@ src/
 │   ├── search/        # Search client and service
 │   └── webfetch/      # Web fetching and conversion services
 ├── tools/             # Command-line tools for file, web operations and more
-└── utils/             # Utility modules
+└── core/              # Utility modules
     ├── azureopenai/   # Azure OpenAI wrappers (chat, client)
-    └── mcpclient/     # MCP client for server interactions
+    ├── mcpclient/     # MCP client for server interactions
+    └── rag/           # Retrieval-Augmented Generation components
+        ├── schema.py  # Data models for graph database
+        ├── embedder/  # Vector embedding generation services
+        ├── loader/    # Content loading mechanisms (files, web)
+        └── graph_client.py # Memgraph database interface
+```
+
+## RAG Implementation
+
+The project includes a Retrieval-Augmented Generation (RAG) system using a graph database (Memgraph) for knowledge storage and retrieval:
+
+### Core Components
+- **Content Loaders**: Extract text from files and web pages
+  - `DocumentLoader`: Processes local filesystem content
+  - `WebLoader`: Fetches and processes web content
+
+- **Text Processing**: Split content into semantic chunks for embedding
+  - Configurable chunk size (default: 1024 tokens)
+  - Configurable overlap (default: 200 tokens)
+  - Sentence-aware splitting for better semantic units
+
+- **Embedding Service**: Generate vector representations with Azure OpenAI
+  - `TextEmbedding3Small`: Uses text-embedding-3-small model
+  - Batch processing with async support for better throughput
+
+- **Graph Database**: Store documents, chunks and their relationships
+  - `MemGraphClient`: Interface to Memgraph database
+  - Support for vector similarity search
+  - Relationship modeling (CHUNK_OF, SOURCED_FROM, etc.)
+
+### Key Features
+- **Document Processing**: Load, chunk, embed, and store documents with proper relationship modeling
+- **Vector Search**: Find semantically similar content using embedding-based search
+- **Web Content Indexing**: Crawl and index web pages with customizable parameters
+- **Graph Storage**: Store relationships between documents, chunks, sources, and embeddings
+
+### Documentation
+- [RAG Architecture](docs/rag_architecture.md): Detailed system architecture
+- [Edge Relationships](docs/rag_edge_relationships.md): Graph relationship model
+- [RAG Integration ADR](docs/ADRs/RAG-Integration.md): Decision record and implementation details
+
+### Usage
+See the examples directory for usage patterns:
+```bash
+# Example for processing local documents
+python examples/7-loader.py
+
+# Example for processing web content
+python examples/8-url-loader.py
 ```
 
 ## Installation
@@ -69,6 +133,30 @@ src/
    cp config/mcp.template.json config/mcp.json
    # Edit the config/mcp.json file to configure your MCP servers
    ```
+6. Set up Memgraph for RAG (optional):
+   ```bash
+   # Using Docker
+   cd docker
+   ./memgraph.sh
+   # This will start a Memgraph instance on port 7687
+   ```
+
+## Environment Variables
+
+Key environment variables for configuration:
+
+```
+# Azure OpenAI Configuration
+AZURE_OPENAI_API_KEY=your-api-key
+AZURE_OPENAI_ENDPOINT=your-endpoint
+AZURE_OPENAI_VERSION=2023-05-15
+
+# Memgraph Configuration (for RAG)
+MEMGRAPH_URI=localhost
+MEMGRAPH_PORT=7687
+MEMGRAPH_USERNAME=memgraph
+MEMGRAPH_PASSWORD=memgraph
+```
 
 ## Usage
 
@@ -85,6 +173,18 @@ python -m src.agent
 Run the **Main Application** with:
 ```bash
 python -m src.main
+```
+
+Try the **RAG examples** with:
+```bash
+# Start a virtual environment first
+source .venv/bin/activate
+
+# Process local documents
+python examples/7-loader.py
+
+# Process web content
+python examples/8-url-loader.py
 ```
 
 Customize behavior via:

@@ -1,0 +1,92 @@
+---
+title: "Data Visualization Techniques Reference"
+author: "Data Science Institute"
+version: 1.2
+last_updated: "2024-05-01"
+
+categories:
+  - Statistical Visualization:
+      description: "Techniques focused on representing statistical properties and relationships"
+      techniques:
+        - name: "Histogram"
+          purpose: "Display distribution of a single numerical variable"
+          use_cases: ["Data distribution analysis", "Outlier detection", "Understanding data ranges"]
+          libraries: ["matplotlib", "seaborn", "plotly", "ggplot2"]
+          related_concepts: ["Density plots", "Frequency distribution"]
+          
+        - name: "Box Plot"
+          purpose: "Show distribution statistics (median, quartiles, outliers)"
+          use_cases: ["Comparing distributions across groups", "Identifying outliers", "Visualizing data spread"]
+          libraries: ["matplotlib", "seaborn", "plotly", "ggplot2"]
+          related_concepts: ["Violin plots", "Quartiles", "IQR"]
+          
+        - name: "Scatter Plot"
+          purpose: "Show relationship between two numerical variables"
+          use_cases: ["Correlation analysis", "Pattern identification", "Trend visualization"]
+          libraries: ["matplotlib", "seaborn", "plotly", "ggplot2"]
+          related_concepts: ["Correlation", "Regression plots", "Bubble charts"]
+          
+        - name: "Heatmap"
+          purpose: "Visualize matrix data with color intensity"
+          use_cases: ["Correlation matrices", "Confusion matrices", "Time-based patterns"]
+          libraries: ["seaborn", "plotly", "ggplot2", "d3.js"]
+          related_concepts: ["Color mapping", "Clustering visualization"]
+
+  - Time Series:
+      description: "Visualizations for time-based data"
+      techniques:
+        - name: "Line Chart"
+          purpose: "Display trends over time"
+          use_cases: ["Stock prices", "Temperature changes", "Sales trends"]
+          libraries: ["matplotlib", "plotly", "highcharts", "d3.js"]
+          related_concepts: ["Moving averages", "Trend analysis", "Seasonality"]
+          
+        - name: "Area Chart"
+          purpose: "Show cumulative totals over time"
+          use_cases: ["Market share evolution", "Cumulative sales", "Resource consumption"]
+          libraries: ["matplotlib", "plotly", "highcharts", "d3.js"]
+          related_concepts: ["Stacked area charts", "Stream graphs"]
+          
+        - name: "Candlestick Chart"
+          purpose: "Show price movements (open, high, low, close)"
+          use_cases: ["Stock analysis", "Trading patterns", "Price volatility"]
+          libraries: ["plotly", "bokeh", "highcharts", "tradingview"]
+          related_concepts: ["Technical analysis", "OHLC charts"]
+
+  - Geospatial:
+      description: "Techniques for visualizing geographical data"
+      techniques:
+        - name: "Choropleth Map"
+          purpose: "Show regional variations with color intensity"
+          use_cases: ["Population density", "Election results", "Economic indicators"]
+          libraries: ["folium", "plotly", "geopandas", "leaflet"]
+          related_concepts: ["GeoJSON", "Geographic data binning"]
+          
+        - name: "Point Map"
+          purpose: "Display discrete locations"
+          use_cases: ["Store locations", "Event mapping", "Incident tracking"]
+          libraries: ["folium", "plotly", "geopandas", "leaflet"]
+          related_concepts: ["Marker clustering", "Point density"]
+          
+        - name: "Heat Map (Geographic)"
+          purpose: "Show density of events in geographic space"
+          use_cases: ["Crime hotspots", "Customer density", "Traffic patterns"]
+          libraries: ["folium", "plotly", "geopandas", "leaflet"]
+          related_concepts: ["Kernel density estimation", "Spatial clustering"]
+
+best_practices:
+  - "Choose visualization based on the question you're trying to answer"
+  - "Keep designs simple and focused on the data"
+  - "Use appropriate color schemes (sequential, diverging, categorical)"
+  - "Label axes clearly and include units"
+  - "Add context with annotations when necessary"
+  - "Be aware of how different scales can change perception of data"
+  - "Test visualizations with target audience to ensure clarity"
+  - "Consider accessibility aspects (color blindness, contrast)"
+
+relationships_to_ml:
+  - "Visualizations are critical for exploratory data analysis before modeling"
+  - "Help identify patterns and relationships that can inform feature engineering"
+  - "Useful for model evaluation (ROC curves, confusion matrices, residual plots)"
+  - "Important for communicating model results to stakeholders"
+  - "Reveals insights about model performance across different segments"

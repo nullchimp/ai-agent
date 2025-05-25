@@ -2,27 +2,29 @@ from . import Tool
 from typing import Optional
 
 class ListFiles(Tool):
-    def define(self) -> dict:
+    @property
+    def name(self) -> str:
+        return "list_files"
+    
+    @property
+    def description(self) -> str:
+        return "List files in a specified directory within a secure base directory."
+    
+    @property
+    def parameters(self) -> dict:
         return {
-            "type": "function",
-            "function": {
-                "name": f"{self.name}",
-                "description": "List files within a secure base directory.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "base_dir": {
-                            "type": "string",
-                            "description": "Base directory for file operations"
-                        },
-                        "directory": {
-                            "type": "string",
-                            "description": "The relative subdirectory path to list files from (default: '.')"
-                        }
-                    },
-                    "required": ["base_dir"]
+            "type": "object",
+            "properties": {
+                "base_dir": {
+                    "type": "string",
+                    "description": "Base directory for file operations"
+                },
+                "directory": {
+                    "type": "string",
+                    "description": "The relative subdirectory path to list files from (default: '.')"
                 }
-            }
+            },
+            "required": ["base_dir"]
         }
     
     async def run(self, base_dir: str, directory: Optional[str] = "."):

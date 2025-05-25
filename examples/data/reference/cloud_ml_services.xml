@@ -1,0 +1,155 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CloudServices>
+  <Provider name="AWS" company="Amazon" foundedYear="2006">
+    <Description>Amazon Web Services offers a broad set of machine learning services and supporting cloud infrastructure.</Description>
+    <MLServices>
+      <Service id="sagemaker">
+        <Name>Amazon SageMaker</Name>
+        <Category>End-to-End ML Platform</Category>
+        <LaunchDate>2017-11-29</LaunchDate>
+        <Description>Fully managed service that enables data scientists and developers to build, train, and deploy machine learning models at scale.</Description>
+        <UseCases>
+          <UseCase>Computer Vision</UseCase>
+          <UseCase>Natural Language Processing</UseCase>
+          <UseCase>Time Series Forecasting</UseCase>
+          <UseCase>Recommendation Systems</UseCase>
+        </UseCases>
+        <CompatibleFrameworks>
+          <Framework>TensorFlow</Framework>
+          <Framework>PyTorch</Framework>
+          <Framework>scikit-learn</Framework>
+          <Framework>XGBoost</Framework>
+        </CompatibleFrameworks>
+        <RelatedServices>
+          <RelatedService id="s3">Amazon S3</RelatedService>
+          <RelatedService id="lambda">AWS Lambda</RelatedService>
+          <RelatedService id="glue">AWS Glue</RelatedService>
+        </RelatedServices>
+      </Service>
+      <Service id="comprehend">
+        <Name>Amazon Comprehend</Name>
+        <Category>Natural Language Processing</Category>
+        <LaunchDate>2017-11-29</LaunchDate>
+        <Description>Natural language processing service that uses machine learning to find insights and relationships in text.</Description>
+        <UseCases>
+          <UseCase>Sentiment Analysis</UseCase>
+          <UseCase>Entity Recognition</UseCase>
+          <UseCase>Key Phrase Extraction</UseCase>
+          <UseCase>Language Detection</UseCase>
+        </UseCases>
+        <DataFormats>
+          <Format>Plain text</Format>
+          <Format>PDF</Format>
+          <Format>Word documents</Format>
+          <Format>Images with text</Format>
+        </DataFormats>
+      </Service>
+      <Service id="rekognition">
+        <Name>Amazon Rekognition</Name>
+        <Category>Computer Vision</Category>
+        <LaunchDate>2016-11-30</LaunchDate>
+        <Description>Provides pre-trained computer vision capabilities for image and video analysis.</Description>
+        <UseCases>
+          <UseCase>Object Detection</UseCase>
+          <UseCase>Facial Analysis</UseCase>
+          <UseCase>Content Moderation</UseCase>
+          <UseCase>Celebrity Recognition</UseCase>
+        </UseCases>
+      </Service>
+    </MLServices>
+  </Provider>
+  
+  <Provider name="GCP" company="Google" foundedYear="2008">
+    <Description>Google Cloud Platform offers a suite of cloud computing services for machine learning and AI.</Description>
+    <MLServices>
+      <Service id="vertex">
+        <Name>Vertex AI</Name>
+        <Category>End-to-End ML Platform</Category>
+        <LaunchDate>2021-05-18</LaunchDate>
+        <Description>Unified platform for building, deploying, and scaling ML models.</Description>
+        <UseCases>
+          <UseCase>Computer Vision</UseCase>
+          <UseCase>Natural Language Processing</UseCase>
+          <UseCase>Tabular Data Analysis</UseCase>
+          <UseCase>Forecasting</UseCase>
+        </UseCases>
+        <CompatibleFrameworks>
+          <Framework>TensorFlow</Framework>
+          <Framework>PyTorch</Framework>
+          <Framework>scikit-learn</Framework>
+          <Framework>XGBoost</Framework>
+        </CompatibleFrameworks>
+        <RelatedServices>
+          <RelatedService id="bigquery">BigQuery</RelatedService>
+          <RelatedService id="dataflow">Dataflow</RelatedService>
+          <RelatedService id="storage">Cloud Storage</RelatedService>
+        </RelatedServices>
+      </Service>
+      <Service id="vision">
+        <Name>Vision AI</Name>
+        <Category>Computer Vision</Category>
+        <LaunchDate>2016-02-18</LaunchDate>
+        <Description>Pre-trained models for image analysis and understanding.</Description>
+        <UseCases>
+          <UseCase>Label Detection</UseCase>
+          <UseCase>Optical Character Recognition</UseCase>
+          <UseCase>Landmark Detection</UseCase>
+          <UseCase>Logo Detection</UseCase>
+        </UseCases>
+      </Service>
+      <Service id="nlp">
+        <Name>Natural Language API</Name>
+        <Category>Natural Language Processing</Category>
+        <LaunchDate>2016-07-20</LaunchDate>
+        <Description>Reveals the structure and meaning of text through machine learning.</Description>
+        <UseCases>
+          <UseCase>Entity Analysis</UseCase>
+          <UseCase>Sentiment Analysis</UseCase>
+          <UseCase>Content Classification</UseCase>
+          <UseCase>Syntax Analysis</UseCase>
+        </UseCases>
+      </Service>
+    </MLServices>
+  </Provider>
+  
+  <Provider name="Azure" company="Microsoft" foundedYear="2010">
+    <Description>Microsoft Azure provides a range of cloud services including AI and ML capabilities.</Description>
+    <MLServices>
+      <Service id="ml">
+        <Name>Azure Machine Learning</Name>
+        <Category>End-to-End ML Platform</Category>
+        <LaunchDate>2014-02-01</LaunchDate>
+        <Description>Cloud-based environment for training, deploying, automating, managing, and tracking ML models.</Description>
+        <UseCases>
+          <UseCase>Computer Vision</UseCase>
+          <UseCase>Natural Language Processing</UseCase>
+          <UseCase>Forecasting</UseCase>
+          <UseCase>Anomaly Detection</UseCase>
+        </UseCases>
+        <CompatibleFrameworks>
+          <Framework>TensorFlow</Framework>
+          <Framework>PyTorch</Framework>
+          <Framework>scikit-learn</Framework>
+          <Framework>ONNX</Framework>
+        </CompatibleFrameworks>
+        <RelatedServices>
+          <RelatedService id="storage">Azure Storage</RelatedService>
+          <RelatedService id="databricks">Azure Databricks</RelatedService>
+          <RelatedService id="synapse">Azure Synapse Analytics</RelatedService>
+        </RelatedServices>
+      </Service>
+      <Service id="cognitive">
+        <Name>Cognitive Services</Name>
+        <Category>Pre-built AI APIs</Category>
+        <LaunchDate>2016-03-30</LaunchDate>
+        <Description>Suite of services and APIs for building cognitive intelligence into applications.</Description>
+        <Subcategories>
+          <Subcategory name="Vision">Computer vision and image processing</Subcategory>
+          <Subcategory name="Language">Text analytics, translation, and language understanding</Subcategory>
+          <Subcategory name="Speech">Speech-to-text and text-to-speech capabilities</Subcategory>
+          <Subcategory name="Decision">Personalized recommendations and anomaly detection</Subcategory>
+        </Subcategories>
+      </Service>
+    </MLServices>
+  </Provider>
+</CloudServices>

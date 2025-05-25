@@ -1,27 +1,29 @@
 from . import Tool
 
 class ReadFile(Tool):
-    def define(self) -> dict:
+    @property
+    def name(self) -> str:
+        return "read_file"
+
+    @property
+    def description(self) -> str:
+        return "Read content from a specified file within a secure base directory."
+    
+    @property
+    def parameters(self) -> dict:
         return {
-            "type": "function",
-            "function": {
-                "name": f"{self.name}",
-                "description": "Read content from a file within a secure base directory.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "base_dir": {
-                            "type": "string",
-                            "description": "Base directory for file operations"
-                        },
-                        "filename": {
-                            "type": "string",
-                            "description": "The name of the file to read from (relative path)"
-                        }
-                    },
-                    "required": ["base_dir", "filename"]
+            "type": "object",
+            "properties": {
+                "base_dir": {
+                    "type": "string",
+                    "description": "Base directory for file operations"
+                },
+                "filename": {
+                    "type": "string",
+                    "description": "The name of the file to read from (relative path)"
                 }
-            }
+            },
+            "required": ["base_dir", "filename"]
         }
     
     async def run(self, base_dir: str, filename: str):

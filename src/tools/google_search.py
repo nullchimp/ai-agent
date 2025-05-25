@@ -1,27 +1,29 @@
 from . import Tool
 
 class GoogleSearch(Tool):
-	def define(self) -> dict:
+	@property
+	def name(self) -> str:
+		return "google_search"
+	
+	@property
+	def description(self) -> str:
+		return "Search the web for relevant information."
+	
+	@property
+	def parameters(self) -> dict:
 		return {
-			"type": "function",
-			"function": {
-				"name": f"{self.name}",
-				"description": "Search the web for relevant information.",
-				"parameters": {
-					"type": "object",
-					"properties": {
-						"query": {
-							"type": "string",
-							"description": "The search query to use"
-						},
-						"num_results": {
-							"type": "number",
-							"description": "Number of results to return (default: 5, max: 10)"
-						}
-					},
-					"required": ["query"]
+			"type": "object",
+			"properties": {
+				"query": {
+					"type": "string",
+					"description": "The search query to use"
+				},
+				"num_results": {
+					"type": "number",
+					"description": "Number of results to return (default: 5, max: 10)"
 				}
-			}
+			},
+			"required": ["query"]
 		}
     
 	async def run(self, query: str, num_results: int = 5):
