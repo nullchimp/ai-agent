@@ -1,249 +1,156 @@
 # AI Agent
 
-An intelligent AI agent framework written in Python, designed to facilitate seamless integration with Model Context Protocol (MCP) servers, Azure OpenAI services, file operations, web fetching, and search functionalities. This project provides modular components to build and extend AI-driven applications with best practices in testing, linting, and continuous integration.
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python Version](https://img.shields.io/badge/python-3.9%2B-blue.svg)](https://www.python.org/downloads/)
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+[![Imports: isort](https://img.shields.io/badge/%20imports-isort-%231674b1?style=flat&labelColor=ef8336)](https://pycqa.github.io/isort/)
+
+An advanced AI agent capable of performing tasks, answering questions, and interacting with various tools and data sources. This project leverages Large Language Models (LLMs), Retrieval Augmented Generation (RAG), and a flexible tool integration system.
 
 ## Table of Contents
+
 - [Features](#features)
 - [Architecture](#architecture)
-- [RAG Implementation](#rag-implementation)
-- [Installation](#installation)
+- [Project Structure](#project-structure)
+- [Setup and Installation](#setup-and-installation)
 - [Usage](#usage)
-- [Development](#development)
-- [Testing](#testing)
+- [Configuration](#configuration)
+- [Tools](#tools)
 - [Contributing](#contributing)
 - [License](#license)
 
 ## Features
-- Integration with Model Context Protocol (MCP) servers for AI tool execution
-- Support for Azure OpenAI for chat and completion services
-- Modular file operations (read, write, list)
-- Web fetching and conversion utilities
-- Search client with pluggable backends
-- Azure-based deployment with secure secret management
 
-## Azure Deployment
-The AI Agent can be deployed to Azure using Kubernetes (AKS) with the following features:
-- Infrastructure as code using Terraform
-- Secrets managed securely in Azure Key Vault
-- Continuous deployment with GitHub Actions
-- Persistent storage for Memgraph data
-
-To deploy to Azure:
-1. Run the setup script: `./scripts/setup_azure.sh`
-2. Add the generated service principal credentials to GitHub secrets as `AZURE_CREDENTIALS`
-3. Add `MEMGRAPH_USERNAME` and `MEMGRAPH_PASSWORD` to GitHub secrets
-4. Push to main branch to trigger deployment or manually trigger the workflow
-
-If you encounter issues connecting to Memgraph after deployment, see [Memgraph Troubleshooting Guide](docs/memgraph-troubleshooting.md).
+*   **Conversational AI:** Engage in natural language conversations.
+*   **Tool Usage:** Utilize a variety of tools to perform actions like web searches, file operations, and more.
+*   **Retrieval Augmented Generation (RAG):** Enhance responses with information retrieved from a knowledge graph (Memgraph) and vector embeddings.
+*   **Model Context Protocol (MCP):** Integrate with external tools and services that adhere to the MCP standard.
+*   **Modular Design:** Easily extendable with new tools, data sources, and functionalities.
+*   **Asynchronous Operations:** Built with `asyncio` for efficient I/O-bound tasks.
 
 ## Architecture
-The project follows a component-based architecture where the AI Agent orchestrates interactions between users, language models, local tools, and MCP servers.
 
-For a detailed view of the architecture including sequence diagrams, component descriptions, and workflow, see [Architecture Documentation](docs/architecture.md).
+The AI Agent's architecture is designed for modularity and scalability. Key components include:
 
-The codebase follows a modular structure under `src/`:
+*   **Agent Core (`src/agent.py`):** Orchestrates the conversation flow and tool interactions.
+*   **LLM Services (`src/core/llm/`):** Manages communication with Large Language Models.
+*   **RAG System (`src/core/rag/`):** Implements retrieval augmented generation using a graph database (Memgraph) and vector embeddings for contextual knowledge.
+    *   See [RAG Architecture](./docs/rag_architecture.md) for details.
+*   **MCP Integration (`src/core/mcp/`):** Handles discovery and communication with MCP-compatible tools.
+*   **Libraries (`src/libs/`):** Reusable modules for data loading, file operations, etc.
+*   **Tools (`src/tools/`):** A collection of callable tools that the agent can use.
 
-```
-src/
-├── agent.py           # Entry point for the AI agent
-├── main.py            # Main application entry point
-├── libs/              # Core libraries and abstractions
-│   ├── dataloader/    # Document and web content loading utilities
-│   ├── fileops/       # File operations utilities
-│   └── search/        # Search client and service
-├── tools/             # Built-in tools for the AI agent
-│   ├── google_search.py  # Web search functionality
-│   ├── list_files.py     # Directory listing operations
-│   ├── read_file.py      # File reading operations
-│   └── write_file.py     # File writing operations
-└── core/              # Core system modules
-    ├── llm/           # Language model interfaces
-    │   ├── chat.py    # Chat interaction handler
-    │   └── client.py  # Azure OpenAI client wrapper
-    ├── mcp/           # Model Context Protocol integration
-    │   ├── session.py         # MCP session management
-    │   └── sessions_manager.py # MCP sessions orchestration
-    └── rag/           # Retrieval-Augmented Generation components
-        ├── schema.py          # Data models for graph database
-        ├── dbhandler/         # Database interface implementations
-        │   └── memgraph.py    # Memgraph-specific database operations
-        └── embedder/          # Vector embedding generation services
-            └── text_embedding_3_small.py # Azure OpenAI embedding service
-```
+For a detailed overview, please refer to the [Project Architecture Document](./docs/architecture.md).
 
-## RAG Implementation
+## Project Structure
 
-The project includes a Retrieval-Augmented Generation (RAG) system using a graph database (Memgraph) for knowledge storage and retrieval:
-
-### Core Components
-- **Content Loaders**: Extract text from files and web pages
-  - `DocumentLoader`: Processes local filesystem content (in `libs/dataloader/document.py`)
-  - `WebLoader`: Fetches and processes web content (in `libs/dataloader/web.py`)
-
-- **Text Processing**: Split content into semantic chunks for embedding
-  - Configurable chunk size (default: 1024 tokens)
-  - Configurable overlap (default: 200 tokens)
-  - Sentence-aware splitting for better semantic units
-
-- **Embedding Service**: Generate vector representations with Azure OpenAI
-  - `TextEmbedding3Small`: Uses text-embedding-3-small model
-  - Batch processing with async support for better throughput
-
-- **Graph Database**: Store documents, chunks and their relationships
-  - `MemgraphClient`: Interface to Memgraph database (in `core/rag/dbhandler/`)
-  - Support for vector similarity search
-  - Relationship modeling (CHUNK_OF, SOURCED_FROM, etc.)
-
-### Key Features
-- **Document Processing**: Load, chunk, embed, and store documents with proper relationship modeling
-- **Vector Search**: Find semantically similar content using embedding-based search
-- **Web Content Indexing**: Crawl and index web pages with customizable parameters
-- **Graph Storage**: Store relationships between documents, chunks, sources, and embeddings
-
-### Documentation
-- [RAG Architecture](docs/rag_architecture.md): Detailed system architecture
-- [Edge Relationships](docs/rag_edge_relationships.md): Graph relationship model
-- [RAG Integration ADR](docs/ADRs/RAG-Integration.md): Decision record and implementation details
-
-### Usage
-See the examples directory for usage patterns:
-```bash
-# Example for processing local documents
-python examples/7-loader.py
-
-# Example for processing web content
-python examples/8-url-loader.py
-```
-
-## Installation
-
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/nullchimp/ai-agent.git
-   cd ai-agent
-   ```
-2. Create and activate a Python 3.9+ virtual environment:
-   ```bash
-   python3 -m venv .venv
-   source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-   ```
-3. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
-4. Copy `.env.example` to `.env` and configure your credentials:
-   ```bash
-   cp .env.example .env
-   # Edit .env to set environment variables
-   ```
-5. Configure MCP servers (optional):
-   ```bash
-   cp config/mcp.template.json config/mcp.json
-   # Edit the config/mcp.json file to configure your MCP servers
-   ```
-6. Set up Memgraph for RAG (optional):
-   ```bash
-   # Using Docker
-   cd docker
-   ./memgraph.sh
-   # This will start a Memgraph instance on port 7687
-   ```
-
-## Environment Variables
-
-Key environment variables for configuration:
+The project is organized as follows:
 
 ```
-# Azure OpenAI Configuration
-AZURE_OPENAI_API_KEY=your-api-key
-AZURE_OPENAI_ENDPOINT=your-endpoint
-AZURE_OPENAI_VERSION=2023-05-15
-
-# Memgraph Configuration (for RAG)
-MEMGRAPH_URI=localhost
-MEMGRAPH_PORT=7687
-MEMGRAPH_USERNAME=memgraph
-MEMGRAPH_PASSWORD=memgraph
+ai-agent/
+├── .github/                # GitHub Actions workflows and issue templates
+│   ├── prompts/            # Prompts for GitHub Copilot
+│   └── workflows/          # CI/CD workflows
+├── config/                 # Configuration files
+│   └── mcp.json            # MCP server configurations
+├── docs/                   # Project documentation
+│   ├── ADRs/               # Architecture Decision Records
+│   ├── architecture.md     # Main architecture overview
+│   ├── rag_architecture.md # RAG system details
+│   └── ...                 # Other documentation files
+├── src/                    # Source code
+│   ├── agent.py            # Main agent logic
+│   ├── main.py             # Application entry point
+│   ├── core/               # Core components (LLM, RAG, MCP, utils)
+│   │   ├── llm/
+│   │   ├── rag/
+│   │   ├── mcp/
+│   │   └── ...
+│   ├── libs/               # Reusable libraries (dataloader, fileops)
+│   │   ├── dataloader/
+│   │   └── ...
+│   └── tools/              # Agent tools (google_search, file_io, etc.)
+│       └── ...
+├── tests/                  # Unit and integration tests
+│   └── ... 
+├── .env.example            # Example environment variables file
+├── .gitignore              # Files to ignore in Git
+├── LICENSE                 # Project license (MIT)
+├── README.md               # This file
+├── requirements.txt        # Python dependencies
+└── ...                     # Other project files (linters, formatters config)
 ```
+
+## Setup and Installation
+
+1.  **Clone the repository:**
+    ```bash
+    git clone https://github.com/nullchimp/ai-agent.git
+    cd ai-agent
+    ```
+
+2.  **Create and activate a virtual environment:**
+    ```bash
+    python3 -m venv .venv
+    source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+    ```
+
+3.  **Install dependencies:**
+    ```bash
+    pip install -r requirements.txt
+    ```
+
+4.  **Set up environment variables:**
+    Copy `.env.example` to `.env` and fill in the required API keys and configurations (e.g., `OPENAI_API_KEY`, `MEMGRAPH_HOST`).
+    ```bash
+    cp .env.example .env
+    # Edit .env with your credentials
+    ```
+
+5.  **Ensure Memgraph is running** (if using the RAG features with Memgraph).
+    Refer to the [Memgraph documentation](https://memgraph.com/docs/getting-started) for setup instructions.
 
 ## Usage
 
-Run the **AI Agent** with:
+To run the agent:
+
 ```bash
-python -m src.agent
+python src/main.py
 ```
 
-Run the **Main Application** with:
-```bash
-python -m src.main
-```
+This will start the agent, and it will typically enter a loop to listen for user input or perform tasks based on its configuration.
 
-Try the **Examples** to explore different features:
-```bash
-# Start a virtual environment first
-source .venv/bin/activate
+## Configuration
 
-# Basic chat example
-python examples/1-chat.py
+*   **Environment Variables (`.env`):** API keys, service endpoints (e.g., Memgraph host/port), and other sensitive configurations.
+*   **MCP Configuration (`config/mcp.json`):** Defines connection details for external tools and services that follow the Model Context Protocol.
 
-# Tool usage example  
-python examples/2-tool.py
+## Tools
 
-# Chat with tools
-python examples/3-chat-with-tools.py
+The agent can be equipped with various tools to extend its capabilities. Current tools include:
 
-# Chat with tools and MCP
-python examples/4-chat-with-tools-and-mcp.py
+*   `GoogleSearch`: Performs web searches using Google.
+*   `ReadFile`: Reads content from files.
+*   `WriteFile`: Writes content to files.
+*   `ListFiles`: Lists files in a directory.
+*   `Context7`: Interacts with the Context7 API (e.g., for coding best practices).
 
-# RAG examples
-python examples/7-loader.py    # Process local documents
-python examples/8-url-loader.py  # Process web content
-```
-
-Customize behavior via:
-- Environment variables defined in `.env`
-- MCP server configurations in `config/mcp.json`
-
-## Development
-
-We follow rigorous code quality and security guidelines:
-
-- Python 3.9+
-- Code formatting with `black` and `isort`
-- Linting with `flake8` and `pylint`
-- Type checking with `mypy`
-- Security scanning with `bandit` and `safety`
-
-To check formatting and linting:
-```bash
-black --check .
-isort --check .
-flake8
-pylint src
-mypy src
-``` 
-
-## Testing
-
-All changes must be validated with tests. The `tests/` directory mirrors the structure of `src/`.
-
-Run unit and integration tests with coverage:
-```bash
-pytest --cov=src
-``` 
-
-Ensure all tests pass before committing.
+Tools are located in the `src/tools/` directory. New tools can be added by creating a new Python file in this directory and implementing the `Tool` interface (see `src/tools/__init__.py`).
 
 ## Contributing
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/YourFeature`)
-3. Implement your changes, add tests
-4. Run linting and tests
-5. Submit a Pull Request
+Contributions are welcome! Please follow these steps:
 
-Please follow the [Python Coding Guidelines](#development) in this project.
+1.  Fork the repository.
+2.  Create a new branch (`git checkout -b feature/your-feature-name`).
+3.  Make your changes and commit them (`git commit -m 'Add some feature'`).
+4.  Ensure your code adheres to the project's coding standards (run `black .`, `isort .`, `pylint src tests`, `mypy src`).
+5.  Write tests for your changes and ensure all tests pass (`pytest`).
+6.  Push to the branch (`git push origin feature/your-feature-name`).
+7.  Create a new Pull Request.
+
+Please read `CONTRIBUTING.md` (if available) for more detailed guidelines.
 
 ## License
 
-This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
+This project is licensed under the MIT License - see the [LICENSE](./LICENSE) file for details.
