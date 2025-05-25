@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import Mock, patch, MagicMock
-from src.core.rag.dbhandler import GraphClient
-from src.core.rag.schema import (
+from core.rag.dbhandler import GraphClient
+from core.rag.schema import (
     Document, DocumentChunk, Source, Vector, VectorStore, 
     Interaction, EdgeType, ProcessingStatus
 )

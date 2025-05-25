@@ -1,6 +1,6 @@
 import pytest
 from unittest.mock import Mock, patch
-from src.tools.list_files import ListFiles
+from tools.list_files import ListFiles
 
 
 class TestListFiles:
@@ -111,7 +111,7 @@ class TestListFiles:
 
     @pytest.mark.asyncio
     async def test_list_files_inheritance(self):
-        from src.tools import Tool
+        from tools import Tool
         list_files = ListFiles()
         assert isinstance(list_files, Tool)
 

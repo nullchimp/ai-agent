@@ -2,10 +2,10 @@ import pytest
 from unittest.mock import Mock, patch, MagicMock
 import tempfile
 import os
-from src.libs.dataloader import Loader
-from src.libs.dataloader.document import DocumentLoader
-from src.libs.dataloader.web import WebLoader
-from src.core.rag.schema import Document, DocumentChunk, Source
+from libs.dataloader import Loader
+from libs.dataloader.document import DocumentLoader
+from libs.dataloader.web import WebLoader
+from core.rag.schema import Document, DocumentChunk, Source
 
 
 class TestLoader:
@@ -84,7 +84,7 @@ class TestDocumentLoader:
         with pytest.raises(ValueError, match="Path cannot be empty"):
             loader.create_source("/test/file.txt")
 
-    @patch('src.libs.dataloader.document.SimpleDirectoryReader')
+    @patch('libs.dataloader.document.SimpleDirectoryReader')
     @patch('llama_index.core.node_parser.SentenceSplitter.get_nodes_from_documents')
     def test_load_data_success(self, mock_splitter_method, mock_reader, temp_path):
         loader = DocumentLoader(temp_path)
@@ -118,7 +118,7 @@ class TestDocumentLoader:
         assert len(chunks) == 1
         assert hasattr(chunks[0], 'content')
 
-    @patch('src.libs.dataloader.document.SimpleDirectoryReader')
+    @patch('libs.dataloader.document.SimpleDirectoryReader')
     def test_load_data_no_documents(self, mock_reader, temp_path):
         loader = DocumentLoader(temp_path)
         
@@ -129,7 +129,7 @@ class TestDocumentLoader:
         with pytest.raises(ValueError, match="Failed to load document"):
             list(loader.load_data())
 
-    @patch('src.libs.dataloader.document.SimpleDirectoryReader')
+    @patch('libs.dataloader.document.SimpleDirectoryReader')
     def test_load_data_empty_document(self, mock_reader, temp_path):
         loader = DocumentLoader(temp_path)
         
@@ -146,7 +146,7 @@ class TestDocumentLoader:
         results = list(loader.load_data())
         assert len(results) == 0
 
-    @patch('src.libs.dataloader.document.SimpleDirectoryReader')
+    @patch('libs.dataloader.document.SimpleDirectoryReader')
     def test_load_data_exception(self, mock_reader, temp_path):
         loader = DocumentLoader(temp_path)
         
@@ -188,7 +188,7 @@ class TestWebLoader:
         assert source.type == "website"
         assert source.uri == source_url
 
-    @patch('src.libs.dataloader.web.requests.get')
+    @patch('libs.dataloader.web.requests.get')
     def test_visit_site_success(self, mock_get, web_loader):
         mock_response = Mock()
         mock_response.text = "<html><body><h1>Test</h1><p>Content</p></body></html>"
@@ -205,14 +205,14 @@ class TestWebLoader:
         assert isinstance(links, list)
         mock_get.assert_called_once()
 
-    @patch('src.libs.dataloader.web.requests.get')
+    @patch('libs.dataloader.web.requests.get')
     def test_visit_site_retry_on_failure(self, mock_get, web_loader):
         mock_get.side_effect = Exception("Connection error")
         
         with pytest.raises(ValueError, match="Failed to fetch content"):
             web_loader._visit_site("https://example.com", retry=1)
 
-    @patch('src.libs.dataloader.web.requests.get')
+    @patch('libs.dataloader.web.requests.get')
     def test_get_urls_success(self, mock_get, web_loader):
         html_content = '''
         <html>
@@ -243,7 +243,7 @@ class TestWebLoader:
         web_loader._visit_site = Mock(return_value=("Test content", []))
         
         # Create a real Source object for testing
-        from src.core.rag.schema import Source
+        from core.rag.schema import Source
         test_source = Source(name="test", type="website", uri="https://example.com")
         web_loader.create_source = Mock(return_value=test_source)
         
@@ -268,7 +268,7 @@ class TestWebLoader:
         web_loader._visit_site = Mock(return_value=("", []))
         
         # Create a real Source object for testing
-        from src.core.rag.schema import Source
+        from core.rag.schema import Source
         test_source = Source(name="test", type="website", uri="https://example.com")
         web_loader.create_source = Mock(return_value=test_source)
         

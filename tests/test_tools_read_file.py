@@ -1,6 +1,6 @@
 import pytest
 from unittest.mock import Mock, patch, AsyncMock
-from src.tools.read_file import ReadFile
+from tools.read_file import ReadFile
 
 
 class TestReadFile:
@@ -109,7 +109,7 @@ class TestReadFile:
 
     @pytest.mark.asyncio
     async def test_read_file_inheritance(self):
-        from src.tools import Tool
+        from tools import Tool
         read_file = ReadFile()
         assert isinstance(read_file, Tool)
 

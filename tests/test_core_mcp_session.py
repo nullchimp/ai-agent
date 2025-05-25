@@ -1,6 +1,6 @@
 import pytest
 from unittest.mock import AsyncMock, Mock, patch, MagicMock
-from src.core.mcp.session import MCPSession
+from core.mcp.session import MCPSession
 
 
 class TestMCPSession:
@@ -37,7 +37,7 @@ class TestMCPSession:
         mock_session.list_tools.return_value = [("tools", [mock_tool])]
         
         with patch.object(session, 'get_session', return_value=mock_session):
-            with patch('src.core.mcp.session.Tool') as mock_tool_class:
+            with patch('core.mcp.session.Tool') as mock_tool_class:
                 mock_tool_instance = Mock()
                 mock_tool_class.return_value = mock_tool_instance
                 
@@ -142,8 +142,8 @@ class TestMCPSession:
         mock_write = Mock()
         mock_client_session = Mock()
         
-        with patch('src.core.mcp.session.stdio_client', return_value=(mock_stdio, mock_write)) as mock_stdio_client:
-            with patch('src.core.mcp.session.ClientSession', return_value=mock_client_session) as mock_client_session_class:
+        with patch('core.mcp.session.stdio_client', return_value=(mock_stdio, mock_write)) as mock_stdio_client:
+            with patch('core.mcp.session.ClientSession', return_value=mock_client_session) as mock_client_session_class:
                 with patch.object(session.exit_stack, 'enter_async_context') as mock_enter:
                     mock_enter.side_effect = [(mock_stdio, mock_write), mock_client_session]
                     

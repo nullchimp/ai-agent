@@ -46,21 +46,29 @@ The codebase follows a modular structure under `src/`:
 ```
 src/
 ├── agent.py           # Entry point for the AI agent
-├── chat.py            # Chat interface implementation
 ├── main.py            # Main application entry point
 ├── libs/              # Core libraries and abstractions
+│   ├── dataloader/    # Document and web content loading utilities
 │   ├── fileops/       # File operations utilities
-│   ├── search/        # Search client and service
-│   └── webfetch/      # Web fetching and conversion services
-├── tools/             # Command-line tools for file, web operations and more
-└── core/              # Utility modules
-    ├── azureopenai/   # Azure OpenAI wrappers (chat, client)
-    ├── mcpclient/     # MCP client for server interactions
+│   └── search/        # Search client and service
+├── tools/             # Built-in tools for the AI agent
+│   ├── google_search.py  # Web search functionality
+│   ├── list_files.py     # Directory listing operations
+│   ├── read_file.py      # File reading operations
+│   └── write_file.py     # File writing operations
+└── core/              # Core system modules
+    ├── llm/           # Language model interfaces
+    │   ├── chat.py    # Chat interaction handler
+    │   └── client.py  # Azure OpenAI client wrapper
+    ├── mcp/           # Model Context Protocol integration
+    │   ├── session.py         # MCP session management
+    │   └── sessions_manager.py # MCP sessions orchestration
     └── rag/           # Retrieval-Augmented Generation components
-        ├── schema.py  # Data models for graph database
-        ├── embedder/  # Vector embedding generation services
-        ├── loader/    # Content loading mechanisms (files, web)
-        └── graph_client.py # Memgraph database interface
+        ├── schema.py          # Data models for graph database
+        ├── dbhandler/         # Database interface implementations
+        │   └── memgraph.py    # Memgraph-specific database operations
+        └── embedder/          # Vector embedding generation services
+            └── text_embedding_3_small.py # Azure OpenAI embedding service
 ```
 
 ## RAG Implementation
@@ -69,8 +77,8 @@ The project includes a Retrieval-Augmented Generation (RAG) system using a graph
 
 ### Core Components
 - **Content Loaders**: Extract text from files and web pages
-  - `DocumentLoader`: Processes local filesystem content
-  - `WebLoader`: Fetches and processes web content
+  - `DocumentLoader`: Processes local filesystem content (in `libs/dataloader/document.py`)
+  - `WebLoader`: Fetches and processes web content (in `libs/dataloader/web.py`)
 
 - **Text Processing**: Split content into semantic chunks for embedding
   - Configurable chunk size (default: 1024 tokens)
@@ -82,7 +90,7 @@ The project includes a Retrieval-Augmented Generation (RAG) system using a graph
   - Batch processing with async support for better throughput
 
 - **Graph Database**: Store documents, chunks and their relationships
-  - `MemGraphClient`: Interface to Memgraph database
+  - `MemgraphClient`: Interface to Memgraph database (in `core/rag/dbhandler/`)
   - Support for vector similarity search
   - Relationship modeling (CHUNK_OF, SOURCED_FROM, etc.)
 
@@ -160,11 +168,6 @@ MEMGRAPH_PASSWORD=memgraph
 
 ## Usage
 
-Run the **AI Chat** with:
-```bash
-python -m src.chat
-```
-
 Run the **AI Agent** with:
 ```bash
 python -m src.agent
@@ -175,16 +178,26 @@ Run the **Main Application** with:
 python -m src.main
 ```
 
-Try the **RAG examples** with:
+Try the **Examples** to explore different features:
 ```bash
 # Start a virtual environment first
 source .venv/bin/activate
 
-# Process local documents
-python examples/7-loader.py
+# Basic chat example
+python examples/1-chat.py
 
-# Process web content
-python examples/8-url-loader.py
+# Tool usage example  
+python examples/2-tool.py
+
+# Chat with tools
+python examples/3-chat-with-tools.py
+
+# Chat with tools and MCP
+python examples/4-chat-with-tools-and-mcp.py
+
+# RAG examples
+python examples/7-loader.py    # Process local documents
+python examples/8-url-loader.py  # Process web content
 ```
 
 Customize behavior via:

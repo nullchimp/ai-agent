@@ -2,7 +2,7 @@ import pytest
 from unittest.mock import Mock, patch, AsyncMock
 from dataclasses import dataclass
 
-from src.tools.google_search import GoogleSearch
+from tools.google_search import GoogleSearch
 
 
 class TestGoogleSearch:
@@ -179,7 +179,7 @@ class TestGoogleSearch:
     
     def test_tool_inheritance(self, google_search_tool):
         # Verify that GoogleSearch inherits from Tool
-        from src.tools import Tool
+        from tools import Tool
         assert isinstance(google_search_tool, Tool)
     
     @pytest.mark.asyncio

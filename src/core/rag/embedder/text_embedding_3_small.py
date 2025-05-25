@@ -1,5 +1,5 @@
 import uuid
-from src.core.rag.schema import DocumentChunk
+from core.rag.schema import DocumentChunk
 
 from . import EmbeddingService
 

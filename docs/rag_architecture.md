@@ -6,20 +6,20 @@ This document outlines the architecture of our Retrieval-Augmented Generation (R
 
 The RAG system consists of these main components:
 
-1. **Loaders**: Specialized classes for loading different content types
-   - `DocumentLoader`: Processes files from local filesystem
-   - `WebLoader`: Extracts content from web pages (with crawling capability)
+1. **Loaders**: Specialized classes for loading different content types (in `libs/dataloader/`)
+   - `DocumentLoader`: Processes files from local filesystem (`document.py`)
+   - `WebLoader`: Extracts content from web pages with crawling capability (`web.py`)
 
 2. **Text Processing**: Content chunking and preparation for embedding
    - Uses `SentenceSplitter` from llama-index for semantically meaningful chunks
    - Configurable chunk size and overlap parameters
 
-3. **Embedding Generation**: Creates vector representations
+3. **Embedding Generation**: Creates vector representations (in `core/rag/embedder/`)
    - `TextEmbedding3Small`: Azure OpenAI embeddings service
    - Batch processing with concurrency control
 
-4. **Graph Database**: Stores documents, chunks, and relationships
-   - `MemGraphClient`: Interface to Memgraph database
+4. **Graph Database**: Stores documents, chunks, and relationships (in `core/rag/dbhandler/`)
+   - `MemgraphClient`: Interface to Memgraph database (implemented in `__init__.py`)
    - Entity relationships (CHUNK_OF, SOURCED_FROM, etc.)
    - Vector indexing for similarity search
 
@@ -33,26 +33,34 @@ graph TD
     D --> E[Embedding Generation]
     E --> F[Memgraph Storage]
     
-    subgraph "Content Loading"
+    subgraph "libs/dataloader/"
         B
-        B1[Document Loader] --> B
-        B2[Web Loader] --> B
+        B1[DocumentLoader<br/>document.py] --> B
+        B2[WebLoader<br/>web.py] --> B
     end
     
     subgraph "Text Processing"
         C
-        C1[Chunk Size=1024] --> C
+        C1[SentenceSplitter<br/>Chunk Size=1024] --> C
         C2[Overlap Size=200] --> C
         C3[Sentence Splitting] --> C
     end
     
-    subgraph "Database Integration"
+    subgraph "core/rag/embedder/"
+        E
+        E1[TextEmbedding3Small<br/>text_embedding_3_small.py] --> E
+        E2[Azure OpenAI API] --> E1
+    end
+    
+    subgraph "core/rag/dbhandler/"
         F
-        F1[Store Source Node] --> F
-        F2[Store Document Node] --> F
-        F3[Store Chunk Nodes] --> F
-        F4[Store Vector Embeddings] --> F
-        F5[Create Relationships] --> F
+        F1[GraphClient<br/>__init__.py] --> F
+        F2[MemgraphClient<br/>memgraph.py] --> F
+        F3[Store Source Node] --> F
+        F4[Store Document Node] --> F
+        F5[Store Chunk Nodes] --> F
+        F6[Store Vector Embeddings] --> F
+        F7[Create Relationships] --> F
     end
     
     G[Query Text] --> H[Vector Search]

@@ -3,7 +3,7 @@ import os
 import tempfile
 from unittest.mock import patch, mock_open, MagicMock
 
-from src.libs.fileops.file import FileService
+from libs.fileops.file import FileService
 
 
 class TestFileService:

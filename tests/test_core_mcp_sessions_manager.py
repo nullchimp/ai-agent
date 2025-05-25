@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import AsyncMock, Mock, patch, mock_open
 import json
-from src.core.mcp.sessions_manager import MCPSessionManager
+from core.mcp.sessions_manager import MCPSessionManager
 
 
 class TestMCPSessionManager:
@@ -58,7 +58,7 @@ class TestMCPSessionManager:
         config_path = "/path/to/config.json"
         
         with patch('builtins.open', mock_open(read_data=json.dumps(config_data))):
-            with patch('src.core.mcp.sessions_manager.mcp.MCPSession') as mock_session_class:
+            with patch('core.mcp.sessions_manager.mcp.MCPSession') as mock_session_class:
                 mock_session1 = Mock()
                 mock_session2 = Mock()
                 mock_session_class.side_effect = [mock_session1, mock_session2]
@@ -97,7 +97,7 @@ class TestMCPSessionManager:
         config_path = "/path/to/config.json"
         
         with patch('builtins.open', mock_open(read_data=json.dumps(config_data))):
-            with patch('src.core.mcp.sessions_manager.mcp.MCPSession', side_effect=Exception("Session error")):
+            with patch('core.mcp.sessions_manager.mcp.MCPSession', side_effect=Exception("Session error")):
                 result = await manager.load_mcp_sessions(config_path)
                 
                 assert result is None

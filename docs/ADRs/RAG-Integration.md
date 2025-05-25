@@ -20,19 +20,22 @@ Implementing a RAG system with a graph database addresses these limitations by p
 
 1. **Implementation Structure**
    
-   Created a modular implementation in `src/core/rag/` with these components:
+   Created a modular implementation across `src/core/rag/` and `src/libs/dataloader/` with these components:
 
    ```
    src/core/rag/
-   ├── graph_client.py     # Memgraph database client
    ├── schema.py           # Node and edge type definitions
-   ├── loader/             # Content loading mechanisms
-   │   ├── __init__.py     # Base loader class
-   │   ├── document_loader.py  # File-based document loader
-   │   └── web_loader.py   # Web content loader
-   ├── embedder/           # Vector embedding generation
-   │   ├── __init__.py     # Base embedding service
-   │   └── text_embedding_3_small.py  # Azure OpenAI embedding
+   ├── dbhandler/          # Database interface implementations
+   │   ├── __init__.py     # MemgraphClient implementation
+   │   └── memgraph.py     # Memgraph-specific operations
+   └── embedder/           # Vector embedding generation
+       ├── __init__.py     # Base embedding service
+       └── text_embedding_3_small.py  # Azure OpenAI embedding
+
+   src/libs/dataloader/    # Content loading mechanisms
+   ├── __init__.py         # Base loader class
+   ├── document.py         # File-based document loader
+   └── web.py              # Web content loader
    ```
 
 2. **Data Model and Schema**
