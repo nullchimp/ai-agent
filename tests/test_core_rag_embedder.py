@@ -1,9 +1,8 @@
 import pytest
-import asyncio
 from unittest.mock import Mock, patch, AsyncMock
-from src.core.rag.embedder import EmbeddingService
-from src.core.rag.embedder.text_embedding_3_small import TextEmbedding3Small
-from src.core.rag.schema import DocumentChunk, Vector
+from core.rag.embedder import EmbeddingService
+from core.rag.embedder.text_embedding_3_small import TextEmbedding3Small
+from core.rag.schema import DocumentChunk, Vector
 
 
 class TestEmbeddingService:
@@ -15,7 +14,7 @@ class TestEmbeddingService:
 
     @pytest.fixture
     def service(self, mock_client):
-        with patch('src.core.rag.embedder.EmbeddingsClient', return_value=mock_client):
+        with patch('core.rag.embedder.EmbeddingsClient', return_value=mock_client):
             return EmbeddingService()
 
     def test_init(self, service, mock_client):
@@ -171,7 +170,7 @@ class TestTextEmbedding3Small:
 
     @pytest.fixture
     def embedding_service(self, mock_client):
-        with patch('src.core.rag.embedder.EmbeddingsClient', return_value=mock_client):
+        with patch('core.rag.embedder.EmbeddingsClient', return_value=mock_client):
             return TextEmbedding3Small()
 
     def test_model_property(self, embedding_service):

@@ -1,7 +1,7 @@
 import pytest
 import uuid
 from datetime import datetime, timezone
-from src.core.rag.schema import Document, DocumentChunk, ProcessingStatus, EdgeType, Node, Source, Interaction, VectorStore, Vector
+from core.rag.schema import Document, DocumentChunk, ProcessingStatus, EdgeType, Node, Source, Interaction, VectorStore, Vector
 
 
 class TestDocument:

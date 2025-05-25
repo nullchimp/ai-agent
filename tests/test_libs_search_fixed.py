@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import Mock, patch, MagicMock
 
-from src.libs.search.client import GoogleClient, SearchResult, SearchResults
+from libs.search.client import GoogleClient, SearchResult, SearchResults
 
 
 class TestSearchResult:

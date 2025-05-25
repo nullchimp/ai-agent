@@ -1,6 +1,6 @@
 import pytest
 from unittest.mock import Mock, AsyncMock
-from src.tools import Tool
+from tools import Tool
 
 
 class TestTool:
