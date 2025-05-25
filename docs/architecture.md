@@ -13,48 +13,54 @@ The system is divided into several key packages and modules, primarily located w
 
 ```mermaid
 graph TD
+    %% Define font size
+    %% @config{
+    %%  "themeVariables": {
+    %%    "fontSize": "18px"
+    %%  }
+    %% }
+
     subgraph "Entry & Orchestration"
         Main[src/main.py]
         Agent[src/agent.py]
     end
 
     subgraph "Core Logic - src/core"
-        subgraph "LLM Handling - src/core/llm"
-            LLMCore[LLM Client - src/core/llm/client.py]
-            Chat[Chat Service - src/core/llm/chat.py]
+        subgraph "LLM Handling"
+            LLMCore[LLM Client]
+            Chat[Chat Service]
         end
 
-        subgraph "RAG System - src/core/rag"
-            RAGSchema[Schema - src/core/rag/schema.py]
-            RAGDB[DB Handler - src/core/rag/dbhandler/__init__.py]
-            RAGEmbed[Embedder - src/core/rag/embedder/__init__.py]
-            Memgraph[Memgraph Client - src/core/rag/dbhandler/memgraph.py]
+        subgraph "RAG System"
+            RAGSchema[Schema]
+            RAGDB[DB Handler]
+            RAGEmbed[Embedder]
+            Memgraph[Memgraph Client]
         end
 
-        subgraph "MCP (Model Context Protocol) - src/core/mcp"
-            MCPSession[Session - src/core/mcp/session.py]
-            MCPSessionMgr[Sessions Manager - src/core/mcp/sessions_manager.py]
+        subgraph "MCP"
+            MCPSession[Session]
+            MCPSessionMgr[Sessions Manager]
         end
-        Utils[Utilities - src/core/utils.py, etc.]
+        Utils[Utilities]
     end
 
     subgraph "Libraries - src/libs"
-        subgraph "Data Loaders - src/libs/dataloader"
-            DocLoader[Document - src/libs/dataloader/document.py]
-            WebLoader[Web - src/libs/dataloader/web.py]
+        subgraph "Data Loaders"
+            DocLoader[Document Loader]
+            WebLoader[Web Loader]
         end
-        FileOps[File Operations - src/libs/fileops/file.py]
-        Search[Search Client/Service - src/libs/search/]
+        FileOps[File Operations]
+        Search[Search]
     end
 
     subgraph "Tools - src/tools"
-        ToolBase[Base Tool - src/tools/__init__.py]
-        GoogleSearchTool[Google Search - src/tools/google_search.py]
-        ReadFileTool[Read File - src/tools/read_file.py]
-        WriteFileTool[Write File - src/tools/write_file.py]
-        ListFilesTool[List Files - src/tools/list_files.py]
-        Context7Tool[Context7 - src/tools/context7.py]
-        %% Add other tools as they are implemented
+        ToolBase[Base Tool]
+        GoogleSearchTool[Google Search]
+        ReadFileTool[Read File]
+        WriteFileTool[Write File]
+        ListFilesTool[List Files]
+        Context7Tool[Context7]
     end
 
     subgraph "Configuration & Environment"
@@ -67,44 +73,32 @@ graph TD
     Main --> MCPSessionMgr
     Agent --> Chat
     Agent --> ToolBase
+    Agent -- uses --> RAGSchema
+    Agent -- uses --> RAGDB
+    Agent -- uses --> RAGEmbed
+    Agent -- uses --> FileOps
+    Agent -- uses --> Search
+
+    Chat --> LLMCore
+    
+    RAGDB --> Memgraph
+    RAGDB -- uses --> DocLoader
+    RAGDB -- uses --> WebLoader
+
     MCPSessionMgr --> Context7Tool
     MCPSessionMgr --> MCPSession
 
-    Chat --> LLMCore
     ToolBase --> GoogleSearchTool
     ToolBase --> ReadFileTool
     ToolBase --> WriteFileTool
     ToolBase --> ListFilesTool
     ToolBase --> Context7Tool
 
-    %% RAG Integration (Simplified)
-    Agent -- uses --> RAGSchema
-    Agent -- uses --> RAGDB
-    Agent -- uses --> RAGEmbed
-    RAGDB --> Memgraph
-
-    %% Libs Usage (Simplified)
-    Agent -- uses --> FileOps
-    Agent -- uses --> Search
-    RAGDB -- uses --> DocLoader
-    RAGDB -- uses --> WebLoader
-
-    %% Config Usage
     Main -- reads --> ConfigMCP
     Agent -- reads --> Env
     LLMCore -- reads --> Env
 
-    classDef entry fill:#E1F5FE,stroke:#0288D1,stroke-width:2px
-    classDef core fill:#E8EAF6,stroke:#3F51B5,stroke-width:2px
-    classDef libs fill:#E0F2F1,stroke:#00796B,stroke-width:2px
-    classDef tools fill:#FCE4EC,stroke:#D81B60,stroke-width:2px
-    classDef config fill:#FFFDE7,stroke:#FBC02D,stroke-width:2px
-
-    class Main,Agent entry
-    class LLMCore,Chat,RAGSchema,RAGDB,RAGEmbed,Memgraph,MCPSession,MCPSessionMgr,Utils core
-    class DocLoader,WebLoader,FileOps,Search libs
-    class ToolBase,GoogleSearchTool,ReadFileTool,WriteFileTool,ListFilesTool,Context7Tool tools
-    class Env,ConfigMCP config
+    %% Remove classDefs for colors
 ```
 
 ## Sequence Diagram
@@ -176,7 +170,7 @@ This package houses the fundamental building blocks of the agent.
     *   `chat.py`: Offers a higher-level `Chat` service that abstracts conversation management, message history, and tool integration with the LLM.
 
 *   **RAG System (`src/core/rag/`)**: Enables Retrieval Augmented Generation.
-    *   `schema.py`: Defines the nodes (e.g., `Document`, `DocumentChunk`) and edges (relationships) for the knowledge graph.
+    *   `schema.py`: Defines the nodes (e.g., `Document`, `DocumentChunk`) and edges (relationships) for the knowledge graph. Detailed node and edge types are described in the "RAG Graph Schema Details" section below.
     *   `dbhandler/__init__.py`: Defines the `GraphClient` interface for interacting with graph databases.
     *   `dbhandler/memgraph.py`: Implements `MemGraphClient` for storing and querying graph data in Memgraph.
     *   `embedder/__init__.py`: Defines the `EmbeddingService` interface for generating text embeddings.
@@ -218,5 +212,67 @@ Defines the tools available to the AI agent. Each tool typically inherits from a
 *   **Extensibility:** New tools, LLM providers, data sources, and libraries can be added with minimal changes to the core system.
 *   **Separation of Concerns:** Different functionalities (e.g., LLM interaction, RAG, tool usage) are handled by distinct modules.
 *   **Abstraction:** Interfaces (e.g., `GraphClient`, `EmbeddingService`, `Tool`) allow for different implementations.
+
+## RAG Graph Schema Details
+
+This section outlines the types of nodes and the relationships (edges) between them within the Retrieval Augmented Generation (RAG) knowledge graph. The schema is primarily defined in `src/core/rag/schema.py`.
+
+### Node Types
+
+The core entities in our graph are:
+
+*   **`DOCUMENT`**: Represents a full document, such as a file or a web page, containing content and metadata.
+*   **`DOCUMENTCHUNK`**: Represents a segment of a `DOCUMENT`. These chunks are what get embedded and used for similarity searches. Content is stored in both the graph and the vector store.
+*   **`INTERACTION`**: Represents a chat message (user or assistant) or a system-level interaction/event.
+*   **`SOURCE`**: Represents the origin of a `DOCUMENT`, like a website URL, a file path, or an API endpoint.
+*   **`VECTORSTORE`**: Represents an embedding storage system where vector embeddings are kept.
+*   **`VECTOR`**: Represents the actual embedding vector for a `DOCUMENTCHUNK`.
+
+### Edge Types (Relationships)
+
+Relationships define how these nodes are connected:
+
+*   **`CHUNK_OF`**: `DOCUMENTCHUNK` → `DOCUMENT`
+    *   Indicates that a `DOCUMENTCHUNK` is a part of a larger `DOCUMENT`.
+*   **`FOLLOWS`**: `INTERACTION` → `INTERACTION`
+    *   Links `INTERACTION` nodes chronologically to maintain conversation history.
+*   **`SOURCED_FROM`**: `DOCUMENT` → `SOURCE`
+    *   Connects a `DOCUMENT` to its original `SOURCE`.
+*   **`STORED_IN`**: `VECTOR` → `VECTORSTORE`
+    *   Shows that a `VECTOR` embedding is managed by a specific `VECTORSTORE`.
+*   **`EMBEDDING_OF`**: `VECTOR` → `DOCUMENTCHUNK`
+    *   Links a `VECTOR` embedding to the `DOCUMENTCHUNK` it represents.
+*   **`REFERENCES`**: `DOCUMENT` → `SOURCE`
+    *   Indicates that a `DOCUMENT` makes reference to a `SOURCE` (e.g., a citation or link within the document content).
+
+### RAG Schema Diagram
+
+```mermaid
+graph TD
+    subgraph "Document Processing"
+        D[DOCUMENT]
+        DC[DOCUMENTCHUNK]
+        S[SOURCE]
+        V[VECTOR]
+        VS[VECTORSTORE]
+
+        DC -- CHUNK_OF --> D
+        D -- SOURCED_FROM --> S
+        D -- REFERENCES --> S
+        V -- EMBEDDING_OF --> DC
+        V -- STORED_IN --> VS
+    end
+
+    subgraph "Interaction Flow"
+        I1[INTERACTION]
+        I2[INTERACTION]
+        I3[INTERACTION]
+
+        I2 -- FOLLOWS --> I1
+        I3 -- FOLLOWS --> I2
+    end
+```
+
+This schema allows for flexible querying of document origins, their content (via chunks and embeddings), and the history of interactions related to them.
 
 This architecture provides a solid foundation for developing a sophisticated and adaptable AI agent.
