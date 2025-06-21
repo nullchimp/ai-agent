@@ -177,6 +177,7 @@ class VectorStore(Node):
         status: ProcessingStatus = ProcessingStatus.PENDING
     ):
         super().__init__()
+        self.id = hashlib.sha256(model.encode()).hexdigest()[:32]
         self.status = status
         self.model = model
 

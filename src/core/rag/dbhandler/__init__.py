@@ -343,6 +343,20 @@ class GraphClient:
         
         return [dict(row[0].properties) for row in self._cur.fetchall()]
 
+    def get_source_by_chunk(
+        self, 
+        chunk_id: str
+    ) -> Optional[Dict[str, Any]]:
+        q = f"""
+        MATCH (c:`{DocumentChunk.label()}` {{id: $chunk_id}})-[:CHUNK_OF]->(d:`{Document.label()}`) -[:SOURCED_FROM]->(s:`{Source.label()}`)
+        RETURN s
+        """
+        self._cur.execute(q, {"chunk_id": chunk_id})
+        result = self._cur.fetchone()
+        if result:
+            return dict(result[0].properties)
+        return None
+
     def load_vector_store(
         self,
         model: str = None,

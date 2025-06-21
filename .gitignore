@@ -12,6 +12,9 @@ terraform.tfvars
 
 docker/plugins
 
+examples/data/*
+!examples/data/.gitkeep
+
 config/*
 !config/mcp.template.json
 

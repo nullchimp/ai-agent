@@ -71,7 +71,6 @@ async def test_vector_search(query_text: str):
         return
     
     query_embedding = await embedder.get_embedding(query_text)
-    
     print(f"Using vector store: {vector_store.id} (model: {vector_store.model})")
     
     # 7. Perform vector search
@@ -85,70 +84,42 @@ async def test_vector_search(query_text: str):
         k=10
     )
 
-    doc_ids = set()
+    data = []
     for result in search_results:
         chunk = result["chunk"]
-        doc_id = chunk["parent_id"]
-        if not doc_id in doc_ids:
-            doc_ids.add(doc_id)
-    
-    from core.rag.schema import Document
+        print(f"Found chunk: {chunk["id"]} with score: {result["similarity"]:.4f}")
+        source = db.get_source_by_chunk(chunk["id"])
+        print(f"Source: {source['name']} ({source['uri']})")
 
-    data = []
-    references = set()
-    for doc_id in doc_ids:
-        document = db.get_by_id(Document, doc_id)
-        print(f"Document ID: {doc_id}")
-        refs = db.get_references(doc_id)
-        for ref in refs:
-            ref_uri = ref["uri"]
-            if not ref_uri in references:
-                references.add(ref_uri)
-        
-        sources = db.get_sources(doc_id)
-        print(f"Sources: {sources}")
-        source_uris = [source["uri"] for source in sources]
         data.append({
-            "sources": source_uris,
-            "content": document["content"],
-            "references": list(references),
+            "source": source["uri"],
+            "content": chunk["content"]
         })
-
-    # 8. Display results
-    import json
-    print("\n----- Search Results -----")
-    print(f"Data: {json.dumps(data, indent=2)}")
 
     rag_prompt = f"""
 You are an expert on everything GitHub.
 You have information in the following format of JSON:
 [
     {{
-        "sources": <list of source URIs>,
-        "content": <content that is grounded in the sources>,
-        "references": <list of references to other sources>
+        "source": <source URI>,
+        "content": <content that is grounded in the sources>
     }}
 ]
 You always HAVE TO ground your response in this information.
-You always HAVE TO return the source, where the information is coming from, at the end of your response.
-Use the following format:
+You always have to include Links to relevant information if you have them.
+You always HAVE TO include the source, where the information is coming from when you give an answer.
 
-# Sources:
-1. <Source Name>: <Source URI>
-2. <Source Name>: <Source URI>
-...
-
-It is totally fine to only use 1 source, but you have to mention it.
 If you don't know the answer, say "I don't know".
 Here is the information You have:\n
     """
 
+    import json
     await run_conversation(query_text, f"{rag_prompt}{json.dumps(data)}")
 
 
 async def main():
     text = input("Enter your text: ")
-    #text = "Tell me what the multipliers for premium requests are, based on the Model for GitHub Copilot!"
+    #text = "What user data is collected when interacting with Gemini, Claude and OpenAI Models? And for how long is this data retained?"
     await test_vector_search(text)
     #await run_conversation(text)
     print("Test completed.")
