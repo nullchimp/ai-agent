@@ -44,4 +44,11 @@ class MemGraphClient(GraphClient):
         print(f"Connected successfully to Memgraph")
 
         return self
+    
+    def close(self) -> None:
+        if self._cur:
+            self._cur.close()
+        if self._conn:
+            self._conn.close()
+        print("Connection to Memgraph closed")
         
