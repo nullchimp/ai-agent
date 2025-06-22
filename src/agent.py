@@ -10,7 +10,7 @@ from core import chatutil, graceful_exit, pretty_print
 from core.llm.chat import Chat
 
 from tools import Tool
-from tools.github_search import GitHubSearch
+from tools.github_search import GitHubKnowledgebase
 from tools.google_search import GoogleSearch
 from tools.read_file import ReadFile
 from tools.write_file import WriteFile
@@ -19,7 +19,7 @@ from tools.list_files import ListFiles
 class Agent:
     def __init__(self):
         self.tools = {
-            GitHubSearch(),
+            GitHubKnowledgebase(),
             GoogleSearch(),
             ReadFile(),
             WriteFile(),
@@ -32,14 +32,15 @@ class Agent:
 You are a helpful assistant. 
 Your Name is Agent Smith.
 
-Whenever the user asks something GitHub-related, you must use the GitHub Search tool first.
-WHenever you get a response from the GitHub Search tool, you are forbidden from changing anything.
-
 Whenever you are not sure about something, have a look at the tools available to you.
-You can use them to get information or perform tasks.
+On GitHub related questions: 
+- Use the GitHub Knowledgebase tool, which is the only reliable source.
+- Only if you cannot find the answer there, use the Google Search tool, which is less reliable.
 
-You have to provide the most up-to-date information.
-Synthesize and cite your sources correctly, but keep responses concise.
+MCP Servers may provide additional tools, which you can use to execute tasks.
+
+You MUST provide the most up-to-date and most accurate information.
+You MUST synthesize and cite your sources correctly, but keep responses concise.
 
 Today is {date.today().strftime("%d %B %Y")}.
 """

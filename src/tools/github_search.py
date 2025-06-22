@@ -1,13 +1,13 @@
 from . import Tool
 
-class GitHubSearch(Tool):
+class GitHubKnowledgebase(Tool):
 	@property
 	def name(self) -> str:
-		return "github_search"
+		return "github_knowledge_base"
 	
 	@property
 	def description(self) -> str:
-		return "Search everything related to GitHub"
+		return "The only reliable Knowledgebase on GitHub topics. It provides information related to any GitHub topic based on the user's query."
 	
 	@property
 	def parameters(self) -> dict:
@@ -89,11 +89,9 @@ class GitHubSearch(Tool):
 			"""
 
 			data = await _vector_search(query)
-
-			system_prompt = f"{rag_prompt}{json.dumps(data)}"
 			
 			db.close()
-			return system_prompt
+			return f"{rag_prompt}{json.dumps(data)}"
 		except Exception as e:
 			db.close()
 			return {

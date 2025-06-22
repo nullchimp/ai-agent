@@ -70,7 +70,8 @@ class Chat:
 
             if Chat.debug:
                 print(colorize_text(f"<Tool Call: {colorize_text(tool_name, "green")}> ", "yellow"), arguments)
-            
+                import asyncio
+                await asyncio.sleep(10)  # Allow time for debug output to be processed
             try:
                 args = json.loads(arguments)
             except json.JSONDecodeError:
