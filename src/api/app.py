@@ -1,10 +1,11 @@
 import os
 from contextlib import asynccontextmanager
+import mimetypes
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from api.routes import router, agent, session_manager
-
+mimetypes.add_type("application/javascript", ".js")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

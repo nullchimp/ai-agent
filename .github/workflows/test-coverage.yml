@@ -29,6 +29,8 @@ jobs:
           pip install -r requirements.txt
 
       - name: Run tests with coverage
+        env:
+          AZURE_OPENAI_API_KEY: "test_key"
         run: |
           source .venv/bin/activate
           python -m pytest --cov=src --cov-report=xml --cov-report=term --cov-fail-under=80

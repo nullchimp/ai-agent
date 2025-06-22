@@ -1,14 +1,14 @@
 import pytest
-import tempfile
-import os
 from pathlib import Path
-from unittest.mock import patch, MagicMock
-import sys
+from unittest.mock import patch
+import json
+from fastapi.testclient import TestClient
 
-# Add src to path to import serve_ui
+# Add src to path to import api.app
+import sys
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from serve_ui import serve_ui
+from api.app import create_app
 
 
 def test_ui_files_exist():
@@ -76,31 +76,40 @@ def test_typescript_compiles():
     assert js_file.exists(), "JavaScript file should be compiled from TypeScript"
 
 
-@patch('socketserver.TCPServer')
-@patch('os.chdir')
-def test_serve_ui_server_setup(mock_chdir, mock_tcpserver):
-    """Test that UI server sets up correctly"""
-    mock_server = MagicMock()
-    mock_tcpserver.return_value.__enter__.return_value = mock_server
+def test_api_serves_static_files():
+    """Test that the FastAPI app serves the static UI files."""
+    app = create_app()
+    client = TestClient(app)
 
-    # Mock the UI directory to exist
-    with patch('pathlib.Path.exists', return_value=True):
-        # This should not raise an exception
-        try:
-            serve_ui(8080)
-        except KeyboardInterrupt:
-            pass  # Expected when mocking server
+    # The app mounts static files from src/ui/dist.
+    # We need to make sure those files exist for the test.
+    dist_dir = Path(__file__).parent.parent / "src" / "ui" / "dist"
+    
+    # This test assumes `npm run ui:build` has been run.
+    if not dist_dir.exists() or not (dist_dir / "index.html").exists():
+        pytest.skip("UI files not built. Run 'npm run ui:build' before testing.")
 
-    # Verify server setup
-    mock_tcpserver.assert_called_once()
-    mock_chdir.assert_called_once()
+    response = client.get("/")
+    assert response.status_code == 200
+    assert "text/html" in response.headers["content-type"]
+
+    response = client.get("/styles.css")
+    assert response.status_code == 200
+    assert "text/css" in response.headers["content-type"]
+
+    response = client.get("/chat.js")
+    assert response.status_code == 200
+    assert "application/javascript" in response.headers["content-type"]
 
 
-def test_serve_ui_handles_missing_directory():
-    """Test that server handles missing UI directory gracefully"""
-    with patch('pathlib.Path.exists', return_value=False):
-        with pytest.raises(SystemExit):
-            serve_ui(8080)
+@patch("os.path.exists", return_value=False)
+def test_api_does_not_serve_static_files_if_missing(mock_exists):
+    """Test that the FastAPI app does not mount static files if the directory is missing."""
+    app = create_app()
+    client = TestClient(app)
+
+    response = client.get("/")
+    assert response.status_code == 404
 
 
 def test_javascript_api_integration():
@@ -150,9 +159,7 @@ def test_package_json_scripts():
     package_file = Path(__file__).parent.parent / "package.json"
 
     if package_file.exists():
-        import json
         content = json.loads(package_file.read_text())
 
         scripts = content.get('scripts', {})
-        assert 'ui:build' in scripts, "Should have build-ui script"
-        assert 'ui:serve' in scripts, "Should have serve-ui script"
+        assert 'ui:build' in scripts, "Should have ui:build script"
