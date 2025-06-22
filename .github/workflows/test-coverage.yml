@@ -29,7 +29,7 @@ jobs:
       - name: Install npm dependencies and build UI
         run: |
           npm install
-          npm run build --if-present
+          npm run ui:build
 
       - name: Set up environment
         run: |
