@@ -1,5 +1,7 @@
 #!/bin/bash
 
+source "$(dirname "$0")/../.env"
+
 # Check if API_KEY is set
 if [ -z "$API_KEY" ]; then
   echo "Error: API_KEY environment variable is not set."

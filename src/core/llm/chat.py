@@ -13,10 +13,8 @@ DEFAULT_MAX_TOKENS = 500
 DEFAULT_API_KEY_ENV = "AZURE_OPENAI_API_KEY"
 DEFAULT_TIMEOUT = 30.0
 
-from core import DEBUG
+from core import is_debug
 class Chat:
-    debug = DEBUG
-
     def __init__(self, tool_list: List[Tool] = []):
         self.chat_client: ChatClient = ChatClient()
         self.tool_map = {tool.name: tool for tool in tool_list}
@@ -32,7 +30,7 @@ class Chat:
         if not api_key:
             raise ValueError(f"{DEFAULT_API_KEY_ENV} environment variable is required")
         
-        if Chat.debug:
+        if is_debug():
             for tool in tool_list:
                 print(colorize_text(f"<Tool Initialized: {colorize_text(tool.name, "yellow")}>", "cyan"))
             print("\n")
@@ -55,7 +53,7 @@ class Chat:
     async def process_tool_calls(self, response: Dict[str, Any], call_back) -> None:
         hr = "#" * 50
         name = "Agent -> Tools"
-        if Chat.debug:
+        if is_debug():
             print(colorize_text(f"\n{hr} <{name}> {hr}\n", "yellow"))
             
         # Safely get tool_calls - convert None to empty list to handle the case when tool_calls is None
@@ -68,10 +66,9 @@ class Chat:
             
             arguments = function_data.get("arguments", "{}")
 
-            if Chat.debug:
+            if is_debug():
                 print(colorize_text(f"<Tool Call: {colorize_text(tool_name, "green")}> ", "yellow"), arguments)
-                import asyncio
-                await asyncio.sleep(10)  # Allow time for debug output to be processed
+                
             try:
                 args = json.loads(arguments)
             except json.JSONDecodeError:
@@ -85,16 +82,16 @@ class Chat:
                 tool_instance = self.tool_map[tool_name]
                 try:
                     tool_result = await tool_instance.run(**args)
-                    if Chat.debug:
+                    if is_debug():
                         print(colorize_text(f"<Tool Result: {colorize_text(tool_name, "green")}> ", "yellow"), prettify(tool_result))
                 except Exception as e:
                     tool_result = {
                         "error": f"Error running tool '{tool_name}': {str(e)}"
                     }
-                    if Chat.debug:
+                    if is_debug():
                         print(colorize_text(f"<Tool Exception: {colorize_text(tool_name, "red")}> ", "yellow"), str(e))
             
-            if Chat.debug:
+            if is_debug():
                 print(colorize_text(f"\n####{hr * 2}{"#" * len(name)}", "yellow"))
 
             call_back({

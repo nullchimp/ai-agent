@@ -6,16 +6,14 @@ import os
 from tools import Tool
 from core.mcp import session as mcp
 
-from core import DEBUG, colorize_text
+from core import is_debug, colorize_text
 class MCPSessionManager:
-    debug = DEBUG
-
     def __init__(self) -> None:
         self._sessions: Dict[str, mcp.MCPSession] = {}
         self._tools: List[Tool] = []
 
     async def discovery(self, config_path) -> None:
-        if MCPSessionManager.debug:
+        if is_debug():
             print(colorize_text("<Discovery: MCP Server>", "grey"))
 
         success = await self.load_mcp_sessions(config_path)
@@ -25,7 +23,7 @@ class MCPSessionManager:
         
         await self.list_tools()
 
-        if MCPSessionManager.debug:
+        if is_debug():
             for server_name, session in self._sessions.items():
                 print(colorize_text(f"\n<Active MCP Server: {colorize_text(server_name, "magenta")}>", "cyan"))
                 for tool in session.tools:

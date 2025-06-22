@@ -1,9 +1,7 @@
-from core import set_debug
-set_debug(True)
-
 import asyncio
 import agent
 import os
+import argparse
 
 from core import graceful_exit, mainloop
 from core.mcp.sessions_manager import MCPSessionManager
@@ -35,9 +33,21 @@ def start_api_server():
     
     uvicorn.run(app, host=host, port=port)
 
-if __name__ == "__main__":
-    # Check if we should start the API server or run CLI mode
-    if os.getenv("API_MODE", "cli").lower() == "api":
+def main():
+    parser = argparse.ArgumentParser(description="Run the AI Agent in CLI or API mode.")
+    parser.add_argument("--api", action="store_true", help="Run in API server mode.")
+    parser.add_argument("--debug", action="store_true", help="Enable debug mode.")
+    args = parser.parse_args()
+
+    if args.debug:
+        from core import set_debug
+        set_debug(True)
+
+    if args.api:
         start_api_server()
-    else:
-        asyncio.run(cli_main())
+        return
+    
+    asyncio.run(cli_main())
+
+if __name__ == "__main__":
+    main()

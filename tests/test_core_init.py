@@ -17,10 +17,10 @@ class TestCoreInit:
         original_debug = core.DEBUG
         
         set_debug(True)
-        assert core.DEBUG is True
+        assert core.is_debug() is True
         
         set_debug(False)
-        assert core.DEBUG is False
+        assert core.is_debug() is False
         
         # Restore original state
         core.DEBUG = original_debug

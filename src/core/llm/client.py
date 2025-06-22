@@ -7,10 +7,8 @@ from core import pretty_print, colorize_text
 
 TIMEOUT = 30.0 # seconds
 
-from core import DEBUG
+from core import is_debug
 class Client:
-    debug = DEBUG
-
     def __init__(
         self, 
         model: str,
@@ -27,7 +25,7 @@ class Client:
         self.timeout = timeout or TIMEOUT
         self.http_client = httpx.AsyncClient(timeout=self.timeout)
 
-        if Client.debug:
+        if is_debug():
             print(colorize_text(f"<Client Initialized>", "grey"))
             print(colorize_text(f"<Timeout: {timeout}>", "grey"))
             print(colorize_text(f"<Model: {self.model}>\n", "grey"))
@@ -73,7 +71,7 @@ class EmbeddingsClient(Client):
             "api-key": self.api_key
         }
         
-        if Client.debug:
+        if is_debug():
             pretty_print("Agent -> Embeddings Model", payload, "magenta")
         
         response = await self.http_client.post(
@@ -90,7 +88,7 @@ class EmbeddingsClient(Client):
             
             raise Exception(f"Embeddings API error ({response.status_code}): {error_msg}")
         
-        if Client.debug:
+        if is_debug():
             pretty_print("Embeddings Model -> Agent", response.json(), "cyan")
             
         return response.json()
@@ -152,7 +150,7 @@ class ChatClient(Client):
             "api-key": self.api_key
         }
 
-        if Client.debug:
+        if is_debug():
             pretty_print("Agent -> Model", payload, "magenta")
 
         response = await self.http_client.post(
@@ -169,7 +167,7 @@ class ChatClient(Client):
             
             raise Exception(f"API error ({response.status_code}): {error_msg}")
         
-        if Client.debug:
+        if is_debug():
             pretty_print("Model -> Agent", response.json(), "cyan")
 
         return response.json()
