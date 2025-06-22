@@ -77,17 +77,11 @@ class TestDocumentLoader:
         assert source.type == "file"
         assert source.uri == source_path
 
-    def test_create_source_empty_path(self, temp_path):
-        loader = DocumentLoader(temp_path)
-        loader.path = ""  # Set empty path
-        
-        with pytest.raises(ValueError, match="Path cannot be empty"):
-            loader.create_source("/test/file.txt")
-
     @patch('libs.dataloader.document.SimpleDirectoryReader')
     @patch('llama_index.core.node_parser.SentenceSplitter.get_nodes_from_documents')
     def test_load_data_success(self, mock_splitter_method, mock_reader, temp_path):
         loader = DocumentLoader(temp_path)
+        loader.file_types = []
         
         # Mock the SimpleDirectoryReader
         mock_doc = Mock()
@@ -109,7 +103,6 @@ class TestDocumentLoader:
         assert len(results) == 1
         source, document, chunks = results[0]
         
-        # Check attributes instead of isinstance for Source
         assert hasattr(source, 'name')
         assert hasattr(source, 'type')
         assert hasattr(document, 'content')
@@ -121,6 +114,7 @@ class TestDocumentLoader:
     @patch('libs.dataloader.document.SimpleDirectoryReader')
     def test_load_data_no_documents(self, mock_reader, temp_path):
         loader = DocumentLoader(temp_path)
+        loader.file_types = []
         
         mock_reader_instance = Mock()
         mock_reader_instance.load_data.return_value = []
@@ -132,6 +126,7 @@ class TestDocumentLoader:
     @patch('libs.dataloader.document.SimpleDirectoryReader')
     def test_load_data_empty_document(self, mock_reader, temp_path):
         loader = DocumentLoader(temp_path)
+        loader.file_types = []
         
         # Mock document with empty text
         mock_doc = Mock()

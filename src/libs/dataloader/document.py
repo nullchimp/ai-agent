@@ -1,6 +1,5 @@
 from typing import List, Generator, Tuple
 import os
-import uuid
 import hashlib
 
 from . import Loader
@@ -11,8 +10,10 @@ from core.rag.schema import Document, DocumentChunk, Source
 
 class DocumentLoader(Loader):
     def create_source(self, source_path) -> Document:
-        if not self.path:
+        if not source_path:
             raise ValueError("Path cannot be empty.")
+
+        print(f"Creating source for path: {self.path}, source_path: {source_path}")
 
         source = Source(
             name=source_path.split("/")[-1],
@@ -20,7 +21,7 @@ class DocumentLoader(Loader):
             uri=source_path
         )
 
-        source.id = hashlib.sha256(self.path.encode()).hexdigest()[:16]
+        source.id = hashlib.sha256(source_path.encode()).hexdigest()[:16]
         source.add_metadata(**{
             "file_type": source_path.split(".")[-1],
             "directory": "/".join(source_path.split("/")[:-1])
@@ -31,12 +32,13 @@ class DocumentLoader(Loader):
     def load_data(self) -> Generator[Tuple[Document, List[DocumentChunk]], Source]:
         try:
             path = os.path.abspath(self.path)
-
+            print(f"Loading document from path: {path}")
             # Load the document using SimpleDirectoryReader
             reader = SimpleDirectoryReader(
                 input_dir=path,
                 filename_as_id=True,
-                recursive=self.recursive
+                recursive=self.recursive,
+                required_exts=self.file_types if len(self.file_types) else None
             )
 
             docs = reader.load_data()

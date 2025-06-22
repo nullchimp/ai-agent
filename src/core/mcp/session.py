@@ -8,10 +8,8 @@ from mcp.shared.exceptions import McpError
 
 from core import prettify
 
-from core import DEBUG, graceful_exit, colorize_text
+from core import is_debug, graceful_exit, colorize_text
 class MCPSession:
-    debug = DEBUG
-
     def __init__(self, server_name: str, server_config: dict):
         self.name = server_name
 
@@ -34,7 +32,7 @@ class MCPSession:
         try:
             await session.initialize()
             data = await session.list_tools()
-            if MCPSession.debug:
+            if is_debug():
                 print(colorize_text(f"<MCP: {self.name}>", "magenta"))
                 print(colorize_text(f"<MCP: Tool Discovery Response> {prettify(data)}", "magenta"))
             if not data:
@@ -67,10 +65,10 @@ class MCPSession:
         session = await self.get_session()
         try:
             await session.initialize()
-            if MCPSession.debug:
+            if is_debug():
                 print(colorize_text(f"<MCP Tool Call: Request> {prettify(arguments)}", "magenta"))
             result = await session.call_tool(tool_name, arguments)
-            if MCPSession.debug:
+            if is_debug():
                 print(colorize_text(f"<MCP Tool Call: Response> {prettify(result)}", "magenta"))
             return result
         except McpError as e:

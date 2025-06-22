@@ -8,9 +8,15 @@ __pycache__
 
 .planning
 .terraform*
+
+dist
+node_modules
 terraform.tfvars
 
 docker/plugins
+
+examples/data/*
+!examples/data/.gitkeep
 
 config/*
 !config/mcp.template.json

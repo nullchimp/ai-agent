@@ -35,7 +35,6 @@ The AI Agent's architecture is designed for modularity and scalability. Key comp
 *   **Agent Core (`src/agent.py`):** Orchestrates the conversation flow and tool interactions.
 *   **LLM Services (`src/core/llm/`):** Manages communication with Large Language Models.
 *   **RAG System (`src/core/rag/`):** Implements retrieval augmented generation using a graph database (Memgraph) and vector embeddings for contextual knowledge.
-    *   See [RAG Architecture](./docs/rag_architecture.md) for details.
 *   **MCP Integration (`src/core/mcp/`):** Handles discovery and communication with MCP-compatible tools.
 *   **Libraries (`src/libs/`):** Reusable modules for data loading, file operations, etc.
 *   **Tools (`src/tools/`):** A collection of callable tools that the agent can use.
@@ -56,7 +55,6 @@ ai-agent/
 ├── docs/                   # Project documentation
 │   ├── ADRs/               # Architecture Decision Records
 │   ├── architecture.md     # Main architecture overview
-│   ├── rag_architecture.md # RAG system details
 │   └── ...                 # Other documentation files
 ├── src/                    # Source code
 │   ├── agent.py            # Main agent logic
@@ -72,8 +70,8 @@ ai-agent/
 │   └── tools/              # Agent tools (google_search, file_io, etc.)
 │       └── ...
 ├── tests/                  # Unit and integration tests
-│   └── ... 
-├── .env.example            # Example environment variables file
+│   └── ...
+├── .env                    # Environment variables file
 ├── .gitignore              # Files to ignore in Git
 ├── LICENSE                 # Project license (MIT)
 ├── README.md               # This file
@@ -112,13 +110,65 @@ ai-agent/
 
 ## Usage
 
-To run the agent:
+The application can be run in two modes: CLI mode for direct interaction with the agent, and API mode which serves a web-based UI.
+
+### CLI Mode
+
+To run the agent in a command-line interface:
 
 ```bash
 python src/main.py
 ```
 
-This will start the agent, and it will typically enter a loop to listen for user input or perform tasks based on its configuration.
+### API & UI Mode
+
+To run the backend server and the user interface:
+
+1.  **Build the frontend:**
+    ```bash
+    npm install
+    npm run ui:build
+    ```
+
+2.  **Run the API server:**
+    ```bash
+    python src/main.py --api
+    ```
+
+The API will be available at `http://localhost:5555` and will also serve the frontend.
+
+## User Interface
+
+A ChatGPT-like frontend is included and served by the API server. It's built with HTML, CSS, and TypeScript.
+
+### Features
+
+- 🎨 Modern, clean ChatGPT-inspired interface
+- 💬 Real-time chat with typing indicators
+- 📱 Responsive design for desktop and mobile
+- 💾 Local chat history persistence
+- 🔄 Session management with multiple conversations
+- ⚡ Fast and lightweight
+
+### Building the Frontend
+
+The frontend assets need to be built before running the API server.
+
+```bash
+npm run ui:build
+```
+
+This command compiles the TypeScript code and copies the necessary HTML and CSS files to the `src/ui/dist` directory, which is then served by the backend.
+
+### Running the UI
+
+To use the user interface, run the application in API mode:
+
+```bash
+python src/main.py --api
+```
+
+Then open your browser and navigate to `http://localhost:5555` (or the configured host and port).
 
 ## Configuration
 
@@ -133,7 +183,7 @@ The agent can be equipped with various tools to extend its capabilities. Current
 *   `ReadFile`: Reads content from files.
 *   `WriteFile`: Writes content to files.
 *   `ListFiles`: Lists files in a directory.
-*   `Context7`: Interacts with the Context7 API (e.g., for coding best practices).
+*   `GitHubKnowledgebase`: Searches for information on GitHub topics.
 
 Tools are located in the `src/tools/` directory. New tools can be added by creating a new Python file in this directory and implementing the `Tool` interface (see `src/tools/__init__.py`).
 
@@ -148,8 +198,6 @@ Contributions are welcome! Please follow these steps:
 5.  Write tests for your changes and ensure all tests pass (`pytest`).
 6.  Push to the branch (`git push origin feature/your-feature-name`).
 7.  Create a new Pull Request.
-
-Please read `CONTRIBUTING.md` (if available) for more detailed guidelines.
 
 ## License
 

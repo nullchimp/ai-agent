@@ -163,7 +163,7 @@ class TestVectorStore:
         
         assert vector_store.model == "text-embedding-3-small"
         assert vector_store.status == ProcessingStatus.COMPLETED
-        assert isinstance(vector_store.id, uuid.UUID)
+        assert isinstance(vector_store.id, str)
 
     def test_vector_store_default_status(self):
         vector_store = VectorStore(model="test-model")

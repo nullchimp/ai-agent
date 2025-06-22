@@ -8,7 +8,6 @@ services:
     ports:
       - "7687:7687" # Bolt protocol
       - "7444:7444" # HTTP API
-      - "3000:3000" # MemGraph Lab UI
     volumes:
       - memgraph_data:/data
       - memgraph_logs:/var/log/memgraph

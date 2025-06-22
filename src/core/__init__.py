@@ -7,10 +7,20 @@ from colorama import Fore, Style, init
 
 init(autoreset=True)
 
-DEBUG = False
-def set_debug(debug):
-    global DEBUG
-    DEBUG = debug
+class Debugger:
+    def __init__(self, debug: bool = False):
+        self._debug = debug
+
+    def set_debug(self, debug: bool):
+        self._debug = debug
+
+    def is_debug(self) -> bool:
+        return self._debug
+
+debugger = Debugger()
+
+is_debug = debugger.is_debug
+set_debug = debugger.set_debug
 
 def mainloop(func):
     async def _decorator(*args, **kwargs):
