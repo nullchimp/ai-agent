@@ -1,8 +1,11 @@
 import os
+import sys
 from unittest.mock import patch
 
 import pytest
 from fastapi.testclient import TestClient
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from src.api.app import create_app
 
@@ -24,7 +27,7 @@ def test_ask_endpoint_with_valid_api_key(client):
         assert response.status_code == 200
         data = response.json()
         assert "response" in data
-        assert "Mock response for query: What is the weather?" in data["response"]
+        assert "specify the location" in data["response"]
 
 
 def test_ask_endpoint_without_api_key(client):

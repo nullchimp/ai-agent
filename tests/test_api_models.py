@@ -1,5 +1,9 @@
+import os
+import sys
 import pytest
 from pydantic import ValidationError
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from src.api.models import QueryRequest, QueryResponse
 

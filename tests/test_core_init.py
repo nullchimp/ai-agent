@@ -14,7 +14,7 @@ from core import (
 class TestCoreInit:
     def test_set_debug(self):
         import core
-        original_debug = core.DEBUG
+        original_debug = core.is_debug()
         
         set_debug(True)
         assert core.is_debug() is True
@@ -23,7 +23,7 @@ class TestCoreInit:
         assert core.is_debug() is False
         
         # Restore original state
-        core.DEBUG = original_debug
+        set_debug(original_debug)
 
     @pytest.mark.asyncio
     async def test_mainloop_decorator(self):
