@@ -1,7 +1,7 @@
 import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from api.routes import router, agent, session_manager
 
@@ -31,14 +31,14 @@ def create_app() -> FastAPI:
         lifespan=lifespan
     )
 
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["http://localhost:8080"],
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
-
     app.include_router(router)
+
+    static_files_path = os.path.join(os.path.dirname(__file__), "..", "ui", "dist")
+    if os.path.exists(static_files_path):
+        app.mount(
+            "/",
+            StaticFiles(directory=static_files_path, html=True),
+            name="static"
+        )
 
     return app
