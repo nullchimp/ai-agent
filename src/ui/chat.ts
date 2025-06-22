@@ -1,3 +1,8 @@
+// Type declaration for marked library
+declare const marked: {
+    parse(markdown: string): string;
+};
+
 interface Message {
     id: string;
     content: string;
@@ -147,7 +152,14 @@ class ChatApp {
         
         const text = document.createElement('div');
         text.className = 'message-text';
-        text.textContent = message.content;
+        
+        if (message.role === 'assistant') {
+            // Render markdown for assistant messages
+            text.innerHTML = marked.parse(message.content);
+        } else {
+            // Keep user messages as plain text for security
+            text.textContent = message.content;
+        }
         
         content.appendChild(text);
         messageEl.appendChild(avatar);

@@ -189,6 +189,107 @@ body {
 .message.assistant .message-text {
     margin: 0;
     color: #374151;
+    white-space: normal;
+}
+
+/* Markdown Content Styling */
+.message.assistant .message-text h1,
+.message.assistant .message-text h2,
+.message.assistant .message-text h3,
+.message.assistant .message-text h4,
+.message.assistant .message-text h5,
+.message.assistant .message-text h6 {
+    margin: 1em 0 0.5em 0;
+    font-weight: 600;
+    line-height: 1.2;
+}
+
+.message.assistant .message-text h1 { font-size: 1.5em; }
+.message.assistant .message-text h2 { font-size: 1.3em; }
+.message.assistant .message-text h3 { font-size: 1.1em; }
+.message.assistant .message-text h4,
+.message.assistant .message-text h5,
+.message.assistant .message-text h6 { font-size: 1em; }
+
+.message.assistant .message-text p {
+    margin: 0.5em 0;
+    line-height: 1.6;
+}
+
+.message.assistant .message-text ul,
+.message.assistant .message-text ol {
+    margin: 0.5em 0;
+    padding-left: 1.5em;
+}
+
+.message.assistant .message-text li {
+    margin: 0.25em 0;
+}
+
+.message.assistant .message-text pre {
+    background-color: #f6f8fa;
+    border: 1px solid #e1e4e8;
+    border-radius: 6px;
+    padding: 16px;
+    overflow-x: auto;
+    margin: 1em 0;
+}
+
+.message.assistant .message-text code {
+    background-color: #f6f8fa;
+    border-radius: 3px;
+    padding: 2px 4px;
+    font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+    font-size: 0.9em;
+}
+
+.message.assistant .message-text pre code {
+    background-color: transparent;
+    border-radius: 0;
+    padding: 0;
+}
+
+.message.assistant .message-text blockquote {
+    border-left: 4px solid #e1e4e8;
+    padding-left: 1em;
+    margin: 1em 0;
+    color: #6a737d;
+    font-style: italic;
+}
+
+.message.assistant .message-text table {
+    border-collapse: collapse;
+    margin: 1em 0;
+    width: 100%;
+}
+
+.message.assistant .message-text th,
+.message.assistant .message-text td {
+    border: 1px solid #e1e4e8;
+    padding: 8px 12px;
+    text-align: left;
+}
+
+.message.assistant .message-text th {
+    background-color: #f6f8fa;
+    font-weight: 600;
+}
+
+.message.assistant .message-text a {
+    color: #0366d6;
+    text-decoration: none;
+}
+
+.message.assistant .message-text a:hover {
+    text-decoration: underline;
+}
+
+.message.assistant .message-text strong {
+    font-weight: 600;
+}
+
+.message.assistant .message-text em {
+    font-style: italic;
 }
 
 /* Typing indicator */
