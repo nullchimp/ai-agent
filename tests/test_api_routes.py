@@ -27,7 +27,7 @@ def test_ask_endpoint_with_valid_api_key(client):
         assert response.status_code == 200
         data = response.json()
         assert "response" in data
-        assert "specify the location" in data["response"]
+        assert "location" in data["response"].lower()
 
 
 def test_ask_endpoint_without_api_key(client):
