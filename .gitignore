@@ -8,6 +8,8 @@ __pycache__
 
 .planning
 .terraform*
+
+node_modules
 terraform.tfvars
 
 docker/plugins
