@@ -68,6 +68,10 @@ body {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
 }
 
 .chat-item:hover {
@@ -76,6 +80,37 @@ body {
 
 .chat-item.active {
     background-color: #343541;
+}
+
+.chat-title {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.chat-delete-btn {
+    background: transparent;
+    border: none;
+    color: #ececf1;
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.2s, background-color 0.2s;
+    flex-shrink: 0;
+}
+
+.chat-item:hover .chat-delete-btn {
+    opacity: 1;
+}
+
+.chat-delete-btn:hover {
+    background-color: #4a4a4f;
+    color: #ff6b6b;
 }
 
 /* Main Content */

@@ -41,7 +41,17 @@ class ChatApp {
     private init(): void {
         this.loadChatHistory();
         this.setupEventListeners();
-        this.createNewSession();
+        
+        // Only create a new session if no sessions exist
+        if (this.sessions.length === 0) {
+            this.createNewSession();
+        } else {
+            // Load the most recent session
+            this.currentSession = this.sessions[0];
+            this.loadSession(this.currentSession.id);
+        }
+        
+        this.renderChatHistory();
     }
 
     private setupEventListeners(): void {
@@ -276,8 +286,29 @@ class ChatApp {
             if (session.id === this.currentSession?.id) {
                 item.classList.add('active');
             }
-            item.textContent = session.title;
-            item.addEventListener('click', () => this.loadSession(session.id));
+            
+            const title = document.createElement('span');
+            title.className = 'chat-title';
+            title.textContent = session.title;
+            title.addEventListener('click', () => this.loadSession(session.id));
+            
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = 'chat-delete-btn';
+            deleteBtn.innerHTML = `
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <polyline points="3,6 5,6 21,6"></polyline>
+                    <path d="M19,6V20a2,2,0,0,1-2,2H7a2,2,0,0,1-2-2V6M8,6V4a2,2,0,0,1,2-2h4a2,2,0,0,1,2,2V6"></path>
+                    <line x1="10" y1="11" x2="10" y2="17"></line>
+                    <line x1="14" y1="11" x2="14" y2="17"></line>
+                </svg>
+            `;
+            deleteBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.deleteSession(session.id);
+            });
+            
+            item.appendChild(title);
+            item.appendChild(deleteBtn);
             this.chatHistory.appendChild(item);
         });
     }
@@ -322,6 +353,30 @@ class ChatApp {
 
     private generateId(): string {
         return Date.now().toString(36) + Math.random().toString(36).substr(2);
+    }
+
+    private deleteSession(sessionId: string): void {
+        const sessionIndex = this.sessions.findIndex(s => s.id === sessionId);
+        if (sessionIndex === -1) return;
+        
+        // Remove the session from the array
+        this.sessions.splice(sessionIndex, 1);
+        
+        // If we deleted the current session, switch to another one or create new
+        if (this.currentSession?.id === sessionId) {
+            if (this.sessions.length > 0) {
+                // Load the first available session
+                this.currentSession = this.sessions[0];
+                this.loadSession(this.currentSession.id);
+            } else {
+                // No sessions left, create a new one
+                this.createNewSession();
+                return; // createNewSession already saves and renders
+            }
+        }
+        
+        this.saveChatHistory();
+        this.renderChatHistory();
     }
 }
 
