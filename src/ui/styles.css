@@ -69,7 +69,36 @@ body {
     display: flex;
     align-items: center;
     gap: 8px;
+    flex: 1;
+}
+
+.debug-toggle-container {
     margin-left: auto;
+}
+
+.debug-panel-toggle {
+    padding: 6px;
+    background: transparent;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    color: #6b7280;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.debug-panel-toggle:hover {
+    background: #f3f4f6;
+    border-color: #9ca3af;
+    color: #4b5563;
+}
+
+.debug-panel-toggle.active {
+    background: #1e293b;
+    border-color: #1e293b;
+    color: #e2e8f0;
 }
 
 .tools-section-top .disable-all-item {
@@ -295,6 +324,246 @@ body {
 .chat-delete-btn:hover {
     background-color: #4a4a4f;
     color: #ff6b6b;
+}
+
+/* Debug Panel Overlay */
+.debug-panel-overlay {
+    position: fixed;
+    top: 0;
+    right: -400px;
+    width: 400px;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.1);
+    backdrop-filter: blur(2px);
+    transition: right 0.3s ease;
+    z-index: 1000;
+    pointer-events: none;
+}
+
+.debug-panel-overlay.active {
+    right: 0;
+    pointer-events: all;
+}
+
+/* Adjust main content when debug panel is open */
+body.debug-panel-open .main-content {
+    margin-right: 400px;
+    transition: margin-right 0.3s ease;
+}
+
+.debug-panel {
+    width: 100%;
+    height: 100%;
+    background: #0f172a;
+    border-left: 1px solid #334155;
+    box-shadow: -4px 0 20px rgba(0, 0, 0, 0.15);
+    display: flex;
+    flex-direction: column;
+}
+
+.debug-panel-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid #334155;
+    background: #1e293b;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.debug-panel-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #e2e8f0;
+    font-size: 14px;
+    font-weight: 500;
+    flex: 1;
+}
+
+.debug-panel-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.debug-toggle-btn, .debug-clear-btn {
+    padding: 6px 12px;
+    font-size: 11px;
+    border: 1px solid #475569;
+    border-radius: 4px;
+    background: #334155;
+    color: #e2e8f0;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+
+.debug-toggle-btn:hover, .debug-clear-btn:hover {
+    background: #475569;
+    border-color: #64748b;
+}
+
+.debug-toggle-btn.enabled {
+    background: #059669;
+    border-color: #10b981;
+    color: white;
+}
+
+.debug-panel-close {
+    padding: 6px;
+    background: transparent;
+    border: 1px solid #475569;
+    border-radius: 4px;
+    color: #e2e8f0;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.debug-panel-close:hover {
+    background: #475569;
+    border-color: #64748b;
+}
+
+.debug-events {
+    flex: 1;
+    overflow-y: auto;
+    background: #0f172a;
+}
+
+.debug-disabled-message {
+    padding: 20px;
+    color: #64748b;
+    font-size: 13px;
+    text-align: center;
+    font-style: italic;
+}
+
+.debug-event {
+    padding: 12px 20px;
+    border-bottom: 1px solid #1e293b;
+    font-size: 11px;
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+}
+
+.debug-event:last-child {
+    border-bottom: none;
+}
+
+.debug-event-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+}
+
+.debug-event-type {
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.debug-event-type.agent_to_model {
+    background: #7c3aed;
+    color: white;
+}
+
+.debug-event-type.model_to_agent {
+    background: #0891b2;
+    color: white;
+}
+
+.debug-event-type.tool_call {
+    background: #059669;
+    color: white;
+}
+
+.debug-event-type.tool_result {
+    background: #16a34a;
+    color: white;
+}
+
+.debug-event-type.tool_error {
+    background: #dc2626;
+    color: white;
+}
+
+.debug-event-type.mcp_call {
+    background: #d97706;
+    color: white;
+}
+
+.debug-event-type.mcp_result {
+    background: #ea580c;
+    color: white;
+}
+
+.debug-event-timestamp {
+    color: #64748b;
+    font-size: 9px;
+    margin-left: auto;
+    font-weight: normal;
+}
+
+.debug-event-content {
+    color: #cbd5e1;
+    line-height: 1.4;
+    white-space: pre-wrap;
+    word-break: break-word;
+    background: #1e293b;
+    padding: 8px 12px;
+    border-radius: 4px;
+    border: 1px solid #334155;
+    margin-top: 4px;
+    font-size: 10px;
+}
+
+.debug-event-message {
+    color: #e2e8f0;
+    margin-bottom: 4px;
+}
+
+.debug-event-data {
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 4px;
+    padding: 8px;
+    color: #94a3b8;
+    white-space: pre-wrap;
+    word-break: break-word;
+    word-wrap: break-word;
+    max-height: 300px;
+    overflow-y: auto;
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-size: 11px;
+    line-height: 1.4;
+    overflow-wrap: break-word;
+    /* Prevent text overflow issues */
+    box-sizing: border-box;
+    max-width: 100%;
+}
+
+.debug-events::-webkit-scrollbar {
+    width: 6px;
+}
+
+.debug-events::-webkit-scrollbar-track {
+    background: #0f172a;
+    border-radius: 3px;
+}
+
+.debug-events::-webkit-scrollbar-thumb {
+    background: #334155;
+    border-radius: 3px;
+}
+
+.debug-events::-webkit-scrollbar-thumb:hover {
+    background: #475569;
 }
 
 /* Main Content */

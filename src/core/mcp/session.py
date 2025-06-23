@@ -6,7 +6,7 @@ from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 from mcp.shared.exceptions import McpError
 
-from core import prettify
+from core import prettify, get_debug_capture
 
 from core import is_debug, graceful_exit, colorize_text
 class MCPSession:
@@ -67,9 +67,14 @@ class MCPSession:
             await session.initialize()
             if is_debug():
                 print(colorize_text(f"<MCP Tool Call: Request> {prettify(arguments)}", "magenta"))
+            debug_capture = get_debug_capture()
+            if debug_capture:
+                debug_capture.capture_mcp_call(tool_name, arguments)
             result = await session.call_tool(tool_name, arguments)
             if is_debug():
                 print(colorize_text(f"<MCP Tool Call: Response> {prettify(result)}", "magenta"))
+            if debug_capture:
+                debug_capture.capture_mcp_result(tool_name, result)
             return result
         except McpError as e:
             return None

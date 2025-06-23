@@ -22,6 +22,14 @@ debugger = Debugger()
 is_debug = debugger.is_debug
 set_debug = debugger.set_debug
 
+# Import debug_capture after the debugger is set up to avoid circular imports
+def get_debug_capture():
+    try:
+        from core.debug_capture import debug_capture
+        return debug_capture
+    except ImportError:
+        return None
+
 def mainloop(func):
     async def _decorator(*args, **kwargs):
         while True:

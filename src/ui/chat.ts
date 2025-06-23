@@ -25,6 +25,19 @@ interface ChatSession {
     createdAt: Date;
 }
 
+interface DebugEvent {
+    event_type: string;
+    message: string;
+    data: Record<string, any>;
+    timestamp: string;
+    session_id?: string;
+}
+
+interface DebugInfo {
+    events: DebugEvent[];
+    enabled: boolean;
+}
+
 class ChatApp {
     private messagesContainer: HTMLElement;
     private messageInput: HTMLTextAreaElement;
@@ -33,9 +46,17 @@ class ChatApp {
     private newChatBtn: HTMLButtonElement;
     private toolsHeader: HTMLElement;
     private toolsList: HTMLElement;
+    private debugPanelToggle: HTMLButtonElement;
+    private debugPanelOverlay: HTMLElement;
+    private debugEventsContainer: HTMLElement;
+    private debugClearBtn: HTMLButtonElement;
+    private debugPanelClose: HTMLButtonElement;
     private currentSession: ChatSession | null = null;
     private sessions: ChatSession[] = [];
     private tools: Tool[] = [];
+    private debugEnabled: boolean = false;
+    private debugEventsList: DebugEvent[] = [];
+    private debugPanelOpen: boolean = false;
 
     private apiBaseUrl = 'http://localhost:5555/api';
 
@@ -47,6 +68,13 @@ class ChatApp {
         this.newChatBtn = document.getElementById('newChatBtn') as HTMLButtonElement;
         this.toolsHeader = document.getElementById('toolsHeader') as HTMLElement;
         this.toolsList = document.getElementById('toolsList') as HTMLElement;
+        
+        // Debug elements
+        this.debugPanelToggle = document.getElementById('debugPanelToggle') as HTMLButtonElement;
+        this.debugPanelOverlay = document.getElementById('debugPanelOverlay') as HTMLElement;
+        this.debugEventsContainer = document.getElementById('debugEvents') as HTMLElement;
+        this.debugClearBtn = document.getElementById('debugClearBtn') as HTMLButtonElement;
+        this.debugPanelClose = document.getElementById('debugPanelClose') as HTMLButtonElement;
 
         this.init();
     }
@@ -86,6 +114,14 @@ class ChatApp {
         this.newChatBtn.addEventListener('click', () => this.createNewSession());
 
         this.toolsHeader.addEventListener('click', () => this.toggleToolsSection());
+        
+        // Debug event listeners
+        this.debugPanelToggle.addEventListener('click', (e) => {
+            e.stopPropagation(); // Prevent triggering tools section toggle
+            this.toggleDebugPanel();
+        });
+        this.debugPanelClose.addEventListener('click', () => this.closeDebugPanel());
+        this.debugClearBtn.addEventListener('click', () => this.clearDebugEvents());
     }
 
     private adjustTextareaHeight(): void {
@@ -134,6 +170,11 @@ class ChatApp {
             this.updateSessionTitle();
             this.saveChatHistory();
             this.renderChatHistory();
+            
+            // Load debug events after message processing
+            if (this.debugEnabled) {
+                this.loadDebugEvents();
+            }
         } catch (error) {
             this.hideTypingIndicator();
             this.showError('Failed to get response. Please try again.');
@@ -577,6 +618,171 @@ class ChatApp {
         }
         
         this.renderTools();
+    }
+
+    private async toggleDebugPanel(): Promise<void> {
+        this.debugPanelOpen = !this.debugPanelOpen;
+        
+        if (this.debugPanelOpen) {
+            this.debugPanelOverlay.classList.add('active');
+            this.debugPanelToggle.classList.add('active');
+            document.body.classList.add('debug-panel-open');
+            
+            // Automatically enable debug mode when panel opens
+            await this.setDebugMode(true);
+            this.loadDebugEvents();
+        } else {
+            this.debugPanelOverlay.classList.remove('active');
+            this.debugPanelToggle.classList.remove('active');
+            document.body.classList.remove('debug-panel-open');
+            
+            // Automatically disable debug mode when panel closes
+            await this.setDebugMode(false);
+        }
+    }
+
+    private async closeDebugPanel(): Promise<void> {
+        this.debugPanelOpen = false;
+        this.debugPanelOverlay.classList.remove('active');
+        this.debugPanelToggle.classList.remove('active');
+        document.body.classList.remove('debug-panel-open');
+        
+        // Automatically disable debug mode when panel closes
+        await this.setDebugMode(false);
+    }
+
+    private async setDebugMode(enabled: boolean): Promise<void> {
+        try {
+            const response = await fetch(`${this.apiBaseUrl}/debug/toggle`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-API-Key': 'test_12345'
+                },
+                body: JSON.stringify({
+                    enabled: enabled
+                })
+            });
+
+            if (response.ok) {
+                const result = await response.json();
+                this.debugEnabled = result.enabled;
+                this.updateDebugUI();
+            } else {
+                console.error('Failed to set debug mode:', await response.text());
+            }
+        } catch (error) {
+            console.error('Error setting debug mode:', error);
+        }
+    }
+
+    private async clearDebugEvents(): Promise<void> {
+        try {
+            const response = await fetch(`${this.apiBaseUrl}/debug`, {
+                method: 'DELETE',
+                headers: {
+                    'X-API-Key': 'test_12345'
+                }
+            });
+
+            if (response.ok) {
+                this.debugEventsList = [];
+                this.renderDebugEvents();
+            } else {
+                console.error('Failed to clear debug events:', await response.text());
+            }
+        } catch (error) {
+            console.error('Error clearing debug events:', error);
+        }
+    }
+
+    private async loadDebugEvents(): Promise<void> {
+        try {
+            const response = await fetch(`${this.apiBaseUrl}/debug`, {
+                headers: {
+                    'X-API-Key': 'test_12345'
+                }
+            });
+
+            if (response.ok) {
+                const result = await response.json();
+                this.debugEventsList = result.events;
+                this.debugEnabled = result.enabled;
+                this.updateDebugUI();
+                this.renderDebugEvents();
+            } else {
+                console.error('Failed to load debug events:', await response.text());
+            }
+        } catch (error) {
+            console.error('Error loading debug events:', error);
+        }
+    }
+
+    private updateDebugUI(): void {
+        if (!this.debugEnabled) {
+            this.debugEventsContainer.innerHTML = `
+                <div class="debug-disabled-message">
+                    Debug mode is automatically enabled when this panel is open.
+                </div>
+            `;
+        }
+    }
+
+    private renderDebugEvents(): void {
+        if (!this.debugEnabled) {
+            this.updateDebugUI();
+            return;
+        }
+
+        if (this.debugEventsList.length === 0) {
+            this.debugEventsContainer.innerHTML = `
+                <div class="debug-disabled-message">
+                    No debug events captured yet. Send a message to see the communication flow.
+                </div>
+            `;
+            return;
+        }
+
+        const eventsHtml = this.debugEventsList
+            .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+            .map(event => {
+                const timestamp = new Date(event.timestamp).toLocaleTimeString();
+                let dataStr = JSON.stringify(event.data, null, 2);
+                
+                // Truncate very large responses to prevent display issues
+                const maxLength = 10000;
+                if (dataStr.length > maxLength) {
+                    dataStr = dataStr.substring(0, maxLength) + '\n... [truncated - response too large]';
+                }
+                
+                // Properly escape HTML characters
+                const escapedData = this.escapeHtml(dataStr);
+                const escapedMessage = this.escapeHtml(event.message);
+                
+                return `
+                    <div class="debug-event">
+                        <div class="debug-event-header">
+                            <span class="debug-event-type ${event.event_type}">${event.event_type}</span>
+                            <span class="debug-event-timestamp">${timestamp}</span>
+                        </div>
+                        <div class="debug-event-message">${escapedMessage}</div>
+                        <div class="debug-event-data">${escapedData}</div>
+                    </div>
+                `;
+            })
+            .join('');
+
+        this.debugEventsContainer.innerHTML = eventsHtml;
+        this.debugEventsContainer.scrollTop = this.debugEventsContainer.scrollHeight;
+    }
+
+    private escapeHtml(unsafe: string): string {
+        return unsafe
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
     }
 }
 
