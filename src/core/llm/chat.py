@@ -18,11 +18,11 @@ class Chat:
     def __init__(self, tool_list: List[Tool] = []):
         self.chat_client: ChatClient = ChatClient()
         self.tool_map = {tool.name: tool for tool in tool_list}
-        self.tools: List[Tool] = [tool.define() for tool in tool_list]
+        self.tools: List[Tool] = [tool for tool in tool_list]
     
     def add_tool(self, tool: Tool) -> None:
         self.tool_map[tool.name] = tool
-        self.tools.append(tool.define())
+        self.tools.append(tool)
         self.tools = list(set(self.tools))  # Ensure tools are unique
 
     def get_tools(self) -> List[Dict[str, Any]]:
@@ -36,6 +36,7 @@ class Chat:
 
     def _set_tool_state(self, tool_name: str, active = True) -> None:
         for tool in self.tools:
+            print(f"Checking tool: {tool.name} against {tool_name}  ")
             if tool.name != tool_name:
                 continue
 
@@ -68,7 +69,7 @@ class Chat:
             messages=messages,
             temperature=0.7,
             max_tokens=32000,
-            tools=[tool for tool in self.tools if tool.enabled],
+            tools=[tool.define() for tool in self.tools if tool.enabled],
         )
         
         return resp

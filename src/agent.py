@@ -57,10 +57,18 @@ class Agent:
         self.chat.add_tool(tool)
     
     def enable_tool(self, tool_name: str) -> None:
-        self.chat.enable_tool(tool_name)
+        try:
+            self.chat.enable_tool(tool_name)
+        except Exception as e:
+            return False
+        return True
 
     def disable_tool(self, tool_name: str) -> None:
-        self.chat.disable_tool(tool_name)
+        try:
+            self.chat.disable_tool(tool_name)
+        except Exception as e:
+            return False
+        return True
 
     def get_tools(self) -> list:
         return self.chat.get_tools()

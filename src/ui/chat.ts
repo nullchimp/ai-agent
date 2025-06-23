@@ -11,6 +11,13 @@ interface Message {
     usedTools?: string[];
 }
 
+interface Tool {
+    name: string;
+    description: string;
+    enabled: boolean;
+    parameters: Record<string, any>;
+}
+
 interface ChatSession {
     id: string;
     title: string;
@@ -24,8 +31,11 @@ class ChatApp {
     private sendBtn: HTMLButtonElement;
     private chatHistory: HTMLElement;
     private newChatBtn: HTMLButtonElement;
+    private toolsHeader: HTMLElement;
+    private toolsList: HTMLElement;
     private currentSession: ChatSession | null = null;
     private sessions: ChatSession[] = [];
+    private tools: Tool[] = [];
 
     private apiBaseUrl = 'http://localhost:5555/api';
 
@@ -35,13 +45,16 @@ class ChatApp {
         this.sendBtn = document.getElementById('sendBtn') as HTMLButtonElement;
         this.chatHistory = document.getElementById('chatHistory') as HTMLElement;
         this.newChatBtn = document.getElementById('newChatBtn') as HTMLButtonElement;
+        this.toolsHeader = document.getElementById('toolsHeader') as HTMLElement;
+        this.toolsList = document.getElementById('toolsList') as HTMLElement;
 
         this.init();
     }
 
-    private init(): void {
+    private async init(): Promise<void> {
         this.loadChatHistory();
         this.setupEventListeners();
+        await this.loadTools();
         
         // Only create a new session if no sessions exist
         if (this.sessions.length === 0) {
@@ -71,6 +84,8 @@ class ChatApp {
         });
 
         this.newChatBtn.addEventListener('click', () => this.createNewSession());
+
+        this.toolsHeader.addEventListener('click', () => this.toggleToolsSection());
     }
 
     private adjustTextareaHeight(): void {
@@ -403,6 +418,97 @@ class ChatApp {
         
         this.saveChatHistory();
         this.renderChatHistory();
+    }
+
+    // Tool management methods
+    private async loadTools(): Promise<void> {
+        try {
+            const response = await fetch(`${this.apiBaseUrl}/tools`, {
+                headers: {
+                    'X-API-Key': 'test_12345'
+                }
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                this.tools = data.tools || [];
+                this.renderTools();
+            }
+        } catch (error) {
+            console.error('Failed to load tools:', error);
+        }
+    }
+
+    private toggleToolsSection(): void {
+        const isExpanded = this.toolsHeader.classList.contains('expanded');
+        
+        if (isExpanded) {
+            this.toolsHeader.classList.remove('expanded');
+            this.toolsList.classList.remove('expanded');
+        } else {
+            this.toolsHeader.classList.add('expanded');
+            this.toolsList.classList.add('expanded');
+        }
+    }
+
+    private renderTools(): void {
+        this.toolsList.innerHTML = '';
+        
+        this.tools.forEach(tool => {
+            const toolItem = document.createElement('div');
+            toolItem.className = 'tool-item';
+            
+            const toolName = document.createElement('div');
+            toolName.className = 'tool-name';
+            toolName.textContent = tool.name;
+            
+            const toolDescription = document.createElement('div');
+            toolDescription.className = 'tool-description';
+            toolDescription.textContent = tool.description;
+            toolDescription.title = tool.description; // Show full description on hover
+            
+            const toolToggle = document.createElement('div');
+            toolToggle.className = `tool-toggle ${tool.enabled ? 'enabled' : ''}`;
+            toolToggle.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.toggleTool(tool.name, !tool.enabled);
+            });
+            
+            toolItem.appendChild(toolName);
+            toolItem.appendChild(toolDescription);
+            toolItem.appendChild(toolToggle);
+            
+            this.toolsList.appendChild(toolItem);
+        });
+    }
+
+    private async toggleTool(toolName: string, enabled: boolean): Promise<void> {
+        try {
+            const response = await fetch(`${this.apiBaseUrl}/tools/toggle`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-API-Key': 'test_12345'
+                },
+                body: JSON.stringify({
+                    tool_name: toolName,
+                    enabled: enabled
+                })
+            });
+
+            if (response.ok) {
+                // Update the local tool state
+                const tool = this.tools.find(t => t.name === toolName);
+                if (tool) {
+                    tool.enabled = enabled;
+                    this.renderTools();
+                }
+            } else {
+                console.error('Failed to toggle tool:', await response.text());
+            }
+        } catch (error) {
+            console.error('Error toggling tool:', error);
+        }
     }
 }
 

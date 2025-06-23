@@ -32,7 +32,7 @@ async def list_tools() -> ToolsListResponse:
                 enabled=info.enabled,
                 parameters=info.parameters
             )
-            for info in tools_info.values()
+            for info in tools_info
         ]
         return ToolsListResponse(tools=tools)
     except Exception as e:
