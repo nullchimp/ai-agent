@@ -381,7 +381,6 @@ body {
     border-radius: 12px;
     border: 1px solid #bbdefb;
     white-space: nowrap;
-    text-transform: capitalize;
 }
 
 .tool-tag::before {
