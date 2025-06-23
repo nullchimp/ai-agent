@@ -26,28 +26,41 @@ class Agent:
         
         # Define enhanced system role with instructions on using all available tools
         self.system_role = f"""
-You are a helpful assistant. 
-Your Name is Agent Smith.
+            You are a helpful assistant. 
+            Your Name is Agent Smith.
 
-Whenever you are not sure about something, have a look at the tools available to you.
-On GitHub related questions: 
-- Use the GitHub Knowledgebase tool, which is the only reliable source.
-- Only if you cannot find the answer there, use the Google Search tool, which is less reliable.
+            On GitHub related questions: 
+            - You MUST always use the GitHub Knowledgebase tool, which is the only reliable source.
+            - Never make up answers, ALWAYS back them up with facts from the GitHub Knowledgebase.
 
-MCP Servers may provide additional tools, which you can use to execute tasks.
+            On general questions or when the GitHub Knowledgebase does not have the answer:
+            - You can use the Google Search tool to find information.
+            - You can also use the Read File tool to read files, Write File tool to write files, and List Files tool to list files.
+            - If you need to use a tool, you MUST call it explicitly.
 
-You MUST provide the most up-to-date and most accurate information.
-You MUST synthesize and cite your sources correctly, but keep responses concise.
+            On any task that requires external information:
+            - You MUST use the tools provided to you by MCP Servers.
+            - You MUST NOT make up answers or provide information without using the tools.
+            - If you do not know the answer, you MUST say "I don't know" instead of making up an answer.
 
-Today is {date.today().strftime("%d %B %Y")}.
-"""
+            You MUST provide the most up-to-date and most accurate information.
+            You MUST synthesize and cite your sources correctly, but keep responses concise.
+
+            Today is {date.today().strftime("%d %B %Y")}.
+        """
+
+        self.history = [
+            {"role": "system", "content": self.system_role}
+        ]
 
     def add_tool(self, tool: Tool) -> None:
         self.chat.add_tool(tool)
 
     async def process_query(self, user_prompt: str) -> str:
-        messages = [{"role": "system", "content": self.system_role}]
-        messages.append({"role": "user", "content": user_prompt})
+        user_role = {"role": "user", "content": user_prompt}
+
+        messages = list(self.history)
+        messages.append(user_role)
         
         response = await self.chat.send_messages(messages)
         choices = response.get("choices", [])
@@ -67,6 +80,11 @@ Today is {date.today().strftime("%d %B %Y")}.
             messages.append(assistant_message)
         
         result = assistant_message.get("content", "")
+        if result:
+            self.history.append(user_role)
+            self.history.append(assistant_message)
+            
+        pretty_print("History", self.history)
         return result
 
 
