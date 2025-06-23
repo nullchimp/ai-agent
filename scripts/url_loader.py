@@ -2,17 +2,13 @@ from dotenv import load_dotenv
 # Force reload of environment variables to avoid cached data
 load_dotenv(override=True)
 
-from core.llm.client import Client
-from libs.dataloader.document import DocumentLoader
 from core.rag.embedder import TextEmbedding3Small
 from core.rag.dbhandler.memgraph import MemGraphClient
+from libs.dataloader.web import WebLoader
+from loader_config import WEB_LOADER_CONFIGS
 
 import asyncio
 import os
-
-api_key = os.environ.get("AZURE_OPENAI_API_KEY")
-if not api_key:
-    raise ValueError(f"AZURE_OPENAI_API_KEY environment variable is required")
 
 db = MemGraphClient(
     host=os.environ.get("MEMGRAPH_URI", "localhost"),
@@ -21,6 +17,8 @@ db = MemGraphClient(
     password=os.environ.get("MEMGRAPH_PASSWORD", "memgraph"),
 ).connect()
 
+print("Connected to Memgraph", db.host, db.port)
+
 embedder = TextEmbedding3Small()
 
 vector_store = db.create_vector_store(
@@ -28,6 +26,12 @@ vector_store = db.create_vector_store(
 )
 
 def store(source, doc, chunks, vectors):
+    print("### Storing data in Memgraph")
+    print("Source:", source)
+    print("Document:", doc)
+    print("Chunks:", len(chunks))
+    print("Vectors:", len(vectors))
+
     db.create_source(source)
     db.create_document(doc)
     for chunk in chunks:
@@ -37,18 +41,21 @@ def store(source, doc, chunks, vectors):
         vector.vector_store_id = vector_store.id
         db.create_vector(vector)
 
+    print("### Data stored successfully")
+
 async def main():
-    loadar_paths = [
-        "/Users/nullchimp/Projects/customer-security-trust/FAQ",
-        "/Users/nullchimp/Projects/github-docs/content-copilot"
-    ]
-    for path in loadar_paths:
-        loader = DocumentLoader(path, ['.md'])
+    for config in WEB_LOADER_CONFIGS:
+        loader = WebLoader(config.url)
         for source, doc, chunks in loader.load_data():
             vectors = []
             await embedder.process_chunks(chunks, callback=lambda v: vectors.append(v))
-            if "customer-security-trust/FAQ" in source.uri:
-                source.uri = f"https://github.com/github/customer-security-trust/blob/main/FAQ/{source.name}"
+            if config.uri_replacement:
+                old_pattern, new_pattern = config.uri_replacement
+                source.uri = f"{source.uri.replace(old_pattern, new_pattern)}"
             store(source, doc, chunks, vectors)
 
-asyncio.run(main())
+    db.close()
+    
+
+if __name__ == "__main__":
+    asyncio.run(main())

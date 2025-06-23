@@ -142,7 +142,9 @@ class TestEmbeddingService:
             result = await service._make_embedding_request("test text", retry=2)
 
             assert result == [0.1, 0.2, 0.3]
-            mock_sleep.assert_called_once_with(60)
+            assert mock_sleep.call_count == 2
+            mock_sleep.assert_any_call(5)
+            mock_sleep.assert_any_call(55)
             assert service._client.make_request.call_count == 2
 
     @pytest.mark.asyncio
