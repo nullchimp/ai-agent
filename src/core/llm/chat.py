@@ -57,6 +57,7 @@ class Chat:
             print(colorize_text(f"\n{hr} <{name}> {hr}\n", "yellow"))
             
         # Safely get tool_calls - convert None to empty list to handle the case when tool_calls is None
+        tools_used = []
         tool_calls = response.get("tool_calls", [])
         for tool_call in tool_calls:
             function_data = tool_call.get("function", {})
@@ -82,6 +83,7 @@ class Chat:
                 tool_instance = self.tool_map[tool_name]
                 try:
                     tool_result = await tool_instance.run(**args)
+                    tools_used.append(tool_name)
                     if is_debug():
                         print(colorize_text(f"<Tool Result: {colorize_text(tool_name, "green")}> ", "yellow"), prettify(tool_result))
                 except Exception as e:
@@ -99,3 +101,5 @@ class Chat:
                 "tool_call_id": tool_call.get("id", "unknown_tool"),
                 "content": json.dumps(tool_result, default=complex_handler),
             })
+
+        return tools_used

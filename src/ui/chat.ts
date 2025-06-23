@@ -8,6 +8,7 @@ interface Message {
     content: string;
     role: 'user' | 'assistant';
     timestamp: Date;
+    usedTools?: string[];
 }
 
 interface ChatSession {
@@ -102,14 +103,15 @@ class ChatApp {
         this.showTypingIndicator();
 
         try {
-            const response = await this.callAPI(content);
+            const apiResponse = await this.callAPI(content);
             this.hideTypingIndicator();
 
             const assistantMessage: Message = {
                 id: this.generateId(),
-                content: response,
+                content: apiResponse.response,
                 role: 'assistant',
-                timestamp: new Date()
+                timestamp: new Date(),
+                usedTools: apiResponse.usedTools
             };
 
             this.currentSession.messages.push(assistantMessage);
@@ -124,7 +126,7 @@ class ChatApp {
         }
     }
 
-    private async callAPI(message: string): Promise<string> {
+    private async callAPI(message: string): Promise<{response: string, usedTools: string[]}> {
         try {
             const response = await fetch(`${this.apiBaseUrl}/ask`, {
                 method: 'POST',
@@ -142,10 +144,17 @@ class ChatApp {
             }
 
             const data = await response.json();
-            return data.response || 'Sorry, I couldn\'t process your request.';
+            console.log('API Response Data:', data); // Debug log
+            return {
+                response: data.response || 'Sorry, I couldn\'t process your request.',
+                usedTools: data.used_tools || []
+            };
         } catch (error) {
             console.error('API call failed:', error);
-            return 'An error occurred while communicating with the AI.';
+            return {
+                response: 'An error occurred while communicating with the AI.',
+                usedTools: []
+            };
         }
     }
 
@@ -159,6 +168,22 @@ class ChatApp {
         
         const content = document.createElement('div');
         content.className = 'message-content';
+
+        // Add tool tags at the top for assistant messages
+        if (message.role === 'assistant' && message.usedTools && message.usedTools.length > 0) {
+            console.log('Adding tool tags:', message.usedTools); // Debug log
+            const toolsContainer = document.createElement('div');
+            toolsContainer.className = 'tool-tags';
+            
+            message.usedTools.forEach(tool => {
+                const toolTag = document.createElement('span');
+                toolTag.className = 'tool-tag';
+                toolTag.textContent = tool.toLowerCase();
+                toolsContainer.appendChild(toolTag);
+            });
+            
+            content.appendChild(toolsContainer);
+        }
         
         const text = document.createElement('div');
         text.className = 'message-text';
@@ -172,6 +197,7 @@ class ChatApp {
         }
         
         content.appendChild(text);
+        
         messageEl.appendChild(avatar);
         messageEl.appendChild(content);
         

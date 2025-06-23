@@ -360,6 +360,36 @@ body {
     }
 }
 
+/* Tool Tags */
+.tool-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 8px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.tool-tag {
+    display: inline-flex;
+    align-items: center;
+    background-color: #e3f2fd;
+    color: #1565c0;
+    font-size: 11px;
+    font-weight: 500;
+    padding: 3px 8px;
+    border-radius: 12px;
+    border: 1px solid #bbdefb;
+    white-space: nowrap;
+    text-transform: capitalize;
+}
+
+.tool-tag::before {
+    content: "🔧";
+    margin-right: 4px;
+    font-size: 10px;
+}
+
 /* Input Container */
 .input-container {
     position: fixed;

@@ -13,7 +13,10 @@ router = APIRouter(prefix="/api", dependencies=[Depends(get_api_key)])
 @router.post("/ask", response_model=QueryResponse)
 async def ask_agent(request: QueryRequest) -> QueryResponse:
     try:
-        response = await agent.process_query(request.query)
-        return QueryResponse(response=response)
+        response, used_tools = await agent.process_query(request.query)
+        return QueryResponse(
+            response=response, 
+            used_tools=list(used_tools)
+        )
     except Exception as e:
         return QueryResponse(response=f"Sorry, I encountered an error: {str(e)}")

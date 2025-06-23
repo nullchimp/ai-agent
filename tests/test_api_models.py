@@ -26,11 +26,13 @@ def test_query_request_missing_query():
 def test_query_response_valid():
     response = QueryResponse(response="The weather is sunny today.")
     assert response.response == "The weather is sunny today."
+    assert response.used_tools == []
 
 
 def test_query_response_empty_string():
     response = QueryResponse(response="")
     assert response.response == ""
+    assert response.used_tools == []
 
 
 def test_query_response_missing_response():
@@ -47,4 +49,27 @@ def test_query_request_json_serialization():
 def test_query_response_json_serialization():
     response = QueryResponse(response="Test response")
     json_data = response.model_dump()
-    assert json_data == {"response": "Test response"}
+    assert json_data == {"response": "Test response", "used_tools": []}
+
+
+def test_query_response_with_used_tools():
+    response = QueryResponse(response="Test response", used_tools=["tool1", "tool2"])
+    assert response.response == "Test response"
+    assert response.used_tools == ["tool1", "tool2"]
+
+
+def test_query_response_with_used_tools_json_serialization():
+    response = QueryResponse(response="Test response", used_tools=["google_search", "file_reader"])
+    json_data = response.model_dump()
+    assert json_data == {"response": "Test response", "used_tools": ["google_search", "file_reader"]}
+
+
+def test_query_response_with_empty_used_tools():
+    response = QueryResponse(response="Test response", used_tools=[])
+    assert response.response == "Test response"
+    assert response.used_tools == []
+
+
+def test_query_response_used_tools_default():
+    response = QueryResponse(response="Test response")
+    assert response.used_tools == []
