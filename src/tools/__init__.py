@@ -1,5 +1,9 @@
 class Tool:
     @property
+    def enabled(self) -> bool:
+        return self._enabled
+
+    @property
     def name(self) -> str:
         return self._name
 
@@ -21,6 +25,13 @@ class Tool:
         self._description = description
         self._parameters = parameters if parameters is not None else {}
         self._session = session
+        self._enabled = True
+
+    def enable(self) -> None:
+        self._enabled = True
+
+    def disable(self) -> None:
+        self._enabled = False
 
     def define(self):
         return {

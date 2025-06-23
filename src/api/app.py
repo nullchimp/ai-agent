@@ -4,7 +4,7 @@ import mimetypes
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
-from api.routes import router, agent, session_manager
+from api.routes import router, agent_instance, session_manager
 mimetypes.add_type("application/javascript", ".js")
 
 @asynccontextmanager
@@ -15,7 +15,7 @@ async def lifespan(app: FastAPI):
         config_path = os.path.join(os.path.dirname(__file__), '..', '..', 'config', 'mcp.json')
         await session_manager.discovery(config_path)
         for tool in session_manager.tools:
-            agent.add_tool(tool)
+            agent_instance.add_tool(tool)
         print("Agent and tools initialized successfully.")
     except Exception as e:
         print(f"Error initializing MCP tools: {str(e)}")

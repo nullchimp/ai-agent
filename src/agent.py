@@ -55,6 +55,15 @@ class Agent:
 
     def add_tool(self, tool: Tool) -> None:
         self.chat.add_tool(tool)
+    
+    def enable_tool(self, tool_name: str) -> None:
+        self.chat.enable_tool(tool_name)
+
+    def disable_tool(self, tool_name: str) -> None:
+        self.chat.disable_tool(tool_name)
+
+    def get_tools(self) -> list:
+        return self.chat.get_tools()
 
     async def process_query(self, user_prompt: str) -> str:
         user_role = {"role": "user", "content": user_prompt}
