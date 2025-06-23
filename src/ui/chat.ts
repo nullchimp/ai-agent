@@ -454,7 +454,45 @@ class ChatApp {
     private renderTools(): void {
         this.toolsList.innerHTML = '';
         
-        this.tools.forEach(tool => {
+        // Add toggle all item at the top
+        const toggleAllItem = document.createElement('div');
+        toggleAllItem.className = 'disable-all-item';
+        
+        const toggleAllName = document.createElement('div');
+        toggleAllName.className = 'disable-all-name';
+        toggleAllName.textContent = 'Toggle All Tools';
+        
+        const toggleAllDescription = document.createElement('div');
+        toggleAllDescription.className = 'disable-all-description';
+        toggleAllDescription.textContent = 'Enable or disable all tools at once';
+        
+        const enabledCount = this.tools.filter(tool => tool.enabled).length;
+        const totalCount = this.tools.length;
+        const allEnabled = enabledCount === totalCount;
+        
+        // Update the tools configuration text to show active/total format
+        const toolsLabelSpan = this.toolsHeader.querySelector('.tools-label span');
+        if (toolsLabelSpan) {
+            toolsLabelSpan.textContent = `Tools Configuration [${enabledCount}/${totalCount}]`;
+        }
+        
+        const toggleAllToggle = document.createElement('div');
+        toggleAllToggle.className = `tool-toggle ${allEnabled ? 'enabled' : ''}`;
+        toggleAllToggle.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.toggleAllTools(!allEnabled);
+        });
+        
+        toggleAllItem.appendChild(toggleAllName);
+        toggleAllItem.appendChild(toggleAllDescription);
+        toggleAllItem.appendChild(toggleAllToggle);
+        
+        this.toolsList.appendChild(toggleAllItem);
+        
+        // Sort tools alphabetically by name
+        const sortedTools = [...this.tools].sort((a, b) => a.name.localeCompare(b.name));
+        
+        sortedTools.forEach(tool => {
             const toolItem = document.createElement('div');
             toolItem.className = 'tool-item';
             
@@ -509,6 +547,36 @@ class ChatApp {
         } catch (error) {
             console.error('Error toggling tool:', error);
         }
+    }
+
+    private async toggleAllTools(enabled: boolean): Promise<void> {
+        const toolsToChange = this.tools.filter(tool => tool.enabled !== enabled);
+        
+        for (const tool of toolsToChange) {
+            try {
+                const response = await fetch(`${this.apiBaseUrl}/tools/toggle`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-API-Key': 'test_12345'
+                    },
+                    body: JSON.stringify({
+                        tool_name: tool.name,
+                        enabled: enabled
+                    })
+                });
+
+                if (response.ok) {
+                    tool.enabled = enabled;
+                } else {
+                    console.error(`Failed to ${enabled ? 'enable' : 'disable'} tool ${tool.name}:`, await response.text());
+                }
+            } catch (error) {
+                console.error(`Error ${enabled ? 'enabling' : 'disabling'} tool ${tool.name}:`, error);
+            }
+        }
+        
+        this.renderTools();
     }
 }
 

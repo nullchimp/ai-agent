@@ -7,7 +7,7 @@ class GoogleSearch(Tool):
 	
 	@property
 	def description(self) -> str:
-		return "Search the web for relevant information."
+		return "Perform web searches using Google Custom Search API to retrieve relevant information from the internet. Returns structured search results including titles, URLs, snippets, and metadata. Supports configurable result limits and provides search performance metrics. Requires valid Google API credentials and custom search engine configuration."
 	
 	@property
 	def parameters(self) -> dict:
@@ -16,11 +16,11 @@ class GoogleSearch(Tool):
 			"properties": {
 				"query": {
 					"type": "string",
-					"description": "The search query to use"
+					"description": "The search query string to submit to Google. Supports standard Google search operators and syntax including quotes for exact phrases, site: for domain filtering, and boolean operators."
 				},
 				"num_results": {
 					"type": "number",
-					"description": "Number of results to return (default: 5, max: 10)"
+					"description": "Maximum number of search results to return. Valid range is 1-10, defaults to 5 if not specified. Higher values may increase API quota usage and response time."
 				}
 			},
 			"required": ["query"]
