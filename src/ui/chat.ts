@@ -51,6 +51,10 @@ class ChatApp {
     private debugEventsContainer: HTMLElement;
     private debugClearBtn: HTMLButtonElement;
     private debugPanelClose: HTMLButtonElement;
+    private debugFullscreenOverlay: HTMLElement;
+    private debugFullscreenData: HTMLElement;
+    private debugFullscreenTitle: HTMLElement;
+    private debugFullscreenClose: HTMLButtonElement;
     private currentSession: ChatSession | null = null;
     private sessions: ChatSession[] = [];
     private tools: Tool[] = [];
@@ -75,6 +79,12 @@ class ChatApp {
         this.debugEventsContainer = document.getElementById('debugEvents') as HTMLElement;
         this.debugClearBtn = document.getElementById('debugClearBtn') as HTMLButtonElement;
         this.debugPanelClose = document.getElementById('debugPanelClose') as HTMLButtonElement;
+        
+        // Debug fullscreen elements
+        this.debugFullscreenOverlay = document.getElementById('debugFullscreenOverlay') as HTMLElement;
+        this.debugFullscreenData = document.getElementById('debugFullscreenData') as HTMLElement;
+        this.debugFullscreenTitle = document.getElementById('debugFullscreenTitle') as HTMLElement;
+        this.debugFullscreenClose = document.getElementById('debugFullscreenClose') as HTMLButtonElement;
 
         this.init();
     }
@@ -122,6 +132,21 @@ class ChatApp {
         });
         this.debugPanelClose.addEventListener('click', () => this.closeDebugPanel());
         this.debugClearBtn.addEventListener('click', () => this.clearDebugEvents());
+        
+        // Debug fullscreen event listeners
+        this.debugFullscreenClose.addEventListener('click', () => this.closeDebugFullscreen());
+        this.debugFullscreenOverlay.addEventListener('click', (e) => {
+            if (e.target === this.debugFullscreenOverlay) {
+                this.closeDebugFullscreen();
+            }
+        });
+        
+        // Keyboard shortcut for closing fullscreen
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && this.debugFullscreenOverlay.classList.contains('active')) {
+                this.closeDebugFullscreen();
+            }
+        });
     }
 
     private adjustTextareaHeight(): void {
@@ -535,7 +560,7 @@ class ChatApp {
         
         sortedTools.forEach(tool => {
             const toolItem = document.createElement('div');
-            toolItem.className = 'tool-item';
+            toolItem.className = `tool-item ${tool.enabled ? 'enabled' : ''}`;
             
             const toolName = document.createElement('div');
             toolName.className = 'tool-name';
@@ -745,18 +770,11 @@ class ChatApp {
 
         const eventsHtml = this.debugEventsList
             .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
-            .map(event => {
+            .map((event, index) => {
                 const timestamp = new Date(event.timestamp).toLocaleTimeString();
-                let dataStr = JSON.stringify(event.data, null, 2);
-                
-                // Truncate very large responses to prevent display issues
-                const maxLength = 10000;
-                if (dataStr.length > maxLength) {
-                    dataStr = dataStr.substring(0, maxLength) + '\n... [truncated - response too large]';
-                }
+                const colorizedData = this.applyColorSchemeToData(event.data);
                 
                 // Properly escape HTML characters
-                const escapedData = this.escapeHtml(dataStr);
                 const escapedMessage = this.escapeHtml(event.message);
                 
                 return `
@@ -764,9 +782,15 @@ class ChatApp {
                         <div class="debug-event-header">
                             <span class="debug-event-type ${event.event_type}">${event.event_type}</span>
                             <span class="debug-event-timestamp">${timestamp}</span>
+                            <button class="debug-event-fullscreen-btn" onclick="window.chatApp.openDebugFullscreen(${index})">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
+                                </svg>
+                                Expand
+                            </button>
                         </div>
                         <div class="debug-event-message">${escapedMessage}</div>
-                        <div class="debug-event-data">${escapedData}</div>
+                        <div class="debug-event-data">${colorizedData}</div>
                     </div>
                 `;
             })
@@ -774,6 +798,98 @@ class ChatApp {
 
         this.debugEventsContainer.innerHTML = eventsHtml;
         this.debugEventsContainer.scrollTop = this.debugEventsContainer.scrollHeight;
+    }
+
+    private applyColorSchemeToData(data: Record<string, any>): string {
+        const maxLength = 10000;
+        const jsonStr = JSON.stringify(data, null, 2);
+        
+        if (jsonStr.length > maxLength) {
+            return this.escapeHtml(jsonStr.substring(0, maxLength) + '\n... [truncated - response too large]');
+        }
+        
+        return this.colorizeJsonData(data, 0);
+    }
+
+    private colorizeJsonData(obj: any, depth: number = 0): string {
+        const indent = '  '.repeat(depth);
+        
+        if (obj === null) {
+            return '<span class="debug-color-grey">null</span>';
+        }
+        
+        if (typeof obj === 'string') {
+            if (obj === '...[truncated]') {
+                return `<span class="debug-truncated">"${this.escapeHtml(obj)}"</span>`;
+            }
+            return `"<span class="debug-color-white">${this.escapeHtml(obj)}</span>"`;
+        }
+        
+        if (typeof obj === 'number' || typeof obj === 'boolean') {
+            return `<span class="debug-color-yellow">${obj}</span>`;
+        }
+        
+        if (Array.isArray(obj)) {
+            if (obj.length === 0) return '[]';
+            
+            const items = obj.map(item => {
+                if (typeof item === 'string' && item === '...[truncated]') {
+                    return `${indent}  <span class="debug-truncated">"${item}"</span>`;
+                }
+                return `${indent}  ${this.colorizeJsonData(item, depth + 1)}`;
+            });
+            
+            return `[\n${items.join(',\n')}\n${indent}]`;
+        }
+        
+        if (typeof obj === 'object' && obj !== null) {
+            const entries = Object.entries(obj);
+            if (entries.length === 0) return '{}';
+            
+            // Extract color metadata if present
+            const colorMetadata = obj._debug_colors || {};
+            
+            const items = entries
+                .filter(([key]) => key !== '_debug_colors') // Don't display color metadata
+                .map(([key, value]) => {
+                    // Determine color for this key
+                    const colorKey = `_${key}_color`;
+                    const color = colorMetadata[colorKey];
+                    
+                    let keyHtml;
+                    if (color) {
+                        keyHtml = `<span class="debug-key debug-color-${color}">"${this.escapeHtml(key)}"</span>`;
+                    } else {
+                        keyHtml = `<span class="debug-key">"${this.escapeHtml(key)}"</span>`;
+                    }
+                    
+                    const valueHtml = this.colorizeJsonData(value, depth + 1);
+                    return `${indent}  ${keyHtml}: ${valueHtml}`;
+                });
+            
+            return `{\n${items.join(',\n')}\n${indent}}`;
+        }
+        
+        return this.escapeHtml(String(obj));
+    }
+
+    public openDebugFullscreen(eventIndex: number): void {
+        const event = this.debugEventsList[eventIndex];
+        if (!event) return;
+        
+        const timestamp = new Date(event.timestamp).toLocaleString();
+        this.debugFullscreenTitle.textContent = `${event.event_type} - ${timestamp}`;
+        
+        const colorizedData = this.applyColorSchemeToData(event.data);
+        this.debugFullscreenData.innerHTML = colorizedData;
+        
+        this.debugFullscreenOverlay.classList.add('active');
+        document.body.style.overflow = 'hidden'; // Prevent background scrolling
+    }
+
+    private closeDebugFullscreen(): void {
+        this.debugFullscreenOverlay.classList.remove('active');
+        document.body.style.overflow = ''; // Restore scrolling
     }
 
     private escapeHtml(unsafe: string): string {
@@ -787,5 +903,7 @@ class ChatApp {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    new ChatApp();
+    const chatApp = new ChatApp();
+    // Make it globally accessible for onclick handlers
+    (window as any).chatApp = chatApp;
 });

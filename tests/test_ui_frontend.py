@@ -163,3 +163,20 @@ def test_package_json_scripts():
 
         scripts = content.get('scripts', {})
         assert 'ui:build' in scripts, "Should have ui:build script"
+
+
+def test_tool_highlighting_css():
+    """Test that CSS contains proper styling for tool highlighting"""
+    ui_dir = Path(__file__).parent.parent / "src" / "ui"
+    css_file = ui_dir / "styles.css"
+
+    content = css_file.read_text()
+
+    # Check for tool-related CSS classes
+    assert '.tool-item' in content, "Should have tool-item styling"
+    assert '.tool-item.enabled' in content, "Should have enabled tool highlighting"
+    assert '.tool-item.enabled:hover' in content, "Should have enabled tool hover state"
+    
+    # Check for light blue highlighting colors
+    assert '#dbeafe' in content, "Should have light blue background for enabled tools"
+    assert '#bfdbfe' in content, "Should have light blue border and hover states"

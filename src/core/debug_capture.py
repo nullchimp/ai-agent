@@ -5,26 +5,81 @@ import threading
 from enum import Enum
 
 def safe_serialize(obj: Any, max_length: int = 50000) -> Any:
-    """Safely serialize objects, truncating if too large"""
+    """Safely serialize objects with color identifiers for important attributes"""
+    
+    # Color scheme mapping similar to pretty_print
+    color_scheme = {
+        "messages": "blue",
+        "message": "blue", 
+        "role": "cyan",
+        "function": "green",
+        "name": "yellow",
+        "properties": "green",
+        "arguments": "green",
+        "parameters": "green", 
+        "description": "green",
+        "tools": "yellow",
+        "tool_calls": "yellow",
+        "tool_name": "yellow",
+        "results": "yellow",
+        "result": "yellow",
+        "required": "red",
+        "error": "red",
+        "content": "magenta",
+        "text": "magenta",
+        "event_type": "cyan",
+        "timestamp": "grey",
+        "session_id": "grey",
+        "payload": "blue",
+        "response": "blue"
+    }
+    
+    def should_truncate_key(key: str, value: Any) -> bool:
+        """Determine if a key should be truncated based on importance"""
+        if key in color_scheme:
+            return False  # Important keys should not be truncated
+        # Truncate large, less important data
+        if isinstance(value, str) and len(value) > 200:
+            return True
+        elif isinstance(value, list) and len(value) > 20:
+            return True
+        elif isinstance(value, dict) and len(str(value)) > 1000:
+            return True
+        return False
+    
     try:
         if isinstance(obj, str):
             if len(obj) > max_length:
-                return obj[:max_length] + "... [truncated]"
+                return obj[:max_length] + "...[truncated]"
             return obj
         elif isinstance(obj, dict):
             result = {}
+            color_metadata = {}
+            
             for key, value in obj.items():
-                result[key] = safe_serialize(value, max_length // 10)
+                if should_truncate_key(key, value):
+                    result[key] = "...[truncated]"
+                else:
+                    result[key] = safe_serialize(value, max(max_length // 5, 1000))
+                    
+                # Track color information for frontend
+                if key in color_scheme:
+                    color_metadata[f"_{key}_color"] = color_scheme[key]
+            
+            # Only add color metadata if there are colored attributes
+            if color_metadata:
+                result["_debug_colors"] = color_metadata
+                
             return result
         elif isinstance(obj, list):
-            if len(obj) > 100:  # Limit array size
-                return [safe_serialize(item, max_length // 20) for item in obj[:100]] + ["... [truncated]"]
-            return [safe_serialize(item, max_length // 10) for item in obj]
+            if len(obj) > 50:  # Limit array size for unimportant lists
+                return [safe_serialize(item, max_length // 20) for item in obj[:10]] + ["...[truncated]"]
+            return [safe_serialize(item, max(max_length // 5, 1000)) for item in obj]
         else:
             # For other types, convert to string and check length
             str_repr = str(obj)
             if len(str_repr) > max_length:
-                return str_repr[:max_length] + "... [truncated]"
+                return str_repr[:max_length] + "...[truncated]"
             return obj
     except Exception:
         return "[Error serializing object]"

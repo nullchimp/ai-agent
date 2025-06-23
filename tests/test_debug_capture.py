@@ -117,7 +117,17 @@ class TestDebugCapture:
         assert len(events) == 1
         assert events[0]["event_type"] == DebugEventType.AGENT_TO_MODEL
         assert events[0]["message"] == "LLM Request"
-        assert events[0]["data"]["payload"] == payload
+        
+        # Check that the payload data is preserved (ignoring color metadata)
+        captured_payload = events[0]["data"]["payload"]
+        assert "messages" in captured_payload
+        assert len(captured_payload["messages"]) == 1
+        assert captured_payload["messages"][0]["role"] == "user"
+        assert captured_payload["messages"][0]["content"] == "test"
+        
+        # Check that color metadata is present
+        assert "_debug_colors" in captured_payload
+        assert "_messages_color" in captured_payload["_debug_colors"]
 
     def test_capture_tool_call(self):
         capture = DebugCapture()
@@ -131,6 +141,10 @@ class TestDebugCapture:
         assert events[0]["message"] == "Tool Call: google_search"
         assert events[0]["data"]["tool_name"] == "google_search"
         assert events[0]["data"]["arguments"]["query"] == "test"
+        
+        # Check that color metadata is present for tool_name
+        assert "_debug_colors" in events[0]["data"]
+        assert "_tool_name_color" in events[0]["data"]["_debug_colors"]
 
     def test_debug_event_to_dict(self):
         with patch('core.debug_capture.DebugCapture.get_current_session_id', return_value="test_session"):

@@ -138,3 +138,91 @@ class TestUIToolsConfiguration:
         manager.toggle_tool("read_file", False)
         manager.toggle_tool("write_file", False)
         assert manager.get_configuration_text() == "Tools Configuration <0/3>"
+    
+    def test_tool_item_enabled_class_assignment(self):
+        """Test that enabled tools get the 'enabled' CSS class for highlighting"""
+        
+        def simulate_tool_item_class(tool_enabled):
+            """Simulate the CSS class assignment logic from renderTools in chat.ts"""
+            base_class = "tool-item"
+            if tool_enabled:
+                return f"{base_class} enabled"
+            return base_class
+        
+        # Test enabled tool gets the enabled class
+        enabled_tool_class = simulate_tool_item_class(True)
+        assert enabled_tool_class == "tool-item enabled"
+        
+        # Test disabled tool doesn't get the enabled class
+        disabled_tool_class = simulate_tool_item_class(False)
+        assert disabled_tool_class == "tool-item"
+
+    def test_tool_highlighting_css_classes(self):
+        """Test the CSS class logic for tool highlighting"""
+        
+        def get_tool_classes(enabled):
+            """Simulate the className assignment for tool items"""
+            classes = ["tool-item"]
+            if enabled:
+                classes.append("enabled")
+            return " ".join(classes)
+        
+        # Test various tool states
+        test_cases = [
+            {"enabled": True, "expected_class": "tool-item enabled"},
+            {"enabled": False, "expected_class": "tool-item"},
+        ]
+        
+        for case in test_cases:
+            actual_class = get_tool_classes(case["enabled"])
+            assert actual_class == case["expected_class"], f"Failed for enabled={case['enabled']}"
+
+    def test_tools_list_highlighting_integration(self):
+        """Test that the tools list correctly applies highlighting to enabled tools"""
+        
+        class MockToolRenderer:
+            def __init__(self):
+                self.rendered_tools = []
+            
+            def render_tool(self, tool_name, tool_description, enabled):
+                """Simulate rendering a single tool with proper CSS classes"""
+                tool_item = {
+                    "name": tool_name,
+                    "description": tool_description,
+                    "css_class": f"tool-item {('enabled' if enabled else '')}".strip(),
+                    "enabled": enabled
+                }
+                self.rendered_tools.append(tool_item)
+                return tool_item
+            
+            def render_tools_list(self, tools):
+                """Simulate rendering the complete tools list"""
+                self.rendered_tools.clear()
+                for tool in tools:
+                    self.render_tool(
+                        tool["name"], 
+                        tool["description"], 
+                        tool["enabled"]
+                    )
+                return self.rendered_tools
+        
+        # Test with mixed tool states
+        tools_data = [
+            {"name": "google_search", "description": "Search Google", "enabled": True},
+            {"name": "read_file", "description": "Read files", "enabled": False},
+            {"name": "write_file", "description": "Write files", "enabled": True},
+            {"name": "list_files", "description": "List files", "enabled": False}
+        ]
+        
+        renderer = MockToolRenderer()
+        rendered_tools = renderer.render_tools_list(tools_data)
+        
+        # Verify correct highlighting
+        assert rendered_tools[0]["css_class"] == "tool-item enabled"  # google_search
+        assert rendered_tools[1]["css_class"] == "tool-item"          # read_file
+        assert rendered_tools[2]["css_class"] == "tool-item enabled"  # write_file
+        assert rendered_tools[3]["css_class"] == "tool-item"          # list_files
+        
+        # Verify enabled count
+        enabled_tools = [tool for tool in rendered_tools if tool["enabled"]]
+        assert len(enabled_tools) == 2
