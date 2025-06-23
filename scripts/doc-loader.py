@@ -38,12 +38,17 @@ def store(source, doc, chunks, vectors):
         db.create_vector(vector)
 
 async def main():
-    loadar_paths = ["/Users/nullchimp/Projects/customer-security-trust/FAQ"]
+    loadar_paths = [
+        "/Users/nullchimp/Projects/customer-security-trust/FAQ",
+        "/Users/nullchimp/Projects/github-docs/content-copilot"
+    ]
     for path in loadar_paths:
         loader = DocumentLoader(path, ['.md'])
         for source, doc, chunks in loader.load_data():
             vectors = []
             await embedder.process_chunks(chunks, callback=lambda v: vectors.append(v))
+            if "customer-security-trust/FAQ" in source.uri:
+                source.uri = f"https://github.com/github/customer-security-trust/blob/main/FAQ/{source.name}"
             store(source, doc, chunks, vectors)
 
 asyncio.run(main())

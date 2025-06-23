@@ -22,6 +22,7 @@ class EmbeddingService:
         callback: callable = None
     ) -> None:
         """Process a single chunk: generate embedding and store in vector DB"""
+        
         try:
             embedding = await self._make_embedding_request(chunk.content)
         except Exception as e:
@@ -69,11 +70,13 @@ class EmbeddingService:
             
             raise ValueError("Failed to get embedding from Azure OpenAI")
         except Exception as e:
-            if "429" in str(e) and retry > 1:
-                await asyncio.sleep(60) # Wait for 1 minute before retrying
-                return await self._make_embedding_request(text, retry=retry-1)
+            if retry <= 0:
+                raise ValueError(f"Failed to get embedding after retries: {str(e)}")
+
+            await asyncio.sleep(5) # Wait for 5 seconds before retrying
+            if "429" in str(e):
+                await asyncio.sleep(55) # Wait for a total of 1 minute before retrying
             
-            # Re-raise the exception if it's not a 429 error or if retries are exhausted
-            raise
+            return await self._make_embedding_request(text, retry=retry-1)
     
 from core.rag.embedder.text_embedding_3_small import TextEmbedding3Small
