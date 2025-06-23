@@ -7,7 +7,7 @@ class TestListFiles:
     def test_list_files_properties(self):
         list_files = ListFiles()
         assert list_files.name == "list_files"
-        assert list_files.description == "List files in a specified directory within a secure base directory."
+        assert list_files.description == "List files and directories within a specified directory path, constrained to operate within a secure base directory for security. Returns comprehensive file listing with metadata including file names, types, and directory structure. Supports recursive directory traversal within security boundaries."
         
         parameters = list_files.parameters
         assert parameters["type"] == "object"
@@ -26,7 +26,7 @@ class TestListFiles:
         
         assert definition["type"] == "function"
         assert definition["function"]["name"] == "list_files"
-        assert definition["function"]["description"] == "List files in a specified directory within a secure base directory."
+        assert definition["function"]["description"] == "List files and directories within a specified directory path, constrained to operate within a secure base directory for security. Returns comprehensive file listing with metadata including file names, types, and directory structure. Supports recursive directory traversal within security boundaries."
         assert definition["function"]["parameters"]["type"] == "object"
 
     @pytest.mark.asyncio
@@ -122,13 +122,13 @@ class TestListFiles:
         # Check base_dir parameter
         base_dir_prop = params["properties"]["base_dir"]
         assert base_dir_prop["type"] == "string"
-        assert "Base directory" in base_dir_prop["description"]
+        assert "Absolute path to the base directory" in base_dir_prop["description"]
         
         # Check directory parameter
         directory_prop = params["properties"]["directory"]
         assert directory_prop["type"] == "string"
-        assert "relative subdirectory" in directory_prop["description"]
-        assert "default: '.'" in directory_prop["description"]
+        assert "Relative path to the subdirectory" in directory_prop["description"]
+        assert "Defaults to '.'" in directory_prop["description"]
 
     @pytest.mark.asyncio
     @patch('libs.fileops.file.FileService')

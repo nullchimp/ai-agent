@@ -7,7 +7,7 @@ class TestReadFile:
     def test_read_file_properties(self):
         read_file = ReadFile()
         assert read_file.name == "read_file"
-        assert read_file.description == "Read content from a specified file within a secure base directory."
+        assert read_file.description == "Read and return the complete content of a specified file within security-constrained base directory boundaries. Supports text and binary file reading with proper error handling for missing files, permission issues, and encoding problems. File access is restricted to the specified base directory to prevent path traversal vulnerabilities."
         
         parameters = read_file.parameters
         assert parameters["type"] == "object"
@@ -26,7 +26,7 @@ class TestReadFile:
         
         assert definition["type"] == "function"
         assert definition["function"]["name"] == "read_file"
-        assert definition["function"]["description"] == "Read content from a specified file within a secure base directory."
+        assert definition["function"]["description"] == "Read and return the complete content of a specified file within security-constrained base directory boundaries. Supports text and binary file reading with proper error handling for missing files, permission issues, and encoding problems. File access is restricted to the specified base directory to prevent path traversal vulnerabilities."
         assert definition["function"]["parameters"]["type"] == "object"
 
     @pytest.mark.asyncio
@@ -120,12 +120,12 @@ class TestReadFile:
         # Check base_dir parameter
         base_dir_prop = params["properties"]["base_dir"]
         assert base_dir_prop["type"] == "string"
-        assert "Base directory" in base_dir_prop["description"]
+        assert "Absolute path to the base directory" in base_dir_prop["description"]
         
         # Check filename parameter
         filename_prop = params["properties"]["filename"]
         assert filename_prop["type"] == "string"
-        assert "relative path" in filename_prop["description"]
+        assert "Relative path to the target file" in filename_prop["description"]
 
     @pytest.mark.asyncio
     @patch('libs.fileops.file.FileService')

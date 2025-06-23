@@ -6,7 +6,7 @@ class TestWriteFile:
     def test_write_file_properties(self):
         write_file = WriteFile()
         assert write_file.name == "write_file"
-        assert write_file.description == "Write content to a specified file within a secure base directory."
+        assert write_file.description == "Write or overwrite content to a specified file within security-constrained base directory boundaries. Creates directories as needed and handles text encoding automatically. Supports creating new files or updating existing ones with comprehensive error handling for permission issues, disk space, and path validation. File operations are restricted to the specified base directory to prevent path traversal vulnerabilities."
         
         parameters = write_file.parameters
         assert parameters["type"] == "object"
@@ -26,7 +26,7 @@ class TestWriteFile:
         
         assert definition["type"] == "function"
         assert definition["function"]["name"] == "write_file"
-        assert definition["function"]["description"] == "Write content to a specified file within a secure base directory."
+        assert definition["function"]["description"] == "Write or overwrite content to a specified file within security-constrained base directory boundaries. Creates directories as needed and handles text encoding automatically. Supports creating new files or updating existing ones with comprehensive error handling for permission issues, disk space, and path validation. File operations are restricted to the specified base directory to prevent path traversal vulnerabilities."
         assert definition["function"]["parameters"]["type"] == "object"
 
     @pytest.mark.asyncio
@@ -134,12 +134,12 @@ class TestWriteFile:
         # Check base_dir parameter
         base_dir_prop = params["properties"]["base_dir"]
         assert base_dir_prop["type"] == "string"
-        assert "Base directory" in base_dir_prop["description"]
+        assert "Absolute path to the base directory" in base_dir_prop["description"]
         
         # Check filename parameter
         filename_prop = params["properties"]["filename"]
         assert filename_prop["type"] == "string"
-        assert "relative path" in filename_prop["description"]
+        assert "Relative path to the target file" in filename_prop["description"]
         
         # Check content parameter
         content_prop = params["properties"]["content"]
