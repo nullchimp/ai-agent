@@ -8,7 +8,7 @@ from api.models import (
     QueryRequest, QueryResponse, ToolsListResponse, ToolToggleRequest,
     ToolToggleResponse, ToolInfo, DebugResponse, DebugRequest, NewSessionResponse
 )
-from core.debug_capture import get_debug_capture_instance, get_all_debug_events, clear_all_debug_events
+from core.debug_capture import get_debug_capture_instance, get_all_debug_events, clear_all_debug_events, delete_debug_capture_instance
 from core.mcp.sessions_manager import MCPSessionManager
 
 session_router = APIRouter(prefix="/api")
@@ -18,6 +18,10 @@ api_router = APIRouter(prefix="/api/{session_id}", dependencies=[Depends(get_api
 async def new_session():
     session_id = str(uuid.uuid4())
     agent_instance = get_agent_instance(session_id)
+    
+    # Enable debug capture for this session by default
+    debug_capture = get_debug_capture_instance(session_id)
+    debug_capture.enable()
     
     try:
         config_path = os.path.join(os.path.dirname(__file__), '..', '..', 'config', 'mcp.json')
@@ -33,6 +37,8 @@ async def new_session():
 @session_router.delete("/session/{session_id}")
 async def delete_session(session_id: str):
     if delete_agent_instance(session_id):
+        # Also clean up the debug capture instance for this session
+        delete_debug_capture_instance(session_id)
         return Response(status_code=204)
     else:
         raise HTTPException(status_code=404, detail="Session not found")

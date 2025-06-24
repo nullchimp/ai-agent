@@ -16,7 +16,7 @@ DEFAULT_TIMEOUT = 30.0
 from core import is_debug
 class Chat:
     def __init__(self, tool_list: List[Tool] = [], session_id: str = "default"):
-        self.chat_client: ChatClient = ChatClient()
+        self.chat_client: ChatClient = ChatClient(session_id=session_id)
         self.tool_map = {tool.name: tool for tool in tool_list}
         self.tools: List[Tool] = [tool for tool in tool_list]
         self.session_id = session_id
