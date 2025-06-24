@@ -15,10 +15,11 @@ DEFAULT_TIMEOUT = 30.0
 
 from core import is_debug
 class Chat:
-    def __init__(self, tool_list: List[Tool] = []):
+    def __init__(self, tool_list: List[Tool] = [], session_id: str = "default"):
         self.chat_client: ChatClient = ChatClient()
         self.tool_map = {tool.name: tool for tool in tool_list}
         self.tools: List[Tool] = [tool for tool in tool_list]
+        self.session_id = session_id
     
     def add_tool(self, tool: Tool) -> None:
         self.tool_map[tool.name] = tool
@@ -48,7 +49,7 @@ class Chat:
         raise ValueError(f"Tool '{tool_name}' not found in the chat tools.")
 
     @classmethod
-    def create(cls, tool_list = []) -> 'Chat':
+    def create(cls, tool_list = [], session_id: str = "default") -> 'Chat':
         api_key = os.environ.get(DEFAULT_API_KEY_ENV)
         if not api_key:
             raise ValueError(f"{DEFAULT_API_KEY_ENV} environment variable is required")
@@ -58,7 +59,7 @@ class Chat:
                 print(colorize_text(f"<Tool Initialized: {colorize_text(tool.name, "yellow")}>", "cyan"))
             print("\n")
 
-        return cls(tool_list)
+        return cls(tool_list, session_id)
     
     async def send_messages(
         self,
@@ -98,7 +99,7 @@ class Chat:
             except json.JSONDecodeError:
                 args = {}
                 
-            debug_capture = get_debug_capture()
+            debug_capture = get_debug_capture(self.session_id)
             if debug_capture:
                 debug_capture.capture_tool_call(tool_name, args)
 
@@ -113,7 +114,7 @@ class Chat:
                     tools_used.append(tool_name)
                     if is_debug():
                         print(colorize_text(f"<Tool Result: {colorize_text(tool_name, "green")}> ", "yellow"), prettify(tool_result))
-                    debug_capture = get_debug_capture()
+                    debug_capture = get_debug_capture(self.session_id)
                     if debug_capture:
                         debug_capture.capture_tool_result(tool_name, tool_result)
                 except Exception as e:
@@ -122,7 +123,7 @@ class Chat:
                     }
                     if is_debug():
                         print(colorize_text(f"<Tool Exception: {colorize_text(tool_name, "red")}> ", "yellow"), str(e))
-                    debug_capture = get_debug_capture()
+                    debug_capture = get_debug_capture(self.session_id)
                     if debug_capture:
                         debug_capture.capture_tool_error(tool_name, str(e))
             

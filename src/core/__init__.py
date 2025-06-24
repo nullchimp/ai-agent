@@ -23,10 +23,10 @@ is_debug = debugger.is_debug
 set_debug = debugger.set_debug
 
 # Import debug_capture after the debugger is set up to avoid circular imports
-def get_debug_capture():
+def get_debug_capture(session_id: str = "default"):
     try:
-        from core.debug_capture import debug_capture
-        return debug_capture
+        from core.debug_capture import get_debug_capture_instance
+        return get_debug_capture_instance(session_id)
     except ImportError:
         return None
 
