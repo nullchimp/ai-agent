@@ -8,6 +8,14 @@ interface Message {
     content: string;
     role: 'user' | 'assistant';
     timestamp: Date;
+    usedTools?: string[];
+}
+
+interface Tool {
+    name: string;
+    description: string;
+    enabled: boolean;
+    parameters: Record<string, any>;
 }
 
 interface ChatSession {
@@ -23,8 +31,11 @@ class ChatApp {
     private sendBtn: HTMLButtonElement;
     private chatHistory: HTMLElement;
     private newChatBtn: HTMLButtonElement;
+    private toolsHeader: HTMLElement;
+    private toolsList: HTMLElement;
     private currentSession: ChatSession | null = null;
     private sessions: ChatSession[] = [];
+    private tools: Tool[] = [];
 
     private apiBaseUrl = 'http://localhost:5555/api';
 
@@ -34,13 +45,16 @@ class ChatApp {
         this.sendBtn = document.getElementById('sendBtn') as HTMLButtonElement;
         this.chatHistory = document.getElementById('chatHistory') as HTMLElement;
         this.newChatBtn = document.getElementById('newChatBtn') as HTMLButtonElement;
+        this.toolsHeader = document.getElementById('toolsHeader') as HTMLElement;
+        this.toolsList = document.getElementById('toolsList') as HTMLElement;
 
         this.init();
     }
 
-    private init(): void {
+    private async init(): Promise<void> {
         this.loadChatHistory();
         this.setupEventListeners();
+        await this.loadTools();
         
         // Only create a new session if no sessions exist
         if (this.sessions.length === 0) {
@@ -70,6 +84,8 @@ class ChatApp {
         });
 
         this.newChatBtn.addEventListener('click', () => this.createNewSession());
+
+        this.toolsHeader.addEventListener('click', () => this.toggleToolsSection());
     }
 
     private adjustTextareaHeight(): void {
@@ -102,14 +118,15 @@ class ChatApp {
         this.showTypingIndicator();
 
         try {
-            const response = await this.callAPI(content);
+            const apiResponse = await this.callAPI(content);
             this.hideTypingIndicator();
 
             const assistantMessage: Message = {
                 id: this.generateId(),
-                content: response,
+                content: apiResponse.response,
                 role: 'assistant',
-                timestamp: new Date()
+                timestamp: new Date(),
+                usedTools: apiResponse.usedTools
             };
 
             this.currentSession.messages.push(assistantMessage);
@@ -124,7 +141,7 @@ class ChatApp {
         }
     }
 
-    private async callAPI(message: string): Promise<string> {
+    private async callAPI(message: string): Promise<{response: string, usedTools: string[]}> {
         try {
             const response = await fetch(`${this.apiBaseUrl}/ask`, {
                 method: 'POST',
@@ -142,10 +159,17 @@ class ChatApp {
             }
 
             const data = await response.json();
-            return data.response || 'Sorry, I couldn\'t process your request.';
+            console.log('API Response Data:', data); // Debug log
+            return {
+                response: data.response || 'Sorry, I couldn\'t process your request.',
+                usedTools: data.used_tools || []
+            };
         } catch (error) {
             console.error('API call failed:', error);
-            return 'An error occurred while communicating with the AI.';
+            return {
+                response: 'An error occurred while communicating with the AI.',
+                usedTools: []
+            };
         }
     }
 
@@ -159,6 +183,22 @@ class ChatApp {
         
         const content = document.createElement('div');
         content.className = 'message-content';
+
+        // Add tool tags at the top for assistant messages
+        if (message.role === 'assistant' && message.usedTools && message.usedTools.length > 0) {
+            console.log('Adding tool tags:', message.usedTools); // Debug log
+            const toolsContainer = document.createElement('div');
+            toolsContainer.className = 'tool-tags';
+            
+            message.usedTools.forEach(tool => {
+                const toolTag = document.createElement('span');
+                toolTag.className = 'tool-tag';
+                toolTag.textContent = tool.toLowerCase();
+                toolsContainer.appendChild(toolTag);
+            });
+            
+            content.appendChild(toolsContainer);
+        }
         
         const text = document.createElement('div');
         text.className = 'message-text';
@@ -172,6 +212,7 @@ class ChatApp {
         }
         
         content.appendChild(text);
+        
         messageEl.appendChild(avatar);
         messageEl.appendChild(content);
         
@@ -377,6 +418,165 @@ class ChatApp {
         
         this.saveChatHistory();
         this.renderChatHistory();
+    }
+
+    // Tool management methods
+    private async loadTools(): Promise<void> {
+        try {
+            const response = await fetch(`${this.apiBaseUrl}/tools`, {
+                headers: {
+                    'X-API-Key': 'test_12345'
+                }
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                this.tools = data.tools || [];
+                this.renderTools();
+            }
+        } catch (error) {
+            console.error('Failed to load tools:', error);
+        }
+    }
+
+    private toggleToolsSection(): void {
+        const isExpanded = this.toolsHeader.classList.contains('expanded');
+        
+        if (isExpanded) {
+            this.toolsHeader.classList.remove('expanded');
+            this.toolsList.classList.remove('expanded');
+        } else {
+            this.toolsHeader.classList.add('expanded');
+            this.toolsList.classList.add('expanded');
+        }
+    }
+
+    private renderTools(): void {
+        this.toolsList.innerHTML = '';
+        
+        // Add toggle all item at the top
+        const toggleAllItem = document.createElement('div');
+        toggleAllItem.className = 'disable-all-item';
+        
+        const toggleAllName = document.createElement('div');
+        toggleAllName.className = 'disable-all-name';
+        toggleAllName.textContent = 'Toggle All Tools';
+        
+        const toggleAllDescription = document.createElement('div');
+        toggleAllDescription.className = 'disable-all-description';
+        toggleAllDescription.textContent = 'Enable or disable all tools at once';
+        
+        const enabledCount = this.tools.filter(tool => tool.enabled).length;
+        const totalCount = this.tools.length;
+        const allEnabled = enabledCount === totalCount;
+        
+        // Update the tools configuration text to show active/total format
+        const toolsLabelSpan = this.toolsHeader.querySelector('.tools-label span');
+        if (toolsLabelSpan) {
+            toolsLabelSpan.textContent = `Tools Configuration [${enabledCount}/${totalCount}]`;
+        }
+        
+        const toggleAllToggle = document.createElement('div');
+        toggleAllToggle.className = `tool-toggle ${allEnabled ? 'enabled' : ''}`;
+        toggleAllToggle.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.toggleAllTools(!allEnabled);
+        });
+        
+        toggleAllItem.appendChild(toggleAllName);
+        toggleAllItem.appendChild(toggleAllDescription);
+        toggleAllItem.appendChild(toggleAllToggle);
+        
+        this.toolsList.appendChild(toggleAllItem);
+        
+        // Sort tools alphabetically by name
+        const sortedTools = [...this.tools].sort((a, b) => a.name.localeCompare(b.name));
+        
+        sortedTools.forEach(tool => {
+            const toolItem = document.createElement('div');
+            toolItem.className = 'tool-item';
+            
+            const toolName = document.createElement('div');
+            toolName.className = 'tool-name';
+            toolName.textContent = tool.name;
+            
+            const toolDescription = document.createElement('div');
+            toolDescription.className = 'tool-description';
+            toolDescription.textContent = tool.description;
+            toolDescription.title = tool.description; // Show full description on hover
+            
+            const toolToggle = document.createElement('div');
+            toolToggle.className = `tool-toggle ${tool.enabled ? 'enabled' : ''}`;
+            toolToggle.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.toggleTool(tool.name, !tool.enabled);
+            });
+            
+            toolItem.appendChild(toolName);
+            toolItem.appendChild(toolDescription);
+            toolItem.appendChild(toolToggle);
+            
+            this.toolsList.appendChild(toolItem);
+        });
+    }
+
+    private async toggleTool(toolName: string, enabled: boolean): Promise<void> {
+        try {
+            const response = await fetch(`${this.apiBaseUrl}/tools/toggle`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-API-Key': 'test_12345'
+                },
+                body: JSON.stringify({
+                    tool_name: toolName,
+                    enabled: enabled
+                })
+            });
+
+            if (response.ok) {
+                // Update the local tool state
+                const tool = this.tools.find(t => t.name === toolName);
+                if (tool) {
+                    tool.enabled = enabled;
+                    this.renderTools();
+                }
+            } else {
+                console.error('Failed to toggle tool:', await response.text());
+            }
+        } catch (error) {
+            console.error('Error toggling tool:', error);
+        }
+    }
+
+    private async toggleAllTools(enabled: boolean): Promise<void> {
+        const toolsToChange = this.tools.filter(tool => tool.enabled !== enabled);
+        
+        for (const tool of toolsToChange) {
+            try {
+                const response = await fetch(`${this.apiBaseUrl}/tools/toggle`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-API-Key': 'test_12345'
+                    },
+                    body: JSON.stringify({
+                        tool_name: tool.name,
+                        enabled: enabled
+                    })
+                });
+
+                if (response.ok) {
+                    tool.enabled = enabled;
+                } else {
+                    console.error(`Failed to ${enabled ? 'enable' : 'disable'} tool ${tool.name}:`, await response.text());
+                }
+            } catch (error) {
+                console.error(`Error ${enabled ? 'enabling' : 'disabling'} tool ${tool.name}:`, error);
+            }
+        }
+        
+        this.renderTools();
     }
 }
 

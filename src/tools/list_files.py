@@ -8,7 +8,7 @@ class ListFiles(Tool):
     
     @property
     def description(self) -> str:
-        return "List files in a specified directory within a secure base directory."
+        return "List files and directories within a specified directory path, constrained to operate within a secure base directory for security. Returns comprehensive file listing with metadata including file names, types, and directory structure. Supports recursive directory traversal within security boundaries."
     
     @property
     def parameters(self) -> dict:
@@ -17,11 +17,11 @@ class ListFiles(Tool):
             "properties": {
                 "base_dir": {
                     "type": "string",
-                    "description": "Base directory for file operations"
+                    "description": "Absolute path to the base directory that serves as the security boundary for all file operations. All file access is restricted to this directory and its subdirectories."
                 },
                 "directory": {
                     "type": "string",
-                    "description": "The relative subdirectory path to list files from (default: '.')"
+                    "description": "Relative path to the subdirectory within base_dir to list files from. Defaults to '.' for current directory. Path traversal attacks are prevented by security validation."
                 }
             },
             "required": ["base_dir"]

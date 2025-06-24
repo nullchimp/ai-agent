@@ -55,6 +55,23 @@ class Agent:
 
     def add_tool(self, tool: Tool) -> None:
         self.chat.add_tool(tool)
+    
+    def enable_tool(self, tool_name: str) -> None:
+        try:
+            self.chat.enable_tool(tool_name)
+        except Exception as e:
+            return False
+        return True
+
+    def disable_tool(self, tool_name: str) -> None:
+        try:
+            self.chat.disable_tool(tool_name)
+        except Exception as e:
+            return False
+        return True
+
+    def get_tools(self) -> list:
+        return self.chat.get_tools()
 
     async def process_query(self, user_prompt: str) -> str:
         user_role = {"role": "user", "content": user_prompt}
@@ -68,10 +85,13 @@ class Agent:
         assistant_message = choices[0].get("message", {})
         messages.append(assistant_message)
         
+        tools_used = set()
         # Handle the case where tool_calls might be missing or not a list
         while assistant_message.get("tool_calls"):
-            await self.chat.process_tool_calls(assistant_message, messages.append)
-            
+            used_tools = await self.chat.process_tool_calls(assistant_message, messages.append)
+            for tool in used_tools:
+                tools_used.add(tool)
+
             response = await self.chat.send_messages(messages)
             if not (response and response.get("choices", None)):
                 break
@@ -85,7 +105,7 @@ class Agent:
             self.history.append(assistant_message)
             
         pretty_print("History", self.history)
-        return result
+        return result, tools_used
 
 
 # Global agent instance for backwards compatibility

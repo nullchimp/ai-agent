@@ -7,7 +7,7 @@ class WriteFile(Tool):
     
     @property
     def description(self) -> str:
-        return "Write content to a specified file within a secure base directory."
+        return "Write or overwrite content to a specified file within security-constrained base directory boundaries. Creates directories as needed and handles text encoding automatically. Supports creating new files or updating existing ones with comprehensive error handling for permission issues, disk space, and path validation. File operations are restricted to the specified base directory to prevent path traversal vulnerabilities."
     
     @property
     def parameters(self) -> dict:
@@ -16,15 +16,15 @@ class WriteFile(Tool):
             "properties": {
                 "base_dir": {
                     "type": "string",
-                    "description": "Base directory for file operations"
+                    "description": "Absolute path to the base directory that serves as the security boundary for all file operations. All file access is restricted to this directory and its subdirectories."
                 },
                 "filename": {
                     "type": "string",
-                    "description": "The name of the file to write to (relative path)"
+                    "description": "Relative path to the target file within base_dir. Can include subdirectory paths which will be created if they don't exist. Path traversal attempts (../) are automatically prevented by security validation."
                 },
                 "content": {
                     "type": "string",
-                    "description": "The content to write to the file"
+                    "description": "The text content to write to the file. Existing file content will be completely replaced. Unicode and special characters are supported with automatic encoding handling."
                 }
             },
             "required": ["base_dir", "filename", "content"]

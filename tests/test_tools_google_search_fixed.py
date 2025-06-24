@@ -15,7 +15,7 @@ class TestGoogleSearch:
         assert google_search_tool.name == "google_search"
     
     def test_description_property(self, google_search_tool):
-        expected_description = "Search the web for relevant information."
+        expected_description = "Perform web searches using Google Custom Search API to retrieve relevant information from the internet. Returns structured search results including titles, URLs, snippets, and metadata. Supports configurable result limits and provides search performance metrics. Requires valid Google API credentials and custom search engine configuration."
         assert google_search_tool.description == expected_description
     
     def test_parameters_property(self, google_search_tool):
