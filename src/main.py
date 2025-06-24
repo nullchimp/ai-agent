@@ -18,7 +18,7 @@ async def cli_main():
     session_manager = MCPSessionManager()
     await session_manager.discovery(path)
     for tool in session_manager.tools:
-        agent.add_tool(tool)
+        await agent.add_tool(tool)
 
     await agent_task()
 

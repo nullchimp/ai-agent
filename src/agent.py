@@ -2,11 +2,12 @@ from dotenv import load_dotenv
 load_dotenv(override=True)
 
 import asyncio
-
+import os
 from datetime import date
 
 from core import chatutil, graceful_exit, pretty_print
 from core.llm.chat import Chat
+from core.mcp.sessions_manager import MCPSessionManager
 
 from tools import Tool
 from tools.github_search import GitHubKnowledgebase
@@ -33,6 +34,7 @@ class Agent:
             tool.enable()
 
         self.session_id = session_id
+        self.mcp_initialized = False
 
         self.history = []
         self._update_system_prompt()
@@ -116,6 +118,21 @@ class Agent:
     def get_tools(self) -> list:
         return self.chat.get_tools()
 
+    async def initialize_mcp_tools(self):
+        if self.mcp_initialized:
+            return
+        
+        print("Initializing MCP tools...")
+
+        config_path = os.path.join(os.path.dirname(__file__), "..", "config", "mcp.json")
+        session_manager = MCPSessionManager()
+        await session_manager.discovery(config_path)
+        for tool in session_manager.tools:
+            self.add_tool(tool)
+
+        print("MCP tools initialized.")
+        self.mcp_initialized = True
+
     async def process_query(self, user_prompt: str) -> str:
         user_role = {"role": "user", "content": user_prompt}
 
@@ -152,12 +169,17 @@ class Agent:
         pretty_print("History", self.history)
         return result, tools_used
 
-def get_agent_instance(session_id: str = None) -> Agent:
+async def get_agent_instance(session_id: str = None) -> Agent:
     if not session_id:
         raise ValueError("Session ID must be provided to get agent instance.")
     
     if not session_id in _agent_sessions:
-        _agent_sessions[session_id] = Agent(session_id)
+        print(f"Creating new agent instance for session: {session_id}")
+        agent: Agent = Agent(session_id)
+        print(f"Agent instance created with session ID: {agent.session_id}")
+        await agent.initialize_mcp_tools()
+
+        _agent_sessions[session_id] = agent
 
     return _agent_sessions[session_id]
 
@@ -172,13 +194,15 @@ def delete_agent_instance(session_id: str) -> bool:
     return False
 
 
-def add_tool(tool: Tool, session_id: str = "cli-session") -> None:
-    get_agent_instance(session_id).add_tool(tool)
+async def add_tool(tool: Tool, session_id: str = "cli-session") -> None:
+    agent = await get_agent_instance(session_id)
+    agent.add_tool(tool)
 
 @graceful_exit
 @chatutil("Agent")
 async def run_conversation(user_prompt, session_id: str = "cli-session") -> str:
-    result = await get_agent_instance(session_id).process_query(user_prompt)
+    agent = await get_agent_instance(session_id)
+    result = await agent.process_query(user_prompt)
     pretty_print("Result", result)
     return result
 

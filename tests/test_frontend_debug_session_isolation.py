@@ -1,52 +1,72 @@
 import pytest
 from unittest.mock import Mock, patch, AsyncMock
 from core.debug_capture import DebugCapture, get_debug_capture_instance, _debug_sessions
-from api.routes import session_router, api_router
+from api.app import create_app
+from agent import get_agent_instance
 from fastapi.testclient import TestClient
-from fastapi import FastAPI
 
 
 class TestDebugSessionIsolation:
     """Test that debug events are properly isolated per session in the frontend-backend integration"""
 
+    def setup_method(self):
+        # Clear all debug sessions between tests
+        _debug_sessions.clear()
+
     @pytest.fixture
     def app(self):
-        app = FastAPI()
-        app.include_router(session_router)
-        app.include_router(api_router)
-        return app
+        return create_app()
 
     @pytest.fixture
     def client(self, app):
         return TestClient(app)
 
     @pytest.fixture
-    def mock_agent_deps(self):
-        with patch("api.routes.get_agent_instance") as mock_get_agent:
+    def auth_headers(self):
+        return {"X-API-Key": "test_12345"}
+
+    @pytest.fixture
+    def mock_agent_deps(self, app):
+        # Mock the Agent class constructor to prevent MCP initialization
+        with patch('agent.Agent') as mock_agent_class, \
+             patch('agent.MCPSessionManager') as mock_mcp_manager:
+            
+            # Create a mock agent instance
             mock_agent = Mock()
+            mock_agent.session_id = "test_session"
             mock_agent.get_tools.return_value = []
-            mock_agent.process_query = AsyncMock(return_value=("Test response", set()))
-            mock_get_agent.return_value = mock_agent
+            
+            async def mock_process_query(query):
+                return ("Test response", set())
+            
+            mock_agent.process_query = mock_process_query
+            mock_agent.initialize_mcp_tools = AsyncMock()
+            
+            # Make the Agent constructor return our mock
+            mock_agent_class.return_value = mock_agent
+            
+            # Mock MCPSessionManager
+            mock_mcp_instance = Mock()
+            mock_mcp_instance.discovery = AsyncMock()
+            mock_mcp_instance.tools = []
+            mock_mcp_manager.return_value = mock_mcp_instance
+            
             yield mock_agent
 
     @pytest.fixture
     def mock_session_manager(self):
-        with patch("api.routes.MCPSessionManager") as mock_mgr:
-            mock_instance = Mock()
-            mock_instance.discovery = AsyncMock()
-            mock_instance.tools = []
-            mock_mgr.return_value = mock_instance
-            yield mock_instance
+        # No longer needed since route doesn't use MCPSessionManager
+        yield None
 
-    def test_debug_events_isolated_per_session(self, client, mock_agent_deps, mock_session_manager):
+    def test_debug_events_isolated_per_session(self, client, auth_headers, mock_agent_deps, mock_session_manager):
         """Test that debug events are properly isolated between different sessions"""
         
         # Create two sessions
-        response1 = client.post("/api/session/new")
+        response1 = client.get("/api/session/new")
         assert response1.status_code == 200
         session1_id = response1.json()["session_id"]
         
-        response2 = client.post("/api/session/new")
+        response2 = client.get("/api/session/new")
         assert response2.status_code == 200
         session2_id = response2.json()["session_id"]
         
@@ -66,7 +86,7 @@ class TestDebugSessionIsolation:
         debug2.capture_event("test_event_2", "Session 2 event", {"session": 2, "data": "session2_data"})
         
         # Verify session 1 debug endpoint only returns session 1 events
-        debug_response1 = client.get(f"/api/{session1_id}/debug", headers={"X-API-Key": "test_12345"})
+        debug_response1 = client.get(f"/api/{session1_id}/debug", headers=auth_headers)
         assert debug_response1.status_code == 200
         events1 = debug_response1.json()["events"]
         
@@ -93,10 +113,10 @@ class TestDebugSessionIsolation:
         """Test that clearing debug events only affects the specific session"""
         
         # Create two sessions
-        response1 = client.post("/api/session/new")
+        response1 = client.get("/api/session/new")
         session1_id = response1.json()["session_id"]
         
-        response2 = client.post("/api/session/new")
+        response2 = client.get("/api/session/new")
         session2_id = response2.json()["session_id"]
         
         # Add events to both sessions
@@ -136,10 +156,10 @@ class TestDebugSessionIsolation:
         """Test that debug enable/disable is session-specific"""
         
         # Create two sessions
-        response1 = client.post("/api/session/new")
+        response1 = client.get("/api/session/new")
         session1_id = response1.json()["session_id"]
         
-        response2 = client.post("/api/session/new")
+        response2 = client.get("/api/session/new")
         session2_id = response2.json()["session_id"]
         
         # Both should be disabled by default, so enable them first
@@ -175,7 +195,7 @@ class TestDebugSessionIsolation:
         """Test that deleting a session also cleans up its debug data"""
         
         # Create a session
-        response = client.post("/api/session/new")
+        response = client.get("/api/session/new")
         session_id = response.json()["session_id"]
         
         # Add debug events
@@ -201,7 +221,7 @@ class TestDebugSessionIsolation:
         """Test that a new session starts with empty debug state"""
         
         # Create a new session
-        response = client.post("/api/session/new")
+        response = client.get("/api/session/new")
         session_id = response.json()["session_id"]
         
         # Check debug state - should be disabled by default but with no events

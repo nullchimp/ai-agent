@@ -22,77 +22,69 @@ class TestSessionRoutes:
     """Test session creation and deletion routes"""
     
     @patch('api.routes.get_agent_instance')
-    @patch('api.routes.MCPSessionManager')
+    @patch('api.routes.get_debug_capture_instance')
     @patch('uuid.uuid4')
-    def test_create_new_session_success(self, mock_uuid, mock_mcp_manager, mock_get_agent, client):
-        """Test successful session creation"""
+    def test_get_session_new_success(self, mock_uuid, mock_get_debug, mock_get_agent, client):
+        """Test successful creation of new session"""
         # Setup mocks
         test_session_id = "test-session-123"
         mock_uuid.return_value = test_session_id
         
-        mock_agent = MagicMock()
+        mock_agent = AsyncMock()
         mock_get_agent.return_value = mock_agent
-        
-        mock_session_manager = AsyncMock()
-        mock_session_manager.tools = []
-        mock_mcp_manager.return_value = mock_session_manager
+        mock_get_debug.return_value = MagicMock()
         
         # Make request
-        response = client.post("/api/session/new")
+        response = client.get("/api/session/new")
         
         # Verify response
         assert response.status_code == 200
         data = response.json()
         assert data["session_id"] == test_session_id
-        assert data["message"] == "Session created successfully"
+        assert data["message"] == "Session is active"
         
-        # Verify agent was retrieved
+        # Verify agent and debug instances were retrieved
         mock_get_agent.assert_called_once_with(test_session_id)
+        mock_get_debug.assert_called_once_with(test_session_id)
         
     @patch('api.routes.get_agent_instance')
-    @patch('api.routes.MCPSessionManager')
-    @patch('uuid.uuid4')
-    def test_create_new_session_with_tools(self, mock_uuid, mock_mcp_manager, mock_get_agent, client):
-        """Test session creation with tool initialization"""
+    @patch('api.routes.get_debug_capture_instance')
+    def test_get_session_existing_success(self, mock_get_debug, mock_get_agent, client):
+        """Test getting existing session"""
         # Setup mocks
-        test_session_id = "test-session-123"
-        mock_uuid.return_value = test_session_id
+        test_session_id = "existing-session-456"
         
-        mock_agent = MagicMock()
+        mock_agent = AsyncMock()
         mock_get_agent.return_value = mock_agent
-        
-        mock_tool = MagicMock()
-        mock_session_manager = AsyncMock()
-        mock_session_manager.tools = [mock_tool]
-        mock_mcp_manager.return_value = mock_session_manager
+        mock_get_debug.return_value = MagicMock()
         
         # Make request
-        response = client.post("/api/session/new")
+        response = client.get(f"/api/session/{test_session_id}")
         
         # Verify response
         assert response.status_code == 200
         data = response.json()
         assert data["session_id"] == test_session_id
+        assert data["message"] == "Session is active"
         
-        # Verify tool was added to agent
-        mock_agent.add_tool.assert_called_once_with(mock_tool)
+        # Verify agent and debug instances were retrieved
+        mock_get_agent.assert_called_once_with(test_session_id)
+        mock_get_debug.assert_called_once_with(test_session_id)
         
     @patch('api.routes.get_agent_instance')
-    @patch('api.routes.MCPSessionManager')
-    @patch('uuid.uuid4')
-    def test_create_new_session_initialization_error(self, mock_uuid, mock_mcp_manager, mock_get_agent, client):
-        """Test session creation with initialization error"""
+    @patch('api.routes.get_debug_capture_instance')
+    def test_get_session_initialization_error(self, mock_get_debug, mock_get_agent, client):
+        """Test session get with initialization error"""
         # Setup mocks
-        test_session_id = "test-session-123"
-        mock_uuid.return_value = test_session_id
+        test_session_id = "error-session-789"
         
-        mock_get_agent.return_value = MagicMock()
+        mock_get_debug.return_value = MagicMock()
         
-        # Make session manager throw an error
-        mock_mcp_manager.side_effect = Exception("MCP initialization failed")
+        # Make agent initialization fail
+        mock_get_agent.side_effect = Exception("MCP initialization failed")
         
         # Make request
-        response = client.post("/api/session/new")
+        response = client.get(f"/api/session/{test_session_id}")
         
         # Verify error response
         assert response.status_code == 500

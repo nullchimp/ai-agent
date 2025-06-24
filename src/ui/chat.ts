@@ -64,6 +64,8 @@ class ChatApp {
     private debugEventsList: DebugEvent[] = [];
     private isCreatingSession: boolean = false;
     private isLoadingTools: boolean = false;
+    private isSendingMessage: boolean = false;
+    private isVerifyingSession: boolean = false;
 
     private apiBaseUrl = 'http://localhost:5555/api';
 
@@ -96,6 +98,8 @@ class ChatApp {
         this.loadChatHistory();
         this.setupEventListeners();
         
+        console.log('ChatApp initialized with', this.sessions.length, 'sessions loaded.');
+
         // Only create a new session if no sessions exist
         if (this.sessions.length === 0) {
             await this.createNewSession();
@@ -103,9 +107,16 @@ class ChatApp {
             // Load the most recent session
             this.currentSession = this.sessions[0];
             
-            // If the session doesn't have a backend sessionId, we'll create one when user sends a message
-            if (!this.currentSession.sessionId) {
-                console.log('Current session has no backend sessionId - will create when needed');
+            console.log('Loading existing session:', this.currentSession.sessionId);
+            // If the session has a backend sessionId, verify it exists
+            if (this.currentSession.sessionId) {
+                this.isVerifyingSession = true;
+                this.updateSendButtonState();
+                this.showSessionVerificationLoading();
+                await this.verifyBackendSession(this.currentSession.sessionId);
+                this.isVerifyingSession = false;
+                this.updateSendButtonState();
+                this.hideSessionVerificationLoading();
             }
             
             await this.loadSession(this.currentSession.id);
@@ -169,7 +180,19 @@ class ChatApp {
     private updateSendButtonState(): void {
         const hasContent = this.messageInput.value.trim().length > 0;
         const hasActiveSession = this.currentSession !== null;
-        this.sendBtn.disabled = !hasContent || !hasActiveSession;
+        const isLoading = this.isLoadingTools || this.isSendingMessage || this.isCreatingSession || this.isVerifyingSession;
+        
+        this.sendBtn.disabled = !hasContent || !hasActiveSession || isLoading;
+        this.messageInput.disabled = isLoading;
+        
+        // Add visual feedback for loading state
+        if (isLoading) {
+            this.messageInput.placeholder = 'Please wait...';
+            this.messageInput.classList.add('loading');
+        } else {
+            this.messageInput.placeholder = 'Type your message...';
+            this.messageInput.classList.remove('loading');
+        }
     }
 
     private updateNewChatButtonState(): void {
@@ -202,12 +225,15 @@ class ChatApp {
         const content = this.messageInput.value.trim();
         if (!content || !this.currentSession) return;
 
-        // If the current session doesn't have a backend session ID, create a new session
+        this.isSendingMessage = true;
+        this.updateSendButtonState();
+
+        // If the current session doesn't have a backend session ID, create one
         if (!this.currentSession.sessionId) {
             console.log('Creating backend session for existing frontend session...');
             try {
                 const response = await fetch(`${this.apiBaseUrl}/session/new`, {
-                    method: 'POST',
+                    method: 'GET',
                     headers: {
                         'Content-Type': 'application/json'
                     }
@@ -222,11 +248,15 @@ class ChatApp {
                     await this.loadTools();
                 } else {
                     this.showError('Failed to create backend session. Please try again.');
+                    this.isSendingMessage = false;
+                    this.updateSendButtonState();
                     return;
                 }
             } catch (error) {
                 console.error('Failed to create backend session:', error);
                 this.showError('Failed to create backend session. Please try again.');
+                this.isSendingMessage = false;
+                this.updateSendButtonState();
                 return;
             }
         }
@@ -273,6 +303,9 @@ class ChatApp {
             this.hideTypingIndicator();
             this.showError('Failed to get response. Please try again.');
             console.error('API Error:', error);
+        } finally {
+            this.isSendingMessage = false;
+            this.updateSendButtonState();
         }
     }
 
@@ -428,6 +461,7 @@ class ChatApp {
         
         this.isCreatingSession = true;
         this.updateNewChatButtonState();
+        this.updateSendButtonState();
         
         // Show loading state immediately
         this.clearMessages();
@@ -435,7 +469,7 @@ class ChatApp {
         try {
             // Create a new backend session
             const response = await fetch(`${this.apiBaseUrl}/session/new`, {
-                method: 'POST',
+                method: 'GET',
                 headers: {
                     'Content-Type': 'application/json'
                 }
@@ -478,6 +512,7 @@ class ChatApp {
         } finally {
             this.isCreatingSession = false;
             this.updateNewChatButtonState();
+            this.updateSendButtonState();
             // Clear the loading message and show the normal welcome message
             this.clearMessages();
         }
@@ -716,6 +751,7 @@ class ChatApp {
 
         this.isLoadingTools = true;
         this.renderToolsLoading();
+        this.updateSendButtonState();
 
         const toolsUrl = `${this.apiBaseUrl}/${this.currentSession.sessionId}/tools`;
         console.log(`Loading tools from: ${toolsUrl}`);
@@ -741,6 +777,7 @@ class ChatApp {
         } finally {
             this.isLoadingTools = false;
             this.renderTools();
+            this.updateSendButtonState();
         }
     }
 
@@ -1258,9 +1295,9 @@ class ChatApp {
             });
         }
         
+        this.updateSendButtonState();
         this.messageInput.disabled = true;
         this.messageInput.placeholder = "Create a new chat to start messaging...";
-        this.updateSendButtonState();
         
         // Clear tools and debug state for no active session
         this.tools = [];
@@ -1278,6 +1315,59 @@ class ChatApp {
         this.messageInput.disabled = false;
         this.messageInput.placeholder = "Message AI Agent...";
         this.updateSendButtonState();
+    }
+
+    private async verifyBackendSession(sessionId: string): Promise<void> {
+        try {
+            console.log(`Verifying backend session: ${sessionId}`);
+            const response = await fetch(`${this.apiBaseUrl}/session/${sessionId}`, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (response.ok) {
+                const sessionData = await response.json();
+                console.log(`Backend session ${sessionId} verified and reinitialized`);
+                // Session exists and is reinitialized
+                return;
+            } else {
+                console.warn(`Backend session ${sessionId} not found, will create new session when needed`);
+                // Clear the sessionId since backend session doesn't exist
+                if (this.currentSession) {
+                    this.currentSession.sessionId = undefined;
+                    this.saveChatHistory();
+                }
+            }
+        } catch (error) {
+            console.error(`Failed to verify backend session ${sessionId}:`, error);
+            // Clear the sessionId since we can't verify
+            if (this.currentSession) {
+                this.currentSession.sessionId = undefined;
+                this.saveChatHistory();
+            }
+        }
+    }
+
+    private showSessionVerificationLoading(): void {
+        this.messagesContainer.innerHTML = `
+            <div class="welcome-message">
+                <div class="session-verification-loading">
+                    <div class="loading-spinner"></div>
+                    <h1>Verifying session...</h1>
+                    <p>Checking if your previous session is still available.</p>
+                </div>
+            </div>
+        `;
+    }
+
+    private hideSessionVerificationLoading(): void {
+        // Clear the loading message - it will be replaced by the actual session content
+        const loadingEl = this.messagesContainer.querySelector('.session-verification-loading');
+        if (loadingEl) {
+            loadingEl.parentElement?.remove();
+        }
     }
 }
 

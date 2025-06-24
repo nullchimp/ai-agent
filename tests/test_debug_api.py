@@ -4,6 +4,7 @@ from fastapi.testclient import TestClient
 
 from api.app import create_app
 from core.debug_capture import get_debug_capture_instance, _debug_sessions, clear_all_debug_events
+from agent import get_agent_instance
 
 @pytest.fixture
 def client():
@@ -130,11 +131,21 @@ class TestDebugAPI:
     def test_ask_endpoint_sets_session_id(self, client, auth_headers):
         # This test is not as relevant with per-session captures
         # since session management is handled differently now
-        with patch('src.agent.get_agent_instance') as mock_get_agent:
-            mock_agent = MagicMock()
-            mock_agent.process_query.return_value = ("Test response", [])
-            mock_get_agent.return_value = mock_agent
+        mock_agent = MagicMock()
+        
+        # Mock the async process_query method to return an awaitable
+        async def mock_process_query(query):
+            return ("Test response", [])
+        
+        mock_agent.process_query = mock_process_query
+        
+        # Mock the dependency injection by overriding the app dependency
+        async def mock_get_agent_instance(session_id: str = None):
+            return mock_agent
             
+        client.app.dependency_overrides[get_agent_instance] = mock_get_agent_instance
+        
+        try:
             response = client.post(
                 "/api/test_session/ask",
                 json={"query": "test query"},
@@ -142,7 +153,14 @@ class TestDebugAPI:
             )
             
             # The main goal is that the request succeeds
-            assert response.status_code == 200 or response.status_code == 422  # Depends on API structure
+            assert response.status_code == 200
+            
+            data = response.json()
+            assert data["response"] == "Test response"
+            assert data["used_tools"] == []
+        finally:
+            # Clean up the dependency override
+            client.app.dependency_overrides.clear()
 
     def test_unauthorized_access(self, client):
         response = client.get("/api/test_session/debug")
