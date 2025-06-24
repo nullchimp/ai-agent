@@ -5,6 +5,8 @@ Tests for loading states in the frontend UI during new chat creation and tool in
 import pytest
 from unittest.mock import Mock, patch, AsyncMock
 import json
+import os
+from pathlib import Path
 
 
 class TestLoadingStates:
@@ -242,8 +244,13 @@ class TestLoadingStates:
 
     def test_css_loading_classes_exist(self):
         """Test that the required CSS classes for loading states exist."""
+        # Get the project root directory dynamically
+        current_dir = Path(__file__).parent
+        project_root = current_dir.parent
+        css_file = project_root / "src" / "ui" / "styles.css"
+        
         # Read the CSS file to check for loading-related classes
-        with open('/Users/nullchimp/Projects/ai-agent/src/ui/styles.css', 'r') as f:
+        with open(css_file, 'r') as f:
             css_content = f.read()
         
         # Check for required loading CSS classes
@@ -260,8 +267,13 @@ class TestLoadingStates:
 
     def test_html_structure_for_loading(self):
         """Test that the HTML structure supports loading states."""
+        # Get the project root directory dynamically
+        current_dir = Path(__file__).parent
+        project_root = current_dir.parent
+        html_file = project_root / "src" / "ui" / "index.html"
+        
         # Read the HTML file to check for loading-related structure
-        with open('/Users/nullchimp/Projects/ai-agent/src/ui/index.html', 'r') as f:
+        with open(html_file, 'r') as f:
             html_content = f.read()
         
         # Check that the new chat button has a span for text
