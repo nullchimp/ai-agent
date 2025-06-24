@@ -20,6 +20,7 @@ interface Tool {
 
 interface ChatSession {
     id: string;
+    sessionId?: string;  // Backend session ID (optional for backward compatibility)
     title: string;
     messages: Message[];
     createdAt: Date;
@@ -92,15 +93,20 @@ class ChatApp {
     private async init(): Promise<void> {
         this.loadChatHistory();
         this.setupEventListeners();
-        await this.loadTools();
         
         // Only create a new session if no sessions exist
         if (this.sessions.length === 0) {
-            this.createNewSession();
+            await this.createNewSession();
         } else {
             // Load the most recent session
             this.currentSession = this.sessions[0];
-            this.loadSession(this.currentSession.id);
+            
+            // If the session doesn't have a backend sessionId, we'll create one when user sends a message
+            if (!this.currentSession.sessionId) {
+                console.log('Current session has no backend sessionId - will create when needed');
+            }
+            
+            await this.loadSession(this.currentSession.id);
         }
         
         this.renderChatHistory();
@@ -163,6 +169,35 @@ class ChatApp {
         const content = this.messageInput.value.trim();
         if (!content || !this.currentSession) return;
 
+        // If the current session doesn't have a backend session ID, create a new session
+        if (!this.currentSession.sessionId) {
+            console.log('Creating backend session for existing frontend session...');
+            try {
+                const response = await fetch(`${this.apiBaseUrl}/session/new`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (response.ok) {
+                    const sessionData = await response.json();
+                    this.currentSession.sessionId = sessionData.session_id;
+                    console.log(`Created backend session: ${sessionData.session_id}`);
+                    this.saveChatHistory();
+                    // Reload tools for the new session
+                    await this.loadTools();
+                } else {
+                    this.showError('Failed to create backend session. Please try again.');
+                    return;
+                }
+            } catch (error) {
+                console.error('Failed to create backend session:', error);
+                this.showError('Failed to create backend session. Please try again.');
+                return;
+            }
+        }
+
         const userMessage: Message = {
             id: this.generateId(),
             content,
@@ -179,6 +214,7 @@ class ChatApp {
         this.showTypingIndicator();
 
         try {
+            console.log(`Sending message to session: ${this.currentSession.sessionId}`);
             const apiResponse = await this.callAPI(content);
             this.hideTypingIndicator();
 
@@ -208,8 +244,15 @@ class ChatApp {
     }
 
     private async callAPI(message: string): Promise<{response: string, usedTools: string[]}> {
+        if (!this.currentSession?.sessionId) {
+            throw new Error('No active session');
+        }
+
+        const apiUrl = `${this.apiBaseUrl}/${this.currentSession.sessionId}/ask`;
+        console.log(`Making API call to: ${apiUrl}`);
+
         try {
-            const response = await fetch(`${this.apiBaseUrl}/ask`, {
+            const response = await fetch(apiUrl, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -218,7 +261,7 @@ class ChatApp {
                 body: JSON.stringify({ query: message })
             });
 
-            console.log('API response status:', response);
+            console.log('API response status:', response.status);
 
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
@@ -347,20 +390,43 @@ class ChatApp {
         this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight;
     }
 
-    private createNewSession(): void {
-        const session: ChatSession = {
-            id: this.generateId(),
-            title: 'New Chat',
-            messages: [],
-            createdAt: new Date()
-        };
+    private async createNewSession(): Promise<void> {
+        try {
+            // Create a new backend session
+            const response = await fetch(`${this.apiBaseUrl}/session/new`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
 
-        this.sessions.unshift(session);
-        this.currentSession = session;
-        this.clearMessages();
-        this.renderChatHistory();
-        this.saveChatHistory();
-        this.messageInput.focus();
+            if (!response.ok) {
+                throw new Error(`Failed to create session: ${response.status}`);
+            }
+
+            const sessionData = await response.json();
+            
+            const session: ChatSession = {
+                id: this.generateId(),
+                sessionId: sessionData.session_id,  // Backend session ID
+                title: 'New Chat',
+                messages: [],
+                createdAt: new Date()
+            };
+
+            this.sessions.unshift(session);
+            this.currentSession = session;
+            this.clearMessages();
+            this.saveChatHistory(); // Save immediately after creating session
+            this.renderChatHistory();
+            this.messageInput.focus();
+            
+            // Reload tools for the new session
+            await this.loadTools();
+        } catch (error) {
+            console.error('Failed to create new session:', error);
+            this.showError('Failed to create new chat session. Please try again.');
+        }
     }
 
     private clearMessages(): void {
@@ -420,7 +486,7 @@ class ChatApp {
         });
     }
 
-    private loadSession(sessionId: string): void {
+    private async loadSession(sessionId: string): Promise<void> {
         const session = this.sessions.find(s => s.id === sessionId);
         if (!session) return;
 
@@ -432,10 +498,26 @@ class ChatApp {
         });
 
         this.renderChatHistory();
+        
+        // Load tools for the current session
+        await this.loadTools();
     }
 
     private saveChatHistory(): void {
-        localStorage.setItem('chatSessions', JSON.stringify(this.sessions));
+        try {
+            const sessionsToSave = this.sessions.map(session => ({
+                id: session.id,
+                sessionId: session.sessionId, // Ensure backend session ID is saved
+                title: session.title,
+                messages: session.messages,
+                createdAt: session.createdAt
+            }));
+            
+            localStorage.setItem('chatSessions', JSON.stringify(sessionsToSave));
+            console.log('Saved chat history:', sessionsToSave.length, 'sessions');
+        } catch (error) {
+            console.error('Failed to save chat history:', error);
+        }
     }
 
     private loadChatHistory(): void {
@@ -445,12 +527,18 @@ class ChatApp {
                 const parsed = JSON.parse(saved);
                 this.sessions = parsed.map((session: any) => ({
                     ...session,
+                    sessionId: session.sessionId || null, // Handle existing sessions without sessionId
                     createdAt: new Date(session.createdAt),
                     messages: session.messages.map((msg: any) => ({
                         ...msg,
                         timestamp: new Date(msg.timestamp)
                     }))
                 }));
+                
+                console.log('Loaded chat history:', this.sessions.length, 'sessions');
+                this.sessions.forEach(session => {
+                    console.log(`Session ${session.id}: backend sessionId = ${session.sessionId}`);
+                });
             } catch (error) {
                 console.error('Failed to load chat history:', error);
                 this.sessions = [];
@@ -462,9 +550,35 @@ class ChatApp {
         return Date.now().toString(36) + Math.random().toString(36).substr(2);
     }
 
-    private deleteSession(sessionId: string): void {
+    private async deleteSession(sessionId: string): Promise<void> {
         const sessionIndex = this.sessions.findIndex(s => s.id === sessionId);
         if (sessionIndex === -1) return;
+        
+        const session = this.sessions[sessionIndex];
+        console.log(`Deleting session: frontend ID=${session.id}, backend ID=${session.sessionId}`);
+        
+        try {
+            // Delete the backend session
+            if (session.sessionId) {
+                const deleteUrl = `${this.apiBaseUrl}/session/${session.sessionId}`;
+                console.log(`Deleting backend session at: ${deleteUrl}`);
+                
+                const response = await fetch(deleteUrl, {
+                    method: 'DELETE'
+                });
+                
+                if (!response.ok && response.status !== 404) {
+                    console.warn(`Failed to delete backend session ${session.sessionId}: ${response.status}`);
+                } else {
+                    console.log(`Successfully deleted backend session ${session.sessionId}`);
+                }
+            } else {
+                console.log('No backend session ID to delete');
+            }
+        } catch (error) {
+            console.error('Failed to delete backend session:', error);
+            // Continue with frontend cleanup even if backend deletion fails
+        }
         
         // Remove the session from the array
         this.sessions.splice(sessionIndex, 1);
@@ -474,10 +588,10 @@ class ChatApp {
             if (this.sessions.length > 0) {
                 // Load the first available session
                 this.currentSession = this.sessions[0];
-                this.loadSession(this.currentSession.id);
+                await this.loadSession(this.currentSession.id);
             } else {
                 // No sessions left, create a new one
-                this.createNewSession();
+                await this.createNewSession();
                 return; // createNewSession already saves and renders
             }
         }
@@ -488,8 +602,18 @@ class ChatApp {
 
     // Tool management methods
     private async loadTools(): Promise<void> {
+        if (!this.currentSession?.sessionId) {
+            console.log('No session ID available for loading tools');
+            this.tools = [];
+            this.renderTools();
+            return;
+        }
+
+        const toolsUrl = `${this.apiBaseUrl}/${this.currentSession.sessionId}/tools`;
+        console.log(`Loading tools from: ${toolsUrl}`);
+
         try {
-            const response = await fetch(`${this.apiBaseUrl}/tools`, {
+            const response = await fetch(toolsUrl, {
                 headers: {
                     'X-API-Key': 'test_12345'
                 }
@@ -498,7 +622,10 @@ class ChatApp {
             if (response.ok) {
                 const data = await response.json();
                 this.tools = data.tools || [];
+                console.log(`Loaded ${this.tools.length} tools:`, this.tools.map(t => t.name));
                 this.renderTools();
+            } else {
+                console.error(`Failed to load tools: ${response.status}`);
             }
         } catch (error) {
             console.error('Failed to load tools:', error);
@@ -587,8 +714,16 @@ class ChatApp {
     }
 
     private async toggleTool(toolName: string, enabled: boolean): Promise<void> {
+        if (!this.currentSession?.sessionId) {
+            console.error('No active session for tool toggle');
+            return;
+        }
+
+        const toggleUrl = `${this.apiBaseUrl}/${this.currentSession.sessionId}/tools/toggle`;
+        console.log(`Toggling tool ${toolName} to ${enabled} at: ${toggleUrl}`);
+
         try {
-            const response = await fetch(`${this.apiBaseUrl}/tools/toggle`, {
+            const response = await fetch(toggleUrl, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -607,6 +742,7 @@ class ChatApp {
                     tool.enabled = enabled;
                     this.renderTools();
                 }
+                console.log(`Successfully toggled tool ${toolName} to ${enabled}`);
             } else {
                 console.error('Failed to toggle tool:', await response.text());
             }
@@ -616,11 +752,16 @@ class ChatApp {
     }
 
     private async toggleAllTools(enabled: boolean): Promise<void> {
+        if (!this.currentSession?.sessionId) {
+            console.error('No active session for tool toggle');
+            return;
+        }
+
         const toolsToChange = this.tools.filter(tool => tool.enabled !== enabled);
         
         for (const tool of toolsToChange) {
             try {
-                const response = await fetch(`${this.apiBaseUrl}/tools/toggle`, {
+                const response = await fetch(`${this.apiBaseUrl}/${this.currentSession.sessionId}/tools/toggle`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -677,8 +818,13 @@ class ChatApp {
     }
 
     private async setDebugMode(enabled: boolean): Promise<void> {
+        if (!this.currentSession?.sessionId) {
+            console.error('No active session for debug mode');
+            return;
+        }
+
         try {
-            const response = await fetch(`${this.apiBaseUrl}/debug/toggle`, {
+            const response = await fetch(`${this.apiBaseUrl}/${this.currentSession.sessionId}/debug/toggle`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -702,8 +848,13 @@ class ChatApp {
     }
 
     private async clearDebugEvents(): Promise<void> {
+        if (!this.currentSession?.sessionId) {
+            console.error('No active session for debug events');
+            return;
+        }
+
         try {
-            const response = await fetch(`${this.apiBaseUrl}/debug`, {
+            const response = await fetch(`${this.apiBaseUrl}/${this.currentSession.sessionId}/debug`, {
                 method: 'DELETE',
                 headers: {
                     'X-API-Key': 'test_12345'
@@ -722,8 +873,13 @@ class ChatApp {
     }
 
     private async loadDebugEvents(): Promise<void> {
+        if (!this.currentSession?.sessionId) {
+            console.error('No active session for debug events');
+            return;
+        }
+
         try {
-            const response = await fetch(`${this.apiBaseUrl}/debug`, {
+            const response = await fetch(`${this.apiBaseUrl}/${this.currentSession.sessionId}/debug`, {
                 headers: {
                     'X-API-Key': 'test_12345'
                 }

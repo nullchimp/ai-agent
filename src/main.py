@@ -6,8 +6,6 @@ import argparse
 from core import graceful_exit, mainloop
 from core.mcp.sessions_manager import MCPSessionManager
 
-session_manager = MCPSessionManager()
-
 @mainloop
 @graceful_exit
 async def agent_task():
@@ -16,6 +14,8 @@ async def agent_task():
 @graceful_exit
 async def cli_main():
     path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../config', 'mcp.json')
+   
+    session_manager = MCPSessionManager()
     await session_manager.discovery(path)
     for tool in session_manager.tools:
         agent.add_tool(tool)

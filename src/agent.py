@@ -1,6 +1,8 @@
 from dotenv import load_dotenv
-
 load_dotenv(override=True)
+
+import asyncio
+from functools import wraps
 
 from datetime import date
 
@@ -14,9 +16,28 @@ from tools.read_file import ReadFile
 from tools.write_file import WriteFile
 from tools.list_files import ListFiles
 
+_agent_sessions = {}
+
+def persist_session(func):
+    if asyncio.iscoroutinefunction(func):
+        @wraps(func)
+        async def async_wrapper(self, *args, **kwargs):
+            result = await func(self, *args, **kwargs)
+            if hasattr(self, 'session_id'):
+                _agent_sessions[self.session_id] = self
+            return result
+        return async_wrapper
+    
+    @wraps(func)
+    def sync_wrapper(self, *args, **kwargs):
+        result = func(self, *args, **kwargs)
+        if hasattr(self, 'session_id'):
+            _agent_sessions[self.session_id] = self
+        return result
+    return sync_wrapper
 
 class Agent:
-    def __init__(self):
+    def __init__(self, session_id: str = "cli-session"):
         self.tools = {
             GitHubKnowledgebase(),
             GoogleSearch(),
@@ -30,15 +51,19 @@ class Agent:
         for tool in self.chat.tools:
             tool.enable()
 
+        self.session_id = session_id
+
         self.history = []
         self._update_system_prompt()
 
+    @persist_session
     def _get_available_tools_text(self) -> str:
         enabled_tools = [tool.name for tool in self.chat.tools if tool.enabled]
         if not enabled_tools:
             return "No tools are currently available."
         return f"Currently available tools: {', '.join(enabled_tools)}"
 
+    @persist_session
     def _update_system_prompt(self) -> None:
         available_tools_text = self._get_available_tools_text()
 
@@ -89,10 +114,12 @@ class Agent:
         else:
             self.history.insert(0, {"role": "system", "content": system_role})
 
+    @persist_session
     def add_tool(self, tool: Tool) -> None:
         self.chat.add_tool(tool)
         self._update_system_prompt()
 
+    @persist_session
     def enable_tool(self, tool_name: str) -> bool:
         try:
             self.chat.enable_tool(tool_name)
@@ -101,6 +128,7 @@ class Agent:
             return False
         return True
 
+    @persist_session
     def disable_tool(self, tool_name: str) -> bool:
         try:
             self.chat.disable_tool(tool_name)
@@ -109,9 +137,11 @@ class Agent:
             return False
         return True
 
+    @persist_session
     def get_tools(self) -> list:
         return self.chat.get_tools()
 
+    @persist_session
     async def process_query(self, user_prompt: str) -> str:
         user_role = {"role": "user", "content": user_prompt}
 
@@ -148,24 +178,33 @@ class Agent:
         pretty_print("History", self.history)
         return result, tools_used
 
+def get_agent_instance(session_id: str = None) -> Agent:
+    if not session_id:
+        raise ValueError("Session ID must be provided to get agent instance.")
+    
+    if not session_id in _agent_sessions:
+        _agent_sessions[session_id] = Agent(session_id)
 
-# Global agent instance for backwards compatibility
-agent_instance = Agent()
+    return _agent_sessions[session_id]
 
 
-def add_tool(tool: Tool) -> None:
-    agent_instance.add_tool(tool)
+def delete_agent_instance(session_id: str) -> bool:
+    if session_id in _agent_sessions:
+        del _agent_sessions[session_id]
+        return True
+    return False
 
+
+def add_tool(tool: Tool, session_id: str = "cli-session") -> None:
+    get_agent_instance(session_id).add_tool(tool)
 
 @graceful_exit
 @chatutil("Agent")
-async def run_conversation(user_prompt) -> str:
-    result = await agent_instance.process_query(user_prompt)
+async def run_conversation(user_prompt, session_id: str = "cli-session") -> str:
+    result = await get_agent_instance(session_id).process_query(user_prompt)
     pretty_print("Result", result)
     return result
 
 
 if __name__ == "__main__":
-    import asyncio
-
     asyncio.run(run_conversation())
