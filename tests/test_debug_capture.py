@@ -2,21 +2,29 @@ import pytest
 from unittest.mock import patch, MagicMock
 from datetime import datetime
 
-from core.debug_capture import DebugCapture, DebugEvent, DebugEventType
+from core.debug_capture import (
+    DebugCapture, DebugEvent, DebugEventType, 
+    get_debug_capture_instance, delete_debug_capture_instance,
+    get_all_debug_events, clear_all_debug_events, _debug_sessions
+)
 
 class TestDebugCapture:
     def setup_method(self):
-        # Reset the singleton instance for each test
-        DebugCapture._instance = None
-        DebugCapture._session_id = None
+        # Clear all debug sessions for each test
+        _debug_sessions.clear()
 
-    def test_debug_capture_singleton(self):
-        capture1 = DebugCapture()
-        capture2 = DebugCapture()
-        assert capture1 is capture2
+    def test_debug_capture_per_session(self):
+        capture1 = get_debug_capture_instance("session1")
+        capture2 = get_debug_capture_instance("session1")
+        capture3 = get_debug_capture_instance("session2")
+        
+        assert capture1 is capture2  # Same session should return same instance
+        assert capture1 is not capture3  # Different sessions should be different instances
+        assert capture1.session_id == "session1"
+        assert capture3.session_id == "session2"
 
     def test_enable_disable_debug(self):
-        capture = DebugCapture()
+        capture = get_debug_capture_instance("test_session")
         assert not capture.is_enabled()
         
         capture.enable()
@@ -26,7 +34,7 @@ class TestDebugCapture:
         assert not capture.is_enabled()
 
     def test_capture_event_when_disabled(self):
-        capture = DebugCapture()
+        capture = get_debug_capture_instance("test_session")
         capture.disable()
         
         capture.capture_event(DebugEventType.TOOL_CALL, "test", {"key": "value"})
@@ -35,7 +43,7 @@ class TestDebugCapture:
         assert len(events) == 0
 
     def test_capture_event_when_enabled(self):
-        capture = DebugCapture()
+        capture = get_debug_capture_instance("test_session")
         capture.enable()
         
         capture.capture_event(DebugEventType.TOOL_CALL, "test", {"key": "value"})
@@ -47,49 +55,60 @@ class TestDebugCapture:
         assert events[0]["data"]["key"] == "value"
 
     def test_session_id_tracking(self):
-        capture = DebugCapture()
-        capture.enable()
+        capture1 = get_debug_capture_instance("session_1")
+        capture2 = get_debug_capture_instance("session_2")
         
-        capture.set_session_id("session_1")
-        capture.capture_event(DebugEventType.TOOL_CALL, "test1", {})
+        capture1.enable()
+        capture2.enable()
         
-        capture.set_session_id("session_2")
-        capture.capture_event(DebugEventType.TOOL_RESULT, "test2", {})
+        capture1.capture_event(DebugEventType.TOOL_CALL, "test1", {})
+        capture2.capture_event(DebugEventType.TOOL_RESULT, "test2", {})
         
-        all_events = capture.get_events()
+        events1 = capture1.get_events()
+        events2 = capture2.get_events()
+        
+        assert len(events1) == 1
+        assert len(events2) == 1
+        assert events1[0]["message"] == "test1"
+        assert events1[0]["session_id"] == "session_1"
+        assert events2[0]["message"] == "test2"
+        assert events2[0]["session_id"] == "session_2"
+        
+        # Test global events gathering
+        all_events = get_all_debug_events()
         assert len(all_events) == 2
         
-        session1_events = capture.get_events("session_1")
+        # Test filtering by session
+        session1_events = get_all_debug_events("session_1")
         assert len(session1_events) == 1
         assert session1_events[0]["message"] == "test1"
-        
-        session2_events = capture.get_events("session_2")
-        assert len(session2_events) == 1
-        assert session2_events[0]["message"] == "test2"
 
     def test_clear_events(self):
-        capture = DebugCapture()
-        capture.enable()
+        capture1 = get_debug_capture_instance("session_1")
+        capture2 = get_debug_capture_instance("session_2")
         
-        capture.set_session_id("session_1")
-        capture.capture_event(DebugEventType.TOOL_CALL, "test1", {})
+        capture1.enable()
+        capture2.enable()
         
-        capture.set_session_id("session_2")
-        capture.capture_event(DebugEventType.TOOL_RESULT, "test2", {})
+        capture1.capture_event(DebugEventType.TOOL_CALL, "test1", {})
+        capture2.capture_event(DebugEventType.TOOL_RESULT, "test2", {})
         
         # Clear specific session
-        capture.clear_events("session_1")
-        events = capture.get_events()
-        assert len(events) == 1
-        assert events[0]["message"] == "test2"
+        capture1.clear_events()
+        events1 = capture1.get_events()
+        events2 = capture2.get_events()
+        assert len(events1) == 0
+        assert len(events2) == 1
+        assert events2[0]["message"] == "test2"
         
-        # Clear all events
-        capture.clear_events()
-        events = capture.get_events()
-        assert len(events) == 0
+        # Test global clear
+        capture1.capture_event(DebugEventType.TOOL_CALL, "test3", {})
+        clear_all_debug_events()
+        assert len(capture1.get_events()) == 0
+        assert len(capture2.get_events()) == 0
 
     def test_max_events_limit(self):
-        capture = DebugCapture()
+        capture = get_debug_capture_instance("test_session")
         capture.enable()
         capture._max_events = 3  # Set low limit for testing
         
@@ -107,7 +126,7 @@ class TestDebugCapture:
         assert "test1" not in messages
 
     def test_capture_llm_request(self):
-        capture = DebugCapture()
+        capture = get_debug_capture_instance("test_session")
         capture.enable()
         
         payload = {"messages": [{"role": "user", "content": "test"}]}
@@ -130,7 +149,7 @@ class TestDebugCapture:
         assert "_messages_color" in captured_payload["_debug_colors"]
 
     def test_capture_tool_call(self):
-        capture = DebugCapture()
+        capture = get_debug_capture_instance("test_session")
         capture.enable()
         
         capture.capture_tool_call("google_search", {"query": "test"})
@@ -147,17 +166,27 @@ class TestDebugCapture:
         assert "_tool_name_color" in events[0]["data"]["_debug_colors"]
 
     def test_debug_event_to_dict(self):
-        with patch('core.debug_capture.DebugCapture.get_current_session_id', return_value="test_session"):
-            event = DebugEvent(
-                DebugEventType.TOOL_RESULT,
-                "Test message",
-                {"result": "success"},
-                datetime(2023, 1, 1, 12, 0, 0)
-            )
-            
-            event_dict = event.to_dict()
-            assert event_dict["event_type"] == DebugEventType.TOOL_RESULT
-            assert event_dict["message"] == "Test message"
-            assert event_dict["data"]["result"] == "success"
-            assert event_dict["timestamp"] == "2023-01-01T12:00:00"
-            assert event_dict["session_id"] == "test_session"
+        event = DebugEvent(
+            DebugEventType.TOOL_RESULT,
+            "Test message",
+            "test_session",
+            {"result": "success"},
+            datetime(2023, 1, 1, 12, 0, 0)
+        )
+        
+        event_dict = event.to_dict()
+        assert event_dict["event_type"] == DebugEventType.TOOL_RESULT
+        assert event_dict["message"] == "Test message"
+        assert event_dict["data"]["result"] == "success"
+        assert event_dict["timestamp"] == "2023-01-01T12:00:00"
+        assert event_dict["session_id"] == "test_session"
+
+    def test_delete_debug_capture_instance(self):
+        capture = get_debug_capture_instance("test_session")
+        capture.enable()
+        capture.capture_event(DebugEventType.TOOL_CALL, "test", {})
+        
+        assert len(_debug_sessions) == 1
+        assert delete_debug_capture_instance("test_session") == True
+        assert len(_debug_sessions) == 0
+        assert delete_debug_capture_instance("non_existent") == False

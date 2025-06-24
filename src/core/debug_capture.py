@@ -100,6 +100,7 @@ class DebugEvent:
         self,
         event_type: DebugEventType,
         message: str,
+        session_id: str,
         data: Optional[Dict[str, Any]] = None,
         timestamp: Optional[datetime] = None
     ):
@@ -107,7 +108,7 @@ class DebugEvent:
         self.message = message
         self.data = data or {}
         self.timestamp = timestamp or datetime.now()
-        self.session_id = DebugCapture.get_current_session_id()
+        self.session_id = session_id
 
     def to_dict(self) -> Dict[str, Any]:
         try:
@@ -129,19 +130,13 @@ class DebugEvent:
             }
 
 class DebugCapture:
-    _instance = None
     _lock = threading.Lock()
-    _session_id = None
 
-    def __new__(cls):
-        if cls._instance is None:
-            with cls._lock:
-                if cls._instance is None:
-                    cls._instance = super(DebugCapture, cls).__new__(cls)
-                    cls._instance._events = []
-                    cls._instance._max_events = 1000
-                    cls._instance._enabled = False
-        return cls._instance
+    def __init__(self, session_id: str):
+        self.session_id = session_id
+        self._events = []
+        self._max_events = 1000
+        self._enabled = False
 
     def enable(self):
         self._enabled = True
@@ -152,12 +147,8 @@ class DebugCapture:
     def is_enabled(self) -> bool:
         return self._enabled
 
-    def set_session_id(self, session_id: str):
-        DebugCapture._session_id = session_id
-
-    @classmethod
-    def get_current_session_id(cls) -> Optional[str]:
-        return cls._session_id
+    def get_current_session_id(self) -> str:
+        return self.session_id
 
     def capture_event(
         self,
@@ -168,30 +159,22 @@ class DebugCapture:
         if not self._enabled:
             return
 
-        # Safely serialize the data to prevent encoding issues
         safe_data = safe_serialize(data) if data else {}
         
-        event = DebugEvent(event_type, message, safe_data)
+        event = DebugEvent(event_type, message, self.session_id, safe_data)
         
         with self._lock:
             self._events.append(event)
-            # Keep only the last max_events
             if len(self._events) > self._max_events:
                 self._events = self._events[-self._max_events:]
 
-    def get_events(self, session_id: Optional[str] = None) -> List[Dict[str, Any]]:
+    def get_events(self) -> List[Dict[str, Any]]:
         with self._lock:
-            events = self._events
-            if session_id:
-                events = [e for e in events if e.session_id == session_id]
-            return [event.to_dict() for event in events]
+            return [event.to_dict() for event in self._events]
 
-    def clear_events(self, session_id: Optional[str] = None):
+    def clear_events(self):
         with self._lock:
-            if session_id:
-                self._events = [e for e in self._events if e.session_id != session_id]
-            else:
-                self._events = []
+            self._events = []
 
     def capture_llm_request(self, payload: Dict[str, Any]):
         self.capture_event(
@@ -242,4 +225,42 @@ class DebugCapture:
             {"tool_name": tool_name, "result": result}
         )
 
-debug_capture = DebugCapture()
+
+# Global session management
+_debug_sessions = {}
+
+def get_debug_capture_instance(session_id: str) -> DebugCapture:
+    if not session_id:
+        raise ValueError("Session ID must be provided to get debug capture instance.")
+    
+    if session_id not in _debug_sessions:
+        _debug_sessions[session_id] = DebugCapture(session_id)
+    
+    return _debug_sessions[session_id]
+
+def delete_debug_capture_instance(session_id: str) -> bool:
+    if session_id in _debug_sessions:
+        del _debug_sessions[session_id]
+        return True
+    return False
+
+def get_all_debug_events(session_id: Optional[str] = None) -> List[Dict[str, Any]]:
+    if session_id:
+        if session_id in _debug_sessions:
+            return _debug_sessions[session_id].get_events()
+        return []
+    
+    all_events = []
+    for capture in _debug_sessions.values():
+        all_events.extend(capture.get_events())
+    
+    all_events.sort(key=lambda x: x['timestamp'])
+    return all_events
+
+def clear_all_debug_events(session_id: Optional[str] = None):
+    if session_id:
+        if session_id in _debug_sessions:
+            _debug_sessions[session_id].clear_events()
+    else:
+        for capture in _debug_sessions.values():
+            capture.clear_events()

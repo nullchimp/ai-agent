@@ -8,7 +8,7 @@ from api.models import (
     QueryRequest, QueryResponse, ToolsListResponse, ToolToggleRequest,
     ToolToggleResponse, ToolInfo, DebugResponse, DebugRequest, NewSessionResponse
 )
-from core.debug_capture import debug_capture
+from core.debug_capture import get_debug_capture_instance, get_all_debug_events, clear_all_debug_events, delete_debug_capture_instance
 from core.mcp.sessions_manager import MCPSessionManager
 
 session_router = APIRouter(prefix="/api")
@@ -18,6 +18,8 @@ api_router = APIRouter(prefix="/api/{session_id}", dependencies=[Depends(get_api
 async def new_session():
     session_id = str(uuid.uuid4())
     agent_instance = get_agent_instance(session_id)
+
+    get_debug_capture_instance(session_id)
     
     try:
         config_path = os.path.join(os.path.dirname(__file__), '..', '..', 'config', 'mcp.json')
@@ -33,6 +35,8 @@ async def new_session():
 @session_router.delete("/session/{session_id}")
 async def delete_session(session_id: str):
     if delete_agent_instance(session_id):
+        # Also clean up the debug capture instance for this session
+        delete_debug_capture_instance(session_id)
         return Response(status_code=204)
     else:
         raise HTTPException(status_code=404, detail="Session not found")
@@ -41,7 +45,7 @@ async def delete_session(session_id: str):
 @api_router.post("/ask", response_model=QueryResponse)
 async def ask_agent(session_id: str, request: QueryRequest, agent_instance: Agent = Depends(get_agent_instance)) -> QueryResponse:
     try:
-        debug_capture.set_session_id(session_id)
+        # Debug capture is now per-session, no need to set session_id
         response, used_tools = await agent_instance.process_query(request.query)
         return QueryResponse(
             response=response,
@@ -99,7 +103,7 @@ async def toggle_tool(request: ToolToggleRequest, agent_instance: Agent = Depend
 @api_router.get("/debug", response_model=DebugResponse)
 async def get_debug_info(session_id: str) -> DebugResponse:
     try:
-        events = debug_capture.get_events(session_id)
+        events = get_all_debug_events(session_id)
         debug_events = [
             {
                 "event_type": event["event_type"],
@@ -110,20 +114,23 @@ async def get_debug_info(session_id: str) -> DebugResponse:
             }
             for event in events
         ]
-        return DebugResponse(events=debug_events, enabled=debug_capture.is_enabled())
+        # For checking if enabled, use the specific session
+        capture = get_debug_capture_instance(session_id)
+        return DebugResponse(events=debug_events, enabled=capture.is_enabled())
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error retrieving debug info: {str(e)}")
 
 
 @api_router.post("/debug/toggle", response_model=DebugResponse)
-async def toggle_debug(request: DebugRequest) -> DebugResponse:
+async def toggle_debug(session_id: str, request: DebugRequest) -> DebugResponse:
     try:
+        capture = get_debug_capture_instance(session_id)
         if request.enabled:
-            debug_capture.enable()
+            capture.enable()
         else:
-            debug_capture.disable()
+            capture.disable()
 
-        return DebugResponse(events=[], enabled=debug_capture.is_enabled())
+        return DebugResponse(events=[], enabled=capture.is_enabled())
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error toggling debug: {str(e)}")
 
@@ -131,7 +138,7 @@ async def toggle_debug(request: DebugRequest) -> DebugResponse:
 @api_router.delete("/debug")
 async def clear_debug_events(session_id: str) -> Response:
     try:
-        debug_capture.clear_events(session_id)
+        clear_all_debug_events(session_id)
         return Response(status_code=204)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error clearing debug events: {str(e)}")

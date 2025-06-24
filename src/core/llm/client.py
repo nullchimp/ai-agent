@@ -45,10 +45,12 @@ class EmbeddingsClient(Client):
     def __init__(
         self,
         model: str = None,
-        timeout: Optional[float] = None
+        timeout: Optional[float] = None,
+        session_id: str = "default"
     ):
         self.model = os.environ.get("AZURE_OPENAI_EMBEDDINGS_MODEL", model)
         self.endpoint = os.environ.get("AZURE_OPENAI_EMBEDDINGS_ENDPOINT", None)
+        self.session_id = session_id
         super().__init__(self.model, self.endpoint, timeout)
 
     async def make_request(
@@ -73,7 +75,7 @@ class EmbeddingsClient(Client):
         
         if is_debug():
             pretty_print("Agent -> Embeddings Model", payload, "magenta")
-        debug_capture = get_debug_capture()
+        debug_capture = get_debug_capture(self.session_id)
         if debug_capture:
             debug_capture.capture_llm_request(payload)
         
@@ -94,7 +96,7 @@ class EmbeddingsClient(Client):
         response_json = response.json()
         if is_debug():
             pretty_print("Embeddings Model -> Agent", response_json, "cyan")
-        debug_capture = get_debug_capture()
+        debug_capture = get_debug_capture(self.session_id)
         if debug_capture:
             debug_capture.capture_llm_response(response_json)
             
@@ -104,10 +106,12 @@ class ChatClient(Client):
     def __init__(
         self,
         model: str = None,
-        timeout: Optional[float] = None
+        timeout: Optional[float] = None,
+        session_id: str = "default"
     ):
         self.model = os.environ.get("AZURE_OPENAI_CHAT_MODEL", model)
         self.endpoint = os.environ.get("AZURE_OPENAI_CHAT_ENDPOINT", None)
+        self.session_id = session_id
         super().__init__(self.model, self.endpoint, timeout)
 
     async def make_request(
@@ -159,7 +163,7 @@ class ChatClient(Client):
 
         if is_debug():
             pretty_print("Agent -> Model", payload, "magenta")
-        debug_capture = get_debug_capture()
+        debug_capture = get_debug_capture(self.session_id)
         if debug_capture:
             debug_capture.capture_llm_request(payload)
 
@@ -180,7 +184,7 @@ class ChatClient(Client):
         response_json = response.json()
         if is_debug():
             pretty_print("Model -> Agent", response_json, "cyan")
-        debug_capture = get_debug_capture()
+        debug_capture = get_debug_capture(self.session_id)
         if debug_capture:
             debug_capture.capture_llm_response(response_json)
 

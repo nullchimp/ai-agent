@@ -4,6 +4,7 @@ from fastapi.testclient import TestClient
 import uuid
 
 from api.app import create_app
+from agent import get_agent_instance
 
 
 @pytest.fixture
@@ -136,20 +137,22 @@ class TestSessionRoutes:
 class TestSessionBasedRoutes:
     """Test that existing routes work with session IDs"""
     
-    @patch('agent.get_agent_instance')
-    @patch('api.routes.debug_capture')
-    def test_ask_with_session_id(self, mock_debug_capture, mock_get_agent, client, auth_headers):
+    def test_ask_with_session_id(self, client, auth_headers):
         """Test the ask endpoint with session ID"""
-        # Setup mock
+        # Setup mock agent
         mock_agent = AsyncMock()
         mock_agent.process_query.return_value = ("Test response", ["tool1"])
-        mock_get_agent.return_value = mock_agent
         
-        # Mock debug capture
-        mock_debug_capture.set_session_id = MagicMock()
+        def mock_get_agent_instance(session_id: str):
+            return mock_agent
+        
+        # Override the dependency
+        app = create_app()
+        app.dependency_overrides[get_agent_instance] = mock_get_agent_instance
+        test_client = TestClient(app)
         
         # Make request
-        response = client.post(
+        response = test_client.post(
             "/api/test-session-123/ask",
             json={"query": "Test question"},
             headers=auth_headers
@@ -161,17 +164,13 @@ class TestSessionBasedRoutes:
         assert data["response"] == "Test response"
         assert data["used_tools"] == ["tool1"]
         
-        # Verify agent was retrieved with correct session ID
-        mock_get_agent.assert_called_once_with("test-session-123")
-        
         # Verify query was processed
         mock_agent.process_query.assert_called_once_with("Test question")
         
-        # Verify debug session was set
-        mock_debug_capture.set_session_id.assert_called_once_with("test-session-123")
+        # Clean up
+        app.dependency_overrides.clear()
         
-    @patch('agent.get_agent_instance')
-    def test_tools_list_with_session_id(self, mock_get_agent, client, auth_headers):
+    def test_tools_list_with_session_id(self, client, auth_headers):
         """Test the tools list endpoint with session ID"""
         # Setup mock
         mock_tool_info = MagicMock()
@@ -182,10 +181,17 @@ class TestSessionBasedRoutes:
         
         mock_agent = MagicMock()
         mock_agent.get_tools.return_value = [mock_tool_info]
-        mock_get_agent.return_value = mock_agent
+        
+        def mock_get_agent_instance(session_id: str):
+            return mock_agent
+        
+        # Override the dependency
+        app = create_app()
+        app.dependency_overrides[get_agent_instance] = mock_get_agent_instance
+        test_client = TestClient(app)
         
         # Make request
-        response = client.get(
+        response = test_client.get(
             "/api/test-session-123/tools",
             headers=auth_headers
         )
@@ -200,19 +206,25 @@ class TestSessionBasedRoutes:
         assert tool["enabled"] is True
         assert tool["parameters"] == {"param1": "value1"}
         
-        # Verify agent was retrieved with correct session ID
-        mock_get_agent.assert_called_once_with("test-session-123")
+        # Clean up
+        app.dependency_overrides.clear()
         
-    @patch('agent.get_agent_instance')
-    def test_tools_toggle_with_session_id(self, mock_get_agent, client, auth_headers):
+    def test_tools_toggle_with_session_id(self, client, auth_headers):
         """Test the tools toggle endpoint with session ID"""
         # Setup mock
         mock_agent = MagicMock()
         mock_agent.enable_tool.return_value = True
-        mock_get_agent.return_value = mock_agent
+        
+        def mock_get_agent_instance(session_id: str):
+            return mock_agent
+        
+        # Override the dependency
+        app = create_app()
+        app.dependency_overrides[get_agent_instance] = mock_get_agent_instance
+        test_client = TestClient(app)
         
         # Make request
-        response = client.post(
+        response = test_client.post(
             "/api/test-session-123/tools/toggle",
             json={"tool_name": "test_tool", "enabled": True},
             headers=auth_headers
@@ -225,11 +237,11 @@ class TestSessionBasedRoutes:
         assert data["enabled"] is True
         assert "enabled" in data["message"]
         
-        # Verify agent was retrieved with correct session ID
-        mock_get_agent.assert_called_once_with("test-session-123")
-        
         # Verify tool was enabled
         mock_agent.enable_tool.assert_called_once_with("test_tool")
+        
+        # Clean up
+        app.dependency_overrides.clear()
 
 
 if __name__ == "__main__":

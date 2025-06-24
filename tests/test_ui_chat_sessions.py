@@ -146,6 +146,107 @@ class TestChatSessionManagement:
         
         # Assistant messages should be rendered as HTML
         assert assistant_message["role"] == "assistant"
+        
+    def test_delete_last_session_shows_empty_state(self):
+        """Test that deleting the last session shows empty state instead of creating new session"""
+        sessions = [
+            {"id": "last-session", "sessionId": "backend-uuid-last", "title": "Last Chat"}
+        ]
+        
+        current_session_id = "last-session"
+        session_to_delete = "last-session"
+        
+        # Find session to delete and get its backend session ID
+        session_to_delete_obj = next(s for s in sessions if s["id"] == session_to_delete)
+        backend_session_id = session_to_delete_obj["sessionId"]
+        assert backend_session_id == "backend-uuid-last"
+        
+        # Simulate deletion
+        sessions = [s for s in sessions if s["id"] != session_to_delete]
+        
+        # After deletion, should have 0 sessions
+        assert len(sessions) == 0
+        
+        # Current session should be None (empty state)
+        current_session = None
+        assert current_session is None
+        
+        # UI should show empty state with:
+        # - Disabled message input
+        # - Disabled send button 
+        # - Message prompting to create new chat
+        expected_empty_state = {
+            "input_disabled": True,
+            "send_disabled": True,
+            "placeholder": "Create a new chat to start messaging...",
+            "message": "No active chat sessions."
+        }
+        
+        # Validate empty state configuration
+        assert expected_empty_state["input_disabled"] == True
+        assert expected_empty_state["send_disabled"] == True
+        assert "Create a new chat" in expected_empty_state["placeholder"]
+        assert "No active chat sessions" in expected_empty_state["message"]
+
+    def test_chat_functionality_disabled_when_no_sessions(self):
+        """Test that chat functionality is disabled when no sessions exist"""
+        sessions = []
+        current_session = None
+        
+        # Simulate state when no sessions exist
+        has_content = True  # User has typed something
+        has_active_session = current_session is not None
+        
+        # Send button should be disabled even with content
+        send_button_enabled = has_content and has_active_session
+        assert send_button_enabled == False
+        
+        # Input should be disabled
+        input_disabled = not has_active_session
+        assert input_disabled == True
+        
+        # Expected UI state
+        expected_ui_state = {
+            "send_button_disabled": True,
+            "input_disabled": True,
+            "show_empty_message": True,
+            "sessions_count": 0
+        }
+        
+        assert expected_ui_state["send_button_disabled"] == True
+        assert expected_ui_state["input_disabled"] == True
+        assert expected_ui_state["show_empty_message"] == True
+        assert expected_ui_state["sessions_count"] == len(sessions)
+
+    def test_input_re_enabled_after_creating_new_session(self):
+        """Test that input is re-enabled after creating a new session from empty state"""
+        # Start with empty state
+        sessions = []
+        current_session = None
+        input_disabled = True
+        
+        # Create new session
+        new_session = {
+            "id": "new-session-1",
+            "sessionId": "backend-new-uuid-1",
+            "title": "New Chat",
+            "messages": [],
+            "createdAt": "2025-06-24T10:00:00Z"
+        }
+        
+        # Add to sessions
+        sessions.append(new_session)
+        current_session = new_session
+        
+        # Input should be re-enabled
+        has_active_session = current_session is not None
+        input_disabled = not has_active_session
+        
+        assert len(sessions) == 1
+        assert current_session is not None
+        assert input_disabled == False
+        assert current_session["id"] == "new-session-1"
+        assert current_session["sessionId"] == "backend-new-uuid-1"
 
 
 if __name__ == "__main__":

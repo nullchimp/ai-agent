@@ -24,6 +24,8 @@ interface ChatSession {
     title: string;
     messages: Message[];
     createdAt: Date;
+    debugPanelOpen?: boolean;  // Debug panel state per session
+    debugEnabled?: boolean;    // Debug enabled state per session
 }
 
 interface DebugEvent {
@@ -59,9 +61,9 @@ class ChatApp {
     private currentSession: ChatSession | null = null;
     private sessions: ChatSession[] = [];
     private tools: Tool[] = [];
-    private debugEnabled: boolean = false;
     private debugEventsList: DebugEvent[] = [];
-    private debugPanelOpen: boolean = false;
+    private isCreatingSession: boolean = false;
+    private isLoadingTools: boolean = false;
 
     private apiBaseUrl = 'http://localhost:5555/api';
 
@@ -127,7 +129,11 @@ class ChatApp {
             this.updateSendButtonState();
         });
 
-        this.newChatBtn.addEventListener('click', () => this.createNewSession());
+        this.newChatBtn.addEventListener('click', () => {
+            if (!this.isCreatingSession) {
+                this.createNewSession();
+            }
+        });
 
         this.toolsHeader.addEventListener('click', () => this.toggleToolsSection());
         
@@ -161,8 +167,35 @@ class ChatApp {
     }
 
     private updateSendButtonState(): void {
-        const hasText = this.messageInput.value.trim().length > 0;
-        this.sendBtn.disabled = !hasText;
+        const hasContent = this.messageInput.value.trim().length > 0;
+        const hasActiveSession = this.currentSession !== null;
+        this.sendBtn.disabled = !hasContent || !hasActiveSession;
+    }
+
+    private updateNewChatButtonState(): void {
+        const button = this.newChatBtn;
+        const icon = button.querySelector('svg');
+        const span = button.querySelector('span');
+        
+        if (this.isCreatingSession) {
+            button.disabled = true;
+            button.classList.add('loading');
+            if (icon) {
+                icon.style.display = 'none';
+            }
+            if (span) {
+                span.textContent = 'Creating...';
+            }
+        } else {
+            button.disabled = false;
+            button.classList.remove('loading');
+            if (icon) {
+                icon.style.display = 'block';
+            }
+            if (span) {
+                span.textContent = 'New chat';
+            }
+        }
     }
 
     private async sendMessage(): Promise<void> {
@@ -233,7 +266,7 @@ class ChatApp {
             this.renderChatHistory();
             
             // Load debug events after message processing
-            if (this.debugEnabled) {
+            if (this.getCurrentDebugEnabled()) {
                 this.loadDebugEvents();
             }
         } catch (error) {
@@ -391,6 +424,14 @@ class ChatApp {
     }
 
     private async createNewSession(): Promise<void> {
+        if (this.isCreatingSession) return;
+        
+        this.isCreatingSession = true;
+        this.updateNewChatButtonState();
+        
+        // Show loading state immediately
+        this.clearMessages();
+        
         try {
             // Create a new backend session
             const response = await fetch(`${this.apiBaseUrl}/session/new`, {
@@ -411,31 +452,58 @@ class ChatApp {
                 sessionId: sessionData.session_id,  // Backend session ID
                 title: 'New Chat',
                 messages: [],
-                createdAt: new Date()
+                createdAt: new Date(),
+                debugPanelOpen: false,
+                debugEnabled: false
             };
 
             this.sessions.unshift(session);
             this.currentSession = session;
-            this.clearMessages();
             this.saveChatHistory(); // Save immediately after creating session
             this.renderChatHistory();
-            this.messageInput.focus();
+            
+            // Re-enable input for the new session
+            this.enableInput();
             
             // Reload tools for the new session
             await this.loadTools();
+            // Restore debug state for the new session
+            await this.restoreDebugState();
+            
+            // Focus input after everything is loaded
+            this.messageInput.focus();
         } catch (error) {
             console.error('Failed to create new session:', error);
             this.showError('Failed to create new chat session. Please try again.');
+        } finally {
+            this.isCreatingSession = false;
+            this.updateNewChatButtonState();
+            // Clear the loading message and show the normal welcome message
+            this.clearMessages();
         }
     }
 
     private clearMessages(): void {
-        this.messagesContainer.innerHTML = `
-            <div class="welcome-message">
-                <h1>AI Agent</h1>
-                <p>How can I help you today?</p>
-            </div>
-        `;
+        if (this.isCreatingSession) {
+            this.messagesContainer.innerHTML = `
+                <div class="welcome-message">
+                    <div class="session-loading">
+                        <div class="loading-spinner"></div>
+                        <h1>Setting up your new chat...</h1>
+                        <p>Initializing tools and preparing the session for you.</p>
+                    </div>
+                </div>
+            `;
+        } else if (!this.currentSession) {
+            this.showEmptyState();
+        } else {
+            this.messagesContainer.innerHTML = `
+                <div class="welcome-message">
+                    <h1>AI Agent</h1>
+                    <p>How can I help you today?</p>
+                </div>
+            `;
+        }
     }
 
     private updateSessionTitle(): void {
@@ -499,8 +567,41 @@ class ChatApp {
 
         this.renderChatHistory();
         
+        // Re-enable input for the loaded session
+        this.enableInput();
+        
         // Load tools for the current session
         await this.loadTools();
+        
+        // Restore debug panel state for this session
+        await this.restoreDebugState();
+    }
+
+    private async restoreDebugState(): Promise<void> {
+        if (!this.currentSession) return;
+        
+        const debugPanelShouldBeOpen = this.getCurrentDebugPanelState();
+        
+        // Update UI to match session state
+        if (debugPanelShouldBeOpen) {
+            this.debugPanelOverlay.classList.add('active');
+            this.debugPanelToggle.classList.add('active');
+            document.body.classList.add('debug-panel-open');
+            
+            // Load debug events and ensure debug mode is enabled
+            await this.setDebugMode(true);
+            await this.loadDebugEvents();
+        } else {
+            this.debugPanelOverlay.classList.remove('active');
+            this.debugPanelToggle.classList.remove('active');
+            document.body.classList.remove('debug-panel-open');
+            
+            // Ensure debug mode reflects session state
+            const sessionDebugEnabled = this.getCurrentDebugEnabled();
+            if (sessionDebugEnabled) {
+                await this.setDebugMode(true);
+            }
+        }
     }
 
     private saveChatHistory(): void {
@@ -510,7 +611,9 @@ class ChatApp {
                 sessionId: session.sessionId, // Ensure backend session ID is saved
                 title: session.title,
                 messages: session.messages,
-                createdAt: session.createdAt
+                createdAt: session.createdAt,
+                debugPanelOpen: session.debugPanelOpen || false,
+                debugEnabled: session.debugEnabled || false
             }));
             
             localStorage.setItem('chatSessions', JSON.stringify(sessionsToSave));
@@ -529,6 +632,8 @@ class ChatApp {
                     ...session,
                     sessionId: session.sessionId || null, // Handle existing sessions without sessionId
                     createdAt: new Date(session.createdAt),
+                    debugPanelOpen: session.debugPanelOpen || false,
+                    debugEnabled: session.debugEnabled || false,
                     messages: session.messages.map((msg: any) => ({
                         ...msg,
                         timestamp: new Date(msg.timestamp)
@@ -537,7 +642,7 @@ class ChatApp {
                 
                 console.log('Loaded chat history:', this.sessions.length, 'sessions');
                 this.sessions.forEach(session => {
-                    console.log(`Session ${session.id}: backend sessionId = ${session.sessionId}`);
+                    console.log(`Session ${session.id}: backend sessionId = ${session.sessionId}, debugPanel = ${session.debugPanelOpen}, debugEnabled = ${session.debugEnabled}`);
                 });
             } catch (error) {
                 console.error('Failed to load chat history:', error);
@@ -583,16 +688,16 @@ class ChatApp {
         // Remove the session from the array
         this.sessions.splice(sessionIndex, 1);
         
-        // If we deleted the current session, switch to another one or create new
+        // If we deleted the current session, switch to another one or show empty state
         if (this.currentSession?.id === sessionId) {
             if (this.sessions.length > 0) {
                 // Load the first available session
                 this.currentSession = this.sessions[0];
                 await this.loadSession(this.currentSession.id);
             } else {
-                // No sessions left, create a new one
-                await this.createNewSession();
-                return; // createNewSession already saves and renders
+                // No sessions left, show empty state
+                this.currentSession = null;
+                this.showEmptyState();
             }
         }
         
@@ -609,6 +714,9 @@ class ChatApp {
             return;
         }
 
+        this.isLoadingTools = true;
+        this.renderToolsLoading();
+
         const toolsUrl = `${this.apiBaseUrl}/${this.currentSession.sessionId}/tools`;
         console.log(`Loading tools from: ${toolsUrl}`);
 
@@ -623,12 +731,16 @@ class ChatApp {
                 const data = await response.json();
                 this.tools = data.tools || [];
                 console.log(`Loaded ${this.tools.length} tools:`, this.tools.map(t => t.name));
-                this.renderTools();
             } else {
                 console.error(`Failed to load tools: ${response.status}`);
+                this.tools = [];
             }
         } catch (error) {
             console.error('Failed to load tools:', error);
+            this.tools = [];
+        } finally {
+            this.isLoadingTools = false;
+            this.renderTools();
         }
     }
 
@@ -644,8 +756,41 @@ class ChatApp {
         }
     }
 
+    private renderToolsLoading(): void {
+        this.toolsList.innerHTML = `
+            <div class="tools-loading">
+                <div class="loading-spinner"></div>
+                <span>Loading tools...</span>
+            </div>
+        `;
+        
+        // Update the tools configuration text to show loading state
+        const toolsLabelSpan = this.toolsHeader.querySelector('.tools-label span');
+        if (toolsLabelSpan) {
+            toolsLabelSpan.textContent = 'Tools Configuration [Loading...]';
+        }
+    }
+
     private renderTools(): void {
         this.toolsList.innerHTML = '';
+        
+        // Check if there's no active session
+        if (!this.currentSession) {
+            this.toolsList.innerHTML = `
+                <div class="tools-no-session">
+                    <div class="tools-no-session-message">
+                        No active session. Create a new chat to configure tools.
+                    </div>
+                </div>
+            `;
+            
+            // Update the tools configuration text to show no session state
+            const toolsLabelSpan = this.toolsHeader.querySelector('.tools-label span');
+            if (toolsLabelSpan) {
+                toolsLabelSpan.textContent = 'Tools Configuration [No Session]';
+            }
+            return;
+        }
         
         // Add toggle all item at the top
         const toggleAllItem = document.createElement('div');
@@ -787,9 +932,11 @@ class ChatApp {
     }
 
     private async toggleDebugPanel(): Promise<void> {
-        this.debugPanelOpen = !this.debugPanelOpen;
+        const currentState = this.getCurrentDebugPanelState();
+        const newState = !currentState;
+        this.setCurrentDebugPanelState(newState);
         
-        if (this.debugPanelOpen) {
+        if (newState) {
             this.debugPanelOverlay.classList.add('active');
             this.debugPanelToggle.classList.add('active');
             document.body.classList.add('debug-panel-open');
@@ -808,7 +955,7 @@ class ChatApp {
     }
 
     private async closeDebugPanel(): Promise<void> {
-        this.debugPanelOpen = false;
+        this.setCurrentDebugPanelState(false);
         this.debugPanelOverlay.classList.remove('active');
         this.debugPanelToggle.classList.remove('active');
         document.body.classList.remove('debug-panel-open');
@@ -837,7 +984,7 @@ class ChatApp {
 
             if (response.ok) {
                 const result = await response.json();
-                this.debugEnabled = result.enabled;
+                this.setCurrentDebugEnabled(result.enabled);
                 this.updateDebugUI();
             } else {
                 console.error('Failed to set debug mode:', await response.text());
@@ -888,7 +1035,7 @@ class ChatApp {
             if (response.ok) {
                 const result = await response.json();
                 this.debugEventsList = result.events;
-                this.debugEnabled = result.enabled;
+                this.setCurrentDebugEnabled(result.enabled);
                 this.updateDebugUI();
                 this.renderDebugEvents();
             } else {
@@ -900,7 +1047,16 @@ class ChatApp {
     }
 
     private updateDebugUI(): void {
-        if (!this.debugEnabled) {
+        if (!this.currentSession) {
+            this.debugEventsContainer.innerHTML = `
+                <div class="debug-disabled-message">
+                    No active session. Create a new chat to enable debug mode.
+                </div>
+            `;
+            return;
+        }
+        
+        if (!this.getCurrentDebugEnabled()) {
             this.debugEventsContainer.innerHTML = `
                 <div class="debug-disabled-message">
                     Debug mode is automatically enabled when this panel is open.
@@ -910,7 +1066,12 @@ class ChatApp {
     }
 
     private renderDebugEvents(): void {
-        if (!this.debugEnabled) {
+        if (!this.currentSession) {
+            this.updateDebugUI();
+            return;
+        }
+        
+        if (!this.getCurrentDebugEnabled()) {
             this.updateDebugUI();
             return;
         }
@@ -1055,6 +1216,68 @@ class ChatApp {
             .replace(/>/g, "&gt;")
             .replace(/"/g, "&quot;")
             .replace(/'/g, "&#039;");
+    }
+
+    // Debug state management per session
+    private getCurrentDebugPanelState(): boolean {
+        return this.currentSession?.debugPanelOpen || false;
+    }
+
+    private setCurrentDebugPanelState(open: boolean): void {
+        if (this.currentSession) {
+            this.currentSession.debugPanelOpen = open;
+            this.saveChatHistory();
+        }
+    }
+
+    private getCurrentDebugEnabled(): boolean {
+        return this.currentSession?.debugEnabled || false;
+    }
+
+    private setCurrentDebugEnabled(enabled: boolean): void {
+        if (this.currentSession) {
+            this.currentSession.debugEnabled = enabled;
+            this.saveChatHistory();
+        }
+    }
+
+    private showEmptyState(): void {
+        this.messagesContainer.innerHTML = `
+            <div class="welcome-message empty-state">
+                <h1>AI Agent</h1>
+                <p>No active chat sessions.</p>
+                <p>Click <span class="new-chat-link" id="newChatLink">New chat</span> to start a conversation.</p>
+            </div>
+        `;
+        
+        // Add click handler for the new chat link
+        const newChatLink = document.getElementById('newChatLink');
+        if (newChatLink) {
+            newChatLink.addEventListener('click', () => {
+                this.createNewSession();
+            });
+        }
+        
+        this.messageInput.disabled = true;
+        this.messageInput.placeholder = "Create a new chat to start messaging...";
+        this.updateSendButtonState();
+        
+        // Clear tools and debug state for no active session
+        this.tools = [];
+        this.debugEventsList = [];
+        this.renderTools();
+        this.updateDebugUI();
+        
+        // Close debug panel if it's open
+        this.debugPanelOverlay.classList.remove('active');
+        this.debugPanelToggle.classList.remove('active');
+        document.body.classList.remove('debug-panel-open');
+    }
+
+    private enableInput(): void {
+        this.messageInput.disabled = false;
+        this.messageInput.placeholder = "Message AI Agent...";
+        this.updateSendButtonState();
     }
 }
 
