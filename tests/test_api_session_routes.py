@@ -46,7 +46,6 @@ class TestSessionRoutes:
         # Verify agent and debug instances were retrieved
         mock_get_agent.assert_called_once_with(test_session_id)
         mock_get_debug.assert_called_once_with(test_session_id)
-        mock_agent.initialize_mcp_tools.assert_called_once()
         
     @patch('api.routes.get_agent_instance')
     @patch('api.routes.get_debug_capture_instance')
@@ -71,7 +70,6 @@ class TestSessionRoutes:
         # Verify agent and debug instances were retrieved
         mock_get_agent.assert_called_once_with(test_session_id)
         mock_get_debug.assert_called_once_with(test_session_id)
-        mock_agent.initialize_mcp_tools.assert_called_once()
         
     @patch('api.routes.get_agent_instance')
     @patch('api.routes.get_debug_capture_instance')
@@ -80,13 +78,10 @@ class TestSessionRoutes:
         # Setup mocks
         test_session_id = "error-session-789"
         
-        mock_get_agent.return_value = MagicMock()
         mock_get_debug.return_value = MagicMock()
         
         # Make agent initialization fail
-        mock_agent = AsyncMock()
-        mock_agent.initialize_mcp_tools.side_effect = Exception("MCP initialization failed")
-        mock_get_agent.return_value = mock_agent
+        mock_get_agent.side_effect = Exception("MCP initialization failed")
         
         # Make request
         response = client.get(f"/api/session/{test_session_id}")

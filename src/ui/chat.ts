@@ -96,6 +96,8 @@ class ChatApp {
         this.loadChatHistory();
         this.setupEventListeners();
         
+        console.log('ChatApp initialized with', this.sessions.length, 'sessions loaded.');
+
         // Only create a new session if no sessions exist
         if (this.sessions.length === 0) {
             await this.createNewSession();
@@ -103,9 +105,12 @@ class ChatApp {
             // Load the most recent session
             this.currentSession = this.sessions[0];
             
+            console.log('Loading existing session:', this.currentSession.sessionId);
             // If the session has a backend sessionId, verify it exists
             if (this.currentSession.sessionId) {
+                this.showSessionVerificationLoading();
                 await this.verifyBackendSession(this.currentSession.sessionId);
+                this.hideSessionVerificationLoading();
             }
             
             await this.loadSession(this.currentSession.id);
@@ -1310,6 +1315,26 @@ class ChatApp {
                 this.currentSession.sessionId = undefined;
                 this.saveChatHistory();
             }
+        }
+    }
+
+    private showSessionVerificationLoading(): void {
+        this.messagesContainer.innerHTML = `
+            <div class="welcome-message">
+                <div class="session-verification-loading">
+                    <div class="loading-spinner"></div>
+                    <h1>Verifying session...</h1>
+                    <p>Checking if your previous session is still available.</p>
+                </div>
+            </div>
+        `;
+    }
+
+    private hideSessionVerificationLoading(): void {
+        // Clear the loading message - it will be replaced by the actual session content
+        const loadingEl = this.messagesContainer.querySelector('.session-verification-loading');
+        if (loadingEl) {
+            loadingEl.parentElement?.remove();
         }
     }
 }

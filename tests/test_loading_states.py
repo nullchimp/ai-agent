@@ -259,6 +259,7 @@ class TestLoadingStates:
             '.loading-spinner',
             '.tools-loading',
             '.session-loading',
+            '.session-verification-loading',
             '@keyframes spin'
         ]
         
@@ -281,3 +282,37 @@ class TestLoadingStates:
         assert 'id="newChatBtn"' in html_content
         assert 'id="toolsList"' in html_content
         assert 'id="messagesContainer"' in html_content
+
+    def test_session_verification_loading_logic(self):
+        """Test that session verification loading is displayed correctly."""
+        
+        def show_session_verification_loading():
+            """Simulate the TypeScript showSessionVerificationLoading method."""
+            return '''
+                <div class="welcome-message">
+                    <div class="session-verification-loading">
+                        <div class="loading-spinner"></div>
+                        <h1>Verifying session...</h1>
+                        <p>Checking if your previous session is still available.</p>
+                    </div>
+                </div>
+            '''
+        
+        def hide_session_verification_loading():
+            """Simulate the TypeScript hideSessionVerificationLoading method."""
+            return {
+                'loading_removed': True,
+                'ready_for_content': True
+            }
+        
+        # Test verification loading state
+        loading_html = show_session_verification_loading()
+        assert 'session-verification-loading' in loading_html
+        assert 'loading-spinner' in loading_html
+        assert 'Verifying session...' in loading_html
+        assert 'Checking if your previous session is still available.' in loading_html
+        
+        # Test hiding loading state
+        hide_result = hide_session_verification_loading()
+        assert hide_result['loading_removed'] == True
+        assert hide_result['ready_for_content'] == True

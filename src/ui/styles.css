@@ -1270,3 +1270,33 @@ body.debug-panel-open .main-content {
         font-size: 16px; /* Prevents zoom on iOS */
     }
 }
+
+/* Session verification loading state */
+.session-verification-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    padding: 40px 20px;
+}
+
+.session-verification-loading .loading-spinner {
+    width: 24px;
+    height: 24px;
+    border: 3px solid #e5e7eb;
+    border-top: 3px solid #3b82f6;
+}
+
+.session-verification-loading h1 {
+    margin: 0;
+    font-size: 24px;
+    font-weight: 600;
+    color: #1f2937;
+}
+
+.session-verification-loading p {
+    margin: 0;
+    font-size: 16px;
+    color: #6b7280;
+    text-align: center;
+}

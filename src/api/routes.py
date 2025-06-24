@@ -18,10 +18,8 @@ async def get_session(session_id: str):
         if session_id == "new":
             session_id = str(uuid.uuid4())
 
-        agent_instance = get_agent_instance(session_id)
+        await get_agent_instance(session_id)
         get_debug_capture_instance(session_id)
-    
-        await agent_instance.initialize_mcp_tools()
         return NewSessionResponse(session_id=session_id, message="Session is active")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error initializing agent: {str(e)}")
