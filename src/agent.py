@@ -2,11 +2,12 @@ from dotenv import load_dotenv
 load_dotenv(override=True)
 
 import asyncio
-
+import os
 from datetime import date
 
 from core import chatutil, graceful_exit, pretty_print
 from core.llm.chat import Chat
+from core.mcp.sessions_manager import MCPSessionManager
 
 from tools import Tool
 from tools.github_search import GitHubKnowledgebase
@@ -33,6 +34,7 @@ class Agent:
             tool.enable()
 
         self.session_id = session_id
+        self.mcp_initialized = False
 
         self.history = []
         self._update_system_prompt()
@@ -115,6 +117,18 @@ class Agent:
 
     def get_tools(self) -> list:
         return self.chat.get_tools()
+
+    async def initialize_mcp_tools(self):
+        if self.mcp_initialized:
+            return
+
+        config_path = os.path.join(os.path.dirname(__file__), "..", "config", "mcp.json")
+        session_manager = MCPSessionManager()
+        await session_manager.discovery(config_path)
+        for tool in session_manager.tools:
+            self.add_tool(tool)
+
+        self.mcp_initialized = True
 
     async def process_query(self, user_prompt: str) -> str:
         user_role = {"role": "user", "content": user_prompt}

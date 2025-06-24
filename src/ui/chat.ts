@@ -103,9 +103,9 @@ class ChatApp {
             // Load the most recent session
             this.currentSession = this.sessions[0];
             
-            // If the session doesn't have a backend sessionId, we'll create one when user sends a message
-            if (!this.currentSession.sessionId) {
-                console.log('Current session has no backend sessionId - will create when needed');
+            // If the session has a backend sessionId, verify it exists
+            if (this.currentSession.sessionId) {
+                await this.verifyBackendSession(this.currentSession.sessionId);
             }
             
             await this.loadSession(this.currentSession.id);
@@ -202,12 +202,12 @@ class ChatApp {
         const content = this.messageInput.value.trim();
         if (!content || !this.currentSession) return;
 
-        // If the current session doesn't have a backend session ID, create a new session
+        // If the current session doesn't have a backend session ID, create one
         if (!this.currentSession.sessionId) {
             console.log('Creating backend session for existing frontend session...');
             try {
                 const response = await fetch(`${this.apiBaseUrl}/session/new`, {
-                    method: 'POST',
+                    method: 'GET',
                     headers: {
                         'Content-Type': 'application/json'
                     }
@@ -435,7 +435,7 @@ class ChatApp {
         try {
             // Create a new backend session
             const response = await fetch(`${this.apiBaseUrl}/session/new`, {
-                method: 'POST',
+                method: 'GET',
                 headers: {
                     'Content-Type': 'application/json'
                 }
@@ -1278,6 +1278,39 @@ class ChatApp {
         this.messageInput.disabled = false;
         this.messageInput.placeholder = "Message AI Agent...";
         this.updateSendButtonState();
+    }
+
+    private async verifyBackendSession(sessionId: string): Promise<void> {
+        try {
+            console.log(`Verifying backend session: ${sessionId}`);
+            const response = await fetch(`${this.apiBaseUrl}/session/${sessionId}`, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (response.ok) {
+                const sessionData = await response.json();
+                console.log(`Backend session ${sessionId} verified and reinitialized`);
+                // Session exists and is reinitialized
+                return;
+            } else {
+                console.warn(`Backend session ${sessionId} not found, will create new session when needed`);
+                // Clear the sessionId since backend session doesn't exist
+                if (this.currentSession) {
+                    this.currentSession.sessionId = undefined;
+                    this.saveChatHistory();
+                }
+            }
+        } catch (error) {
+            console.error(`Failed to verify backend session ${sessionId}:`, error);
+            // Clear the sessionId since we can't verify
+            if (this.currentSession) {
+                this.currentSession.sessionId = undefined;
+                this.saveChatHistory();
+            }
+        }
     }
 }
 

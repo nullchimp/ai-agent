@@ -22,30 +22,31 @@ class TestFrontendDebugSessionSwitching:
 
     @pytest.fixture
     def mock_agent_deps(self):
-        with patch("api.routes.get_agent_instance") as mock_get_agent:
+        with patch("api.routes.get_agent_instance") as mock_get_agent, \
+             patch("api.routes.get_debug_capture_instance") as mock_get_debug:
             mock_agent = Mock()
             mock_agent.get_tools.return_value = []
             mock_agent.process_query = AsyncMock(return_value=("Test response", set()))
+            mock_agent.initialize_mcp_tools = AsyncMock()
             mock_get_agent.return_value = mock_agent
+            
+            mock_debug = Mock()
+            mock_get_debug.return_value = mock_debug
             yield mock_agent
 
     @pytest.fixture
     def mock_session_manager(self):
-        with patch("api.routes.MCPSessionManager") as mock_mgr:
-            mock_instance = Mock()
-            mock_instance.discovery = AsyncMock()
-            mock_instance.tools = []
-            mock_mgr.return_value = mock_instance
-            yield mock_instance
+        # No longer needed since route doesn't use MCPSessionManager
+        yield None
 
     def test_debug_panel_shows_session_specific_events(self, client, mock_agent_deps, mock_session_manager):
         """Test that the debug panel shows only events for the current session"""
         
         # Create two sessions with different debug events
-        response1 = client.post("/api/session/new")
+        response1 = client.get("/api/session/new")
         session1_id = response1.json()["session_id"]
         
-        response2 = client.post("/api/session/new")
+        response2 = client.get("/api/session/new")
         session2_id = response2.json()["session_id"]
         
         # Add different events to each session
@@ -86,10 +87,10 @@ class TestFrontendDebugSessionSwitching:
         """Test that debug enabled/disabled state is maintained per session"""
         
         # Create two sessions
-        response1 = client.post("/api/session/new")
+        response1 = client.get("/api/session/new")
         session1_id = response1.json()["session_id"]
         
-        response2 = client.post("/api/session/new")
+        response2 = client.get("/api/session/new")
         session2_id = response2.json()["session_id"]
         
         # Both start disabled by default, enable them first
@@ -138,7 +139,7 @@ class TestFrontendDebugSessionSwitching:
         """Test that a new session with no events shows an empty debug panel"""
         
         # Create a new session
-        response = client.post("/api/session/new")
+        response = client.get("/api/session/new")
         session_id = response.json()["session_id"]
         
         # Debug endpoint should return enabled=False but no events by default
@@ -152,7 +153,7 @@ class TestFrontendDebugSessionSwitching:
         """Test that debug events are returned in chronological order"""
         
         # Create a session
-        response = client.post("/api/session/new")
+        response = client.get("/api/session/new")
         session_id = response.json()["session_id"]
         
         debug_capture = get_debug_capture_instance(session_id)

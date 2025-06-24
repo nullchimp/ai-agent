@@ -1,6 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Response
 import uuid
-import os
 
 from agent import get_agent_instance, Agent, delete_agent_instance
 from api.auth import get_api_key
@@ -9,28 +8,24 @@ from api.models import (
     ToolToggleResponse, ToolInfo, DebugResponse, DebugRequest, NewSessionResponse
 )
 from core.debug_capture import get_debug_capture_instance, get_all_debug_events, clear_all_debug_events, delete_debug_capture_instance
-from core.mcp.sessions_manager import MCPSessionManager
 
 session_router = APIRouter(prefix="/api")
 api_router = APIRouter(prefix="/api/{session_id}", dependencies=[Depends(get_api_key)])
 
-@session_router.post("/session/new", response_model=NewSessionResponse)
-async def new_session():
-    session_id = str(uuid.uuid4())
-    agent_instance = get_agent_instance(session_id)
-
-    get_debug_capture_instance(session_id)
-    
+@session_router.get("/session/{session_id}", response_model=NewSessionResponse)
+async def get_session(session_id: str):
     try:
-        config_path = os.path.join(os.path.dirname(__file__), '..', '..', 'config', 'mcp.json')
-        session_manager = MCPSessionManager()
-        await session_manager.discovery(config_path)
-        for tool in session_manager.tools:
-            agent_instance.add_tool(tool)
+        if session_id == "new":
+            session_id = str(uuid.uuid4())
 
-        return NewSessionResponse(session_id=session_id, message="Session created successfully")
+        agent_instance = get_agent_instance(session_id)
+        get_debug_capture_instance(session_id)
+    
+        await agent_instance.initialize_mcp_tools()
+        return NewSessionResponse(session_id=session_id, message="Session is active")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error initializing agent: {str(e)}")
+
 
 @session_router.delete("/session/{session_id}")
 async def delete_session(session_id: str):
