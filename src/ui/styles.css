@@ -274,6 +274,57 @@ body {
     background-color: #2d2d30;
 }
 
+/* Loading states */
+.new-chat-btn.loading {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+
+.new-chat-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.tools-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 20px;
+    color: #6b7280;
+    font-size: 12px;
+}
+
+.loading-spinner {
+    width: 16px;
+    height: 16px;
+    border: 2px solid #e5e7eb;
+    border-top: 2px solid #3b82f6;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Session loading state */
+.session-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    padding: 40px 20px;
+}
+
+.session-loading .loading-spinner {
+    width: 24px;
+    height: 24px;
+    border: 3px solid #e5e7eb;
+    border-top: 3px solid #3b82f6;
+}
+
 .chat-history {
     flex: 1;
     overflow-y: auto;

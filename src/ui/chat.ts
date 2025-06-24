@@ -62,7 +62,8 @@ class ChatApp {
     private sessions: ChatSession[] = [];
     private tools: Tool[] = [];
     private debugEventsList: DebugEvent[] = [];
-    // Remove class-level debug state - now managed per session
+    private isCreatingSession: boolean = false;
+    private isLoadingTools: boolean = false;
 
     private apiBaseUrl = 'http://localhost:5555/api';
 
@@ -128,7 +129,11 @@ class ChatApp {
             this.updateSendButtonState();
         });
 
-        this.newChatBtn.addEventListener('click', () => this.createNewSession());
+        this.newChatBtn.addEventListener('click', () => {
+            if (!this.isCreatingSession) {
+                this.createNewSession();
+            }
+        });
 
         this.toolsHeader.addEventListener('click', () => this.toggleToolsSection());
         
@@ -162,8 +167,34 @@ class ChatApp {
     }
 
     private updateSendButtonState(): void {
-        const hasText = this.messageInput.value.trim().length > 0;
-        this.sendBtn.disabled = !hasText;
+        const hasContent = this.messageInput.value.trim().length > 0;
+        this.sendBtn.disabled = !hasContent;
+    }
+
+    private updateNewChatButtonState(): void {
+        const button = this.newChatBtn;
+        const icon = button.querySelector('svg');
+        const span = button.querySelector('span');
+        
+        if (this.isCreatingSession) {
+            button.disabled = true;
+            button.classList.add('loading');
+            if (icon) {
+                icon.style.display = 'none';
+            }
+            if (span) {
+                span.textContent = 'Creating...';
+            }
+        } else {
+            button.disabled = false;
+            button.classList.remove('loading');
+            if (icon) {
+                icon.style.display = 'block';
+            }
+            if (span) {
+                span.textContent = 'New chat';
+            }
+        }
     }
 
     private async sendMessage(): Promise<void> {
@@ -392,6 +423,14 @@ class ChatApp {
     }
 
     private async createNewSession(): Promise<void> {
+        if (this.isCreatingSession) return;
+        
+        this.isCreatingSession = true;
+        this.updateNewChatButtonState();
+        
+        // Show loading state immediately
+        this.clearMessages();
+        
         try {
             // Create a new backend session
             const response = await fetch(`${this.apiBaseUrl}/session/new`, {
@@ -419,28 +458,46 @@ class ChatApp {
 
             this.sessions.unshift(session);
             this.currentSession = session;
-            this.clearMessages();
             this.saveChatHistory(); // Save immediately after creating session
             this.renderChatHistory();
-            this.messageInput.focus();
             
             // Reload tools for the new session
             await this.loadTools();
             // Restore debug state for the new session
             await this.restoreDebugState();
+            
+            // Focus input after everything is loaded
+            this.messageInput.focus();
         } catch (error) {
             console.error('Failed to create new session:', error);
             this.showError('Failed to create new chat session. Please try again.');
+        } finally {
+            this.isCreatingSession = false;
+            this.updateNewChatButtonState();
+            // Clear the loading message and show the normal welcome message
+            this.clearMessages();
         }
     }
 
     private clearMessages(): void {
-        this.messagesContainer.innerHTML = `
-            <div class="welcome-message">
-                <h1>AI Agent</h1>
-                <p>How can I help you today?</p>
-            </div>
-        `;
+        if (this.isCreatingSession) {
+            this.messagesContainer.innerHTML = `
+                <div class="welcome-message">
+                    <div class="session-loading">
+                        <div class="loading-spinner"></div>
+                        <h1>Setting up your new chat...</h1>
+                        <p>Initializing tools and preparing the session for you.</p>
+                    </div>
+                </div>
+            `;
+        } else {
+            this.messagesContainer.innerHTML = `
+                <div class="welcome-message">
+                    <h1>AI Agent</h1>
+                    <p>How can I help you today?</p>
+                </div>
+            `;
+        }
     }
 
     private updateSessionTitle(): void {
@@ -648,6 +705,9 @@ class ChatApp {
             return;
         }
 
+        this.isLoadingTools = true;
+        this.renderToolsLoading();
+
         const toolsUrl = `${this.apiBaseUrl}/${this.currentSession.sessionId}/tools`;
         console.log(`Loading tools from: ${toolsUrl}`);
 
@@ -662,12 +722,16 @@ class ChatApp {
                 const data = await response.json();
                 this.tools = data.tools || [];
                 console.log(`Loaded ${this.tools.length} tools:`, this.tools.map(t => t.name));
-                this.renderTools();
             } else {
                 console.error(`Failed to load tools: ${response.status}`);
+                this.tools = [];
             }
         } catch (error) {
             console.error('Failed to load tools:', error);
+            this.tools = [];
+        } finally {
+            this.isLoadingTools = false;
+            this.renderTools();
         }
     }
 
@@ -680,6 +744,21 @@ class ChatApp {
         } else {
             this.toolsHeader.classList.add('expanded');
             this.toolsList.classList.add('expanded');
+        }
+    }
+
+    private renderToolsLoading(): void {
+        this.toolsList.innerHTML = `
+            <div class="tools-loading">
+                <div class="loading-spinner"></div>
+                <span>Loading tools...</span>
+            </div>
+        `;
+        
+        // Update the tools configuration text to show loading state
+        const toolsLabelSpan = this.toolsHeader.querySelector('.tools-label span');
+        if (toolsLabelSpan) {
+            toolsLabelSpan.textContent = 'Tools Configuration [Loading...]';
         }
     }
 
