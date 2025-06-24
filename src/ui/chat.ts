@@ -24,6 +24,8 @@ interface ChatSession {
     title: string;
     messages: Message[];
     createdAt: Date;
+    debugPanelOpen?: boolean;  // Debug panel state per session
+    debugEnabled?: boolean;    // Debug enabled state per session
 }
 
 interface DebugEvent {
@@ -59,9 +61,8 @@ class ChatApp {
     private currentSession: ChatSession | null = null;
     private sessions: ChatSession[] = [];
     private tools: Tool[] = [];
-    private debugEnabled: boolean = false;
     private debugEventsList: DebugEvent[] = [];
-    private debugPanelOpen: boolean = false;
+    // Remove class-level debug state - now managed per session
 
     private apiBaseUrl = 'http://localhost:5555/api';
 
@@ -233,7 +234,7 @@ class ChatApp {
             this.renderChatHistory();
             
             // Load debug events after message processing
-            if (this.debugEnabled) {
+            if (this.getCurrentDebugEnabled()) {
                 this.loadDebugEvents();
             }
         } catch (error) {
@@ -411,7 +412,9 @@ class ChatApp {
                 sessionId: sessionData.session_id,  // Backend session ID
                 title: 'New Chat',
                 messages: [],
-                createdAt: new Date()
+                createdAt: new Date(),
+                debugPanelOpen: false,
+                debugEnabled: false
             };
 
             this.sessions.unshift(session);
@@ -423,6 +426,8 @@ class ChatApp {
             
             // Reload tools for the new session
             await this.loadTools();
+            // Restore debug state for the new session
+            await this.restoreDebugState();
         } catch (error) {
             console.error('Failed to create new session:', error);
             this.showError('Failed to create new chat session. Please try again.');
@@ -501,6 +506,36 @@ class ChatApp {
         
         // Load tools for the current session
         await this.loadTools();
+        
+        // Restore debug panel state for this session
+        await this.restoreDebugState();
+    }
+
+    private async restoreDebugState(): Promise<void> {
+        if (!this.currentSession) return;
+        
+        const debugPanelShouldBeOpen = this.getCurrentDebugPanelState();
+        
+        // Update UI to match session state
+        if (debugPanelShouldBeOpen) {
+            this.debugPanelOverlay.classList.add('active');
+            this.debugPanelToggle.classList.add('active');
+            document.body.classList.add('debug-panel-open');
+            
+            // Load debug events and ensure debug mode is enabled
+            await this.setDebugMode(true);
+            await this.loadDebugEvents();
+        } else {
+            this.debugPanelOverlay.classList.remove('active');
+            this.debugPanelToggle.classList.remove('active');
+            document.body.classList.remove('debug-panel-open');
+            
+            // Ensure debug mode reflects session state
+            const sessionDebugEnabled = this.getCurrentDebugEnabled();
+            if (sessionDebugEnabled) {
+                await this.setDebugMode(true);
+            }
+        }
     }
 
     private saveChatHistory(): void {
@@ -510,7 +545,9 @@ class ChatApp {
                 sessionId: session.sessionId, // Ensure backend session ID is saved
                 title: session.title,
                 messages: session.messages,
-                createdAt: session.createdAt
+                createdAt: session.createdAt,
+                debugPanelOpen: session.debugPanelOpen || false,
+                debugEnabled: session.debugEnabled || false
             }));
             
             localStorage.setItem('chatSessions', JSON.stringify(sessionsToSave));
@@ -529,6 +566,8 @@ class ChatApp {
                     ...session,
                     sessionId: session.sessionId || null, // Handle existing sessions without sessionId
                     createdAt: new Date(session.createdAt),
+                    debugPanelOpen: session.debugPanelOpen || false,
+                    debugEnabled: session.debugEnabled || false,
                     messages: session.messages.map((msg: any) => ({
                         ...msg,
                         timestamp: new Date(msg.timestamp)
@@ -537,7 +576,7 @@ class ChatApp {
                 
                 console.log('Loaded chat history:', this.sessions.length, 'sessions');
                 this.sessions.forEach(session => {
-                    console.log(`Session ${session.id}: backend sessionId = ${session.sessionId}`);
+                    console.log(`Session ${session.id}: backend sessionId = ${session.sessionId}, debugPanel = ${session.debugPanelOpen}, debugEnabled = ${session.debugEnabled}`);
                 });
             } catch (error) {
                 console.error('Failed to load chat history:', error);
@@ -787,9 +826,11 @@ class ChatApp {
     }
 
     private async toggleDebugPanel(): Promise<void> {
-        this.debugPanelOpen = !this.debugPanelOpen;
+        const currentState = this.getCurrentDebugPanelState();
+        const newState = !currentState;
+        this.setCurrentDebugPanelState(newState);
         
-        if (this.debugPanelOpen) {
+        if (newState) {
             this.debugPanelOverlay.classList.add('active');
             this.debugPanelToggle.classList.add('active');
             document.body.classList.add('debug-panel-open');
@@ -808,7 +849,7 @@ class ChatApp {
     }
 
     private async closeDebugPanel(): Promise<void> {
-        this.debugPanelOpen = false;
+        this.setCurrentDebugPanelState(false);
         this.debugPanelOverlay.classList.remove('active');
         this.debugPanelToggle.classList.remove('active');
         document.body.classList.remove('debug-panel-open');
@@ -837,7 +878,7 @@ class ChatApp {
 
             if (response.ok) {
                 const result = await response.json();
-                this.debugEnabled = result.enabled;
+                this.setCurrentDebugEnabled(result.enabled);
                 this.updateDebugUI();
             } else {
                 console.error('Failed to set debug mode:', await response.text());
@@ -888,7 +929,7 @@ class ChatApp {
             if (response.ok) {
                 const result = await response.json();
                 this.debugEventsList = result.events;
-                this.debugEnabled = result.enabled;
+                this.setCurrentDebugEnabled(result.enabled);
                 this.updateDebugUI();
                 this.renderDebugEvents();
             } else {
@@ -900,7 +941,7 @@ class ChatApp {
     }
 
     private updateDebugUI(): void {
-        if (!this.debugEnabled) {
+        if (!this.getCurrentDebugEnabled()) {
             this.debugEventsContainer.innerHTML = `
                 <div class="debug-disabled-message">
                     Debug mode is automatically enabled when this panel is open.
@@ -910,7 +951,7 @@ class ChatApp {
     }
 
     private renderDebugEvents(): void {
-        if (!this.debugEnabled) {
+        if (!this.getCurrentDebugEnabled()) {
             this.updateDebugUI();
             return;
         }
@@ -1055,6 +1096,29 @@ class ChatApp {
             .replace(/>/g, "&gt;")
             .replace(/"/g, "&quot;")
             .replace(/'/g, "&#039;");
+    }
+
+    // Debug state management per session
+    private getCurrentDebugPanelState(): boolean {
+        return this.currentSession?.debugPanelOpen || false;
+    }
+
+    private setCurrentDebugPanelState(open: boolean): void {
+        if (this.currentSession) {
+            this.currentSession.debugPanelOpen = open;
+            this.saveChatHistory();
+        }
+    }
+
+    private getCurrentDebugEnabled(): boolean {
+        return this.currentSession?.debugEnabled || false;
+    }
+
+    private setCurrentDebugEnabled(enabled: boolean): void {
+        if (this.currentSession) {
+            this.currentSession.debugEnabled = enabled;
+            this.saveChatHistory();
+        }
     }
 }
 
