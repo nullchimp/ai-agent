@@ -52,6 +52,10 @@ class TestFrontendDebugSessionSwitching:
         debug1 = get_debug_capture_instance(session1_id)
         debug2 = get_debug_capture_instance(session2_id)
         
+        # Enable debug for both sessions before adding events
+        debug1.enable()
+        debug2.enable()
+        
         debug1.capture_event("user_message", "User asks about weather", {"query": "What's the weather?"})
         debug1.capture_event("llm_response", "AI responds about weather", {"response": "It's sunny today"})
         
@@ -88,7 +92,13 @@ class TestFrontendDebugSessionSwitching:
         response2 = client.post("/api/session/new")
         session2_id = response2.json()["session_id"]
         
-        # Both start enabled by default
+        # Both start disabled by default, enable them first
+        debug1 = get_debug_capture_instance(session1_id)
+        debug2 = get_debug_capture_instance(session2_id)
+        
+        debug1.enable()
+        debug2.enable()
+        
         debug_status1 = client.get(f"/api/{session1_id}/debug", headers={"X-API-Key": "test_12345"})
         debug_status2 = client.get(f"/api/{session2_id}/debug", headers={"X-API-Key": "test_12345"})
         
@@ -117,7 +127,7 @@ class TestFrontendDebugSessionSwitching:
         debug1.capture_event("test_event", "Should not be captured", {"test": "data1"})
         debug2.capture_event("test_event", "Should be captured", {"test": "data2"})
         
-        # Verify only session 2 captures events (since session 1 is disabled)
+        # Verify only session 2 captures events (since session 1 is disabled, session 2 still enabled)
         events1 = client.get(f"/api/{session1_id}/debug", headers={"X-API-Key": "test_12345"}).json()["events"]
         events2 = client.get(f"/api/{session2_id}/debug", headers={"X-API-Key": "test_12345"}).json()["events"]
         
@@ -131,11 +141,11 @@ class TestFrontendDebugSessionSwitching:
         response = client.post("/api/session/new")
         session_id = response.json()["session_id"]
         
-        # Debug endpoint should return enabled=True but no events
+        # Debug endpoint should return enabled=False but no events by default
         debug_response = client.get(f"/api/{session_id}/debug", headers={"X-API-Key": "test_12345"})
         debug_data = debug_response.json()
         
-        assert debug_data["enabled"] is True
+        assert debug_data["enabled"] is False
         assert len(debug_data["events"]) == 0
 
     def test_debug_events_ordering_by_timestamp(self, client, mock_agent_deps, mock_session_manager):
@@ -146,6 +156,9 @@ class TestFrontendDebugSessionSwitching:
         session_id = response.json()["session_id"]
         
         debug_capture = get_debug_capture_instance(session_id)
+        
+        # Enable debug before adding events
+        debug_capture.enable()
         
         # Add events in a specific order
         import time

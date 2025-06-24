@@ -18,10 +18,8 @@ api_router = APIRouter(prefix="/api/{session_id}", dependencies=[Depends(get_api
 async def new_session():
     session_id = str(uuid.uuid4())
     agent_instance = get_agent_instance(session_id)
-    
-    # Enable debug capture for this session by default
-    debug_capture = get_debug_capture_instance(session_id)
-    debug_capture.enable()
+
+    get_debug_capture_instance(session_id)
     
     try:
         config_path = os.path.join(os.path.dirname(__file__), '..', '..', 'config', 'mcp.json')

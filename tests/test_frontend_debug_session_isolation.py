@@ -54,9 +54,12 @@ class TestDebugSessionIsolation:
         debug1 = get_debug_capture_instance(session1_id)
         debug2 = get_debug_capture_instance(session2_id)
         
-        # Both should be enabled after session creation
-        assert debug1.is_enabled(), "Session 1 debug should be enabled after creation"
-        assert debug2.is_enabled(), "Session 2 debug should be enabled after creation"
+        # Enable debug for both sessions to test isolation
+        debug1.enable()
+        debug2.enable()
+        
+        assert debug1.is_enabled(), "Session 1 debug should be enabled after manual enable"
+        assert debug2.is_enabled(), "Session 2 debug should be enabled after manual enable"
         
         # Add different debug events to each session
         debug1.capture_event("test_event_1", "Session 1 event", {"session": 1, "data": "session1_data"})
@@ -100,7 +103,10 @@ class TestDebugSessionIsolation:
         debug1 = get_debug_capture_instance(session1_id)
         debug2 = get_debug_capture_instance(session2_id)
         
-        # Both should be enabled by default from session creation
+        # Enable debug for both sessions before adding events
+        debug1.enable()
+        debug2.enable()
+        
         assert debug1.is_enabled()
         assert debug2.is_enabled()
         
@@ -136,7 +142,13 @@ class TestDebugSessionIsolation:
         response2 = client.post("/api/session/new")
         session2_id = response2.json()["session_id"]
         
-        # Both should be enabled by default
+        # Both should be disabled by default, so enable them first
+        debug1 = get_debug_capture_instance(session1_id)
+        debug2 = get_debug_capture_instance(session2_id)
+        
+        debug1.enable()
+        debug2.enable()
+        
         debug_status1 = client.get(f"/api/{session1_id}/debug", headers={"X-API-Key": "test_12345"})
         debug_status2 = client.get(f"/api/{session2_id}/debug", headers={"X-API-Key": "test_12345"})
         
@@ -168,7 +180,8 @@ class TestDebugSessionIsolation:
         
         # Add debug events
         debug_capture = get_debug_capture_instance(session_id)
-        assert debug_capture.is_enabled()  # Should be enabled by default
+        debug_capture.enable()  # Enable debug before adding events
+        assert debug_capture.is_enabled()  # Should be enabled after manual enable
         debug_capture.capture_event("test_event", "Test message", {"test": "data"})
         
         # Verify debug events exist
@@ -191,10 +204,10 @@ class TestDebugSessionIsolation:
         response = client.post("/api/session/new")
         session_id = response.json()["session_id"]
         
-        # Check debug state - should be enabled but with no events
+        # Check debug state - should be disabled by default but with no events
         debug_response = client.get(f"/api/{session_id}/debug", headers={"X-API-Key": "test_12345"})
         debug_data = debug_response.json()
         
         assert debug_response.status_code == 200
-        assert debug_data["enabled"] is True  # Should be enabled by default
+        assert debug_data["enabled"] is False  # Should be disabled by default
         assert len(debug_data["events"]) == 0  # Should have no events initially
