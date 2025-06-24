@@ -25,7 +25,7 @@ class Tool:
         self._description = description
         self._parameters = parameters if parameters is not None else {}
         self._session = session
-        self._enabled = True
+        self._enabled = False
 
     def enable(self) -> None:
         self._enabled = True

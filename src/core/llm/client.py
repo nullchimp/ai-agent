@@ -3,7 +3,7 @@ from typing import Any, Dict, List, Optional, Union
 import httpx
 import os
 
-from core import pretty_print, colorize_text
+from core import pretty_print, colorize_text, get_debug_capture
 
 TIMEOUT = 30.0 # seconds
 
@@ -73,6 +73,9 @@ class EmbeddingsClient(Client):
         
         if is_debug():
             pretty_print("Agent -> Embeddings Model", payload, "magenta")
+        debug_capture = get_debug_capture()
+        if debug_capture:
+            debug_capture.capture_llm_request(payload)
         
         response = await self.http_client.post(
             self.endpoint,
@@ -88,10 +91,14 @@ class EmbeddingsClient(Client):
             
             raise Exception(f"Embeddings API error ({response.status_code}): {error_msg}")
         
+        response_json = response.json()
         if is_debug():
-            pretty_print("Embeddings Model -> Agent", response.json(), "cyan")
+            pretty_print("Embeddings Model -> Agent", response_json, "cyan")
+        debug_capture = get_debug_capture()
+        if debug_capture:
+            debug_capture.capture_llm_response(response_json)
             
-        return response.json()
+        return response_json
 
 class ChatClient(Client):
     def __init__(
@@ -152,6 +159,9 @@ class ChatClient(Client):
 
         if is_debug():
             pretty_print("Agent -> Model", payload, "magenta")
+        debug_capture = get_debug_capture()
+        if debug_capture:
+            debug_capture.capture_llm_request(payload)
 
         response = await self.http_client.post(
             self.endpoint,
@@ -167,7 +177,11 @@ class ChatClient(Client):
             
             raise Exception(f"API error ({response.status_code}): {error_msg}")
         
+        response_json = response.json()
         if is_debug():
-            pretty_print("Model -> Agent", response.json(), "cyan")
+            pretty_print("Model -> Agent", response_json, "cyan")
+        debug_capture = get_debug_capture()
+        if debug_capture:
+            debug_capture.capture_llm_response(response_json)
 
-        return response.json()
+        return response_json

@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 
 class QueryRequest(BaseModel):
     query: str
@@ -30,3 +30,20 @@ class ToolToggleResponse(BaseModel):
     tool_name: str
     enabled: bool
     message: str
+
+
+class DebugEvent(BaseModel):
+    event_type: str
+    message: str
+    data: Dict[str, Any]
+    timestamp: str
+    session_id: Optional[str] = None
+
+
+class DebugResponse(BaseModel):
+    events: List[DebugEvent]
+    enabled: bool
+
+
+class DebugRequest(BaseModel):
+    enabled: bool

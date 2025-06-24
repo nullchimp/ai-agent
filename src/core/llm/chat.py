@@ -6,7 +6,7 @@ from typing import Any, Dict, List
 from tools import Tool
 from .client import ChatClient
 
-from core import prettify, colorize_text, complex_handler
+from core import prettify, colorize_text, complex_handler, get_debug_capture
 
 DEFAULT_TEMPERATURE = 0.5
 DEFAULT_MAX_TOKENS = 500
@@ -36,7 +36,6 @@ class Chat:
 
     def _set_tool_state(self, tool_name: str, active = True) -> None:
         for tool in self.tools:
-            print(f"Checking tool: {tool.name} against {tool_name}  ")
             if tool.name != tool_name:
                 continue
 
@@ -98,6 +97,10 @@ class Chat:
                 args = json.loads(arguments)
             except json.JSONDecodeError:
                 args = {}
+                
+            debug_capture = get_debug_capture()
+            if debug_capture:
+                debug_capture.capture_tool_call(tool_name, args)
 
             tool_result = {
                 "error": f"Tool '{tool_name}' not found"
@@ -110,12 +113,18 @@ class Chat:
                     tools_used.append(tool_name)
                     if is_debug():
                         print(colorize_text(f"<Tool Result: {colorize_text(tool_name, "green")}> ", "yellow"), prettify(tool_result))
+                    debug_capture = get_debug_capture()
+                    if debug_capture:
+                        debug_capture.capture_tool_result(tool_name, tool_result)
                 except Exception as e:
                     tool_result = {
                         "error": f"Error running tool '{tool_name}': {str(e)}"
                     }
                     if is_debug():
                         print(colorize_text(f"<Tool Exception: {colorize_text(tool_name, "red")}> ", "yellow"), str(e))
+                    debug_capture = get_debug_capture()
+                    if debug_capture:
+                        debug_capture.capture_tool_error(tool_name, str(e))
             
             if is_debug():
                 print(colorize_text(f"\n####{hr * 2}{"#" * len(name)}", "yellow"))
