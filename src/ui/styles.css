@@ -295,6 +295,17 @@ body {
     font-size: 12px;
 }
 
+.tools-no-session {
+    padding: 20px;
+    text-align: center;
+}
+
+.tools-no-session-message {
+    color: #6b7280;
+    font-size: 12px;
+    font-style: italic;
+}
+
 .loading-spinner {
     width: 16px;
     height: 16px;
@@ -723,6 +734,23 @@ body.debug-panel-open .main-content {
     font-size: 16px;
     color: #666;
     margin: 0;
+}
+
+.new-chat-link {
+    color: #0066cc;
+    text-decoration: underline;
+    cursor: pointer;
+    font-weight: 500;
+    transition: color 0.2s ease, text-decoration-color 0.2s ease;
+}
+
+.new-chat-link:hover {
+    color: #0052a3;
+    text-decoration-color: #0052a3;
+}
+
+.new-chat-link:active {
+    color: #003d7a;
 }
 
 /* Messages */
