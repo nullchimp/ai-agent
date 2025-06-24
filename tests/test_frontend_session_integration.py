@@ -1,10 +1,11 @@
 import pytest
-from unittest.mock import patch, MagicMock, AsyncMock
+from unittest.mock import patch, Mock, AsyncMock, MagicMock
 from fastapi.testclient import TestClient
 import uuid
 import json
 
 from api.app import create_app
+from agent import get_agent_instance
 
 
 @pytest.fixture
@@ -21,18 +22,31 @@ def auth_headers():
 class TestFrontendSessionIntegration:
     """Test the updated frontend session handling with new GET endpoints"""
     
-    @patch('api.routes.get_agent_instance')
-    @patch('api.routes.get_debug_capture_instance')
+    def setup_method(self):
+        # Clear any existing state between tests
+        from core.debug_capture import _debug_sessions
+        _debug_sessions.clear()
+    
     @patch('uuid.uuid4')
-    def test_frontend_new_session_flow(self, mock_uuid, mock_get_debug, mock_get_agent, client):
+    @patch('agent.Agent')  
+    @patch('agent.MCPSessionManager')
+    def test_frontend_new_session_flow(self, mock_mcp_manager, mock_agent_class, mock_uuid, client):
         """Test the flow when frontend creates a new session"""
         # Setup mocks
         test_session_id = "new-session-123"
         mock_uuid.return_value = test_session_id
         
-        mock_agent = AsyncMock()
-        mock_get_agent.return_value = mock_agent
-        mock_get_debug.return_value = MagicMock()
+        # Mock agent instance
+        mock_agent = Mock()
+        mock_agent.session_id = test_session_id
+        mock_agent.initialize_mcp_tools = AsyncMock()
+        mock_agent_class.return_value = mock_agent
+        
+        # Mock MCPSessionManager
+        mock_mcp_instance = Mock()
+        mock_mcp_instance.discovery = AsyncMock()
+        mock_mcp_instance.tools = []
+        mock_mcp_manager.return_value = mock_mcp_instance
         
         # Frontend calls GET /api/session/new
         response = client.get("/api/session/new")
@@ -44,20 +58,27 @@ class TestFrontendSessionIntegration:
         assert data["message"] == "Session is active"
         
         # Verify backend calls
-        mock_get_agent.assert_called_once_with(test_session_id)
-        mock_get_debug.assert_called_once_with(test_session_id)
+        mock_agent_class.assert_called_once_with(test_session_id)
         mock_agent.initialize_mcp_tools.assert_called_once()
         
-    @patch('api.routes.get_agent_instance')
-    @patch('api.routes.get_debug_capture_instance')
-    def test_frontend_verify_existing_session(self, mock_get_debug, mock_get_agent, client):
+    @patch('agent.Agent')
+    @patch('agent.MCPSessionManager')
+    def test_frontend_verify_existing_session(self, mock_mcp_manager, mock_agent_class, client):
         """Test the flow when frontend verifies an existing session"""
         # Setup mocks
         existing_session_id = "existing-session-456"
         
-        mock_agent = AsyncMock()
-        mock_get_agent.return_value = mock_agent
-        mock_get_debug.return_value = MagicMock()
+        # Mock agent instance
+        mock_agent = Mock()
+        mock_agent.session_id = existing_session_id
+        mock_agent.initialize_mcp_tools = AsyncMock()
+        mock_agent_class.return_value = mock_agent
+        
+        # Mock MCPSessionManager
+        mock_mcp_instance = Mock()
+        mock_mcp_instance.discovery = AsyncMock()
+        mock_mcp_instance.tools = []
+        mock_mcp_manager.return_value = mock_mcp_instance
         
         # Frontend calls GET /api/session/{sessionId}
         response = client.get(f"/api/session/{existing_session_id}")
@@ -69,16 +90,15 @@ class TestFrontendSessionIntegration:
         assert data["message"] == "Session is active"
         
         # Verify backend calls
-        mock_get_agent.assert_called_once_with(existing_session_id)
-        mock_get_debug.assert_called_once_with(existing_session_id)
+        mock_agent_class.assert_called_once_with(existing_session_id)
         mock_agent.initialize_mcp_tools.assert_called_once()
         
-    @patch('api.routes.get_agent_instance')
-    @patch('api.routes.get_debug_capture_instance')
-    def test_frontend_session_verification_failure(self, mock_get_debug, mock_get_agent, client):
+    @patch('agent.Agent')
+    @patch('agent.MCPSessionManager')
+    def test_frontend_session_verification_failure(self, mock_mcp_manager, mock_agent_class, client):
         """Test when session verification fails (session doesn't exist in backend)"""
         # Setup mocks - simulate agent initialization failure
-        mock_get_agent.side_effect = Exception("Session not found")
+        mock_agent_class.side_effect = Exception("Session not found")
         
         # Frontend calls GET /api/session/{sessionId}
         response = client.get("/api/session/lost-session-789")
@@ -90,20 +110,32 @@ class TestFrontendSessionIntegration:
         
         # Frontend should handle this by clearing sessionId and creating new session when needed
         
-    @patch('api.routes.get_agent_instance')
-    @patch('api.routes.get_debug_capture_instance')
     @patch('uuid.uuid4')
-    def test_full_frontend_session_lifecycle(self, mock_uuid, mock_get_debug, mock_get_agent, client, auth_headers):
+    @patch('agent.Agent')
+    @patch('agent.MCPSessionManager')
+    def test_full_frontend_session_lifecycle(self, mock_mcp_manager, mock_agent_class, mock_uuid, client, auth_headers):
         """Test complete session lifecycle: create -> verify -> use"""
         # Setup mocks
         test_session_id = "lifecycle-session-123"
         mock_uuid.return_value = test_session_id
         
-        mock_agent = AsyncMock()
-        mock_agent.process_query = AsyncMock(return_value=("Test response", set()))
+        # Mock agent instance  
+        mock_agent = Mock()
+        mock_agent.session_id = test_session_id
+        mock_agent.initialize_mcp_tools = AsyncMock()
+        
+        async def mock_process_query(query):
+            return ("Test response", set())
+        
+        mock_agent.process_query = mock_process_query
         mock_agent.get_tools = MagicMock(return_value=[])
-        mock_get_agent.return_value = mock_agent
-        mock_get_debug.return_value = MagicMock()
+        mock_agent_class.return_value = mock_agent
+        
+        # Mock MCPSessionManager
+        mock_mcp_instance = Mock()
+        mock_mcp_instance.discovery = AsyncMock()
+        mock_mcp_instance.tools = []
+        mock_mcp_manager.return_value = mock_mcp_instance
         
         # Step 1: Frontend creates new session
         response = client.get("/api/session/new")
@@ -128,8 +160,8 @@ class TestFrontendSessionIntegration:
         response = client.get(f"/api/{session_id}/tools", headers=auth_headers)
         assert response.status_code == 200
         
-        # Verify agent was called for session endpoints (create and verify)
-        assert mock_get_agent.call_count >= 2  # Called for session create and verify
+        # Verify agent was created once (subsequent calls use cached instance)
+        assert mock_agent_class.call_count == 1  # Agent instance is cached
         
     def test_frontend_session_message_flow_documentation(self):
         """Document the expected frontend behavior for session handling"""
