@@ -56,8 +56,7 @@ async def list_tools(agent_instance: Agent = Depends(get_agent_instance)) -> Too
             ToolInfo(
                 name=info.name,
                 description=info.description,
-                enabled=info.enabled,
-                parameters=info.parameters
+                enabled=info.enabled
             )
             for info in tools_info
         ]

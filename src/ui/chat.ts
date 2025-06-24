@@ -562,11 +562,10 @@ class ChatApp {
             if (session.id === this.currentSession?.id) {
                 item.classList.add('active');
             }
-            
+
             const title = document.createElement('span');
             title.className = 'chat-title';
             title.textContent = session.title;
-            title.addEventListener('click', () => this.loadSession(session.id));
             
             const deleteBtn = document.createElement('button');
             deleteBtn.className = 'chat-delete-btn';
@@ -585,6 +584,8 @@ class ChatApp {
             
             item.appendChild(title);
             item.appendChild(deleteBtn);
+            item.addEventListener('click', () => this.loadSession(session.id));
+            
             this.chatHistory.appendChild(item);
         });
     }

@@ -169,7 +169,6 @@ class TestSessionBasedRoutes:
         mock_tool_info.name = "test_tool"
         mock_tool_info.description = "Test tool description"
         mock_tool_info.enabled = True
-        mock_tool_info.parameters = {"param1": "value1"}
         
         mock_agent = MagicMock()
         mock_agent.get_tools.return_value = [mock_tool_info]
@@ -196,7 +195,6 @@ class TestSessionBasedRoutes:
         assert tool["name"] == "test_tool"
         assert tool["description"] == "Test tool description"
         assert tool["enabled"] is True
-        assert tool["parameters"] == {"param1": "value1"}
         
         # Clean up
         app.dependency_overrides.clear()

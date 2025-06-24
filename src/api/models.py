@@ -12,7 +12,6 @@ class ToolInfo(BaseModel):
     name: str
     description: str
     enabled: bool
-    parameters: dict
 
 class ToolsListResponse(BaseModel):
     tools: List[ToolInfo]
@@ -36,7 +35,6 @@ class DebugEvent(BaseModel):
 class DebugResponse(BaseModel):
     events: List[DebugEvent]
     enabled: bool
-
 
 class DebugRequest(BaseModel):
     enabled: bool
