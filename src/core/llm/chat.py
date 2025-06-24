@@ -36,7 +36,6 @@ class Chat:
 
     def _set_tool_state(self, tool_name: str, active = True) -> None:
         for tool in self.tools:
-            print(f"Checking tool: {tool.name} against {tool_name}  ")
             if tool.name != tool_name:
                 continue
 
