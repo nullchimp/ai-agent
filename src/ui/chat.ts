@@ -64,6 +64,8 @@ class ChatApp {
     private debugEventsList: DebugEvent[] = [];
     private isCreatingSession: boolean = false;
     private isLoadingTools: boolean = false;
+    private isSendingMessage: boolean = false;
+    private isVerifyingSession: boolean = false;
 
     private apiBaseUrl = 'http://localhost:5555/api';
 
@@ -108,8 +110,12 @@ class ChatApp {
             console.log('Loading existing session:', this.currentSession.sessionId);
             // If the session has a backend sessionId, verify it exists
             if (this.currentSession.sessionId) {
+                this.isVerifyingSession = true;
+                this.updateSendButtonState();
                 this.showSessionVerificationLoading();
                 await this.verifyBackendSession(this.currentSession.sessionId);
+                this.isVerifyingSession = false;
+                this.updateSendButtonState();
                 this.hideSessionVerificationLoading();
             }
             
@@ -174,7 +180,19 @@ class ChatApp {
     private updateSendButtonState(): void {
         const hasContent = this.messageInput.value.trim().length > 0;
         const hasActiveSession = this.currentSession !== null;
-        this.sendBtn.disabled = !hasContent || !hasActiveSession;
+        const isLoading = this.isLoadingTools || this.isSendingMessage || this.isCreatingSession || this.isVerifyingSession;
+        
+        this.sendBtn.disabled = !hasContent || !hasActiveSession || isLoading;
+        this.messageInput.disabled = isLoading;
+        
+        // Add visual feedback for loading state
+        if (isLoading) {
+            this.messageInput.placeholder = 'Please wait...';
+            this.messageInput.classList.add('loading');
+        } else {
+            this.messageInput.placeholder = 'Type your message...';
+            this.messageInput.classList.remove('loading');
+        }
     }
 
     private updateNewChatButtonState(): void {
@@ -207,6 +225,9 @@ class ChatApp {
         const content = this.messageInput.value.trim();
         if (!content || !this.currentSession) return;
 
+        this.isSendingMessage = true;
+        this.updateSendButtonState();
+
         // If the current session doesn't have a backend session ID, create one
         if (!this.currentSession.sessionId) {
             console.log('Creating backend session for existing frontend session...');
@@ -227,11 +248,15 @@ class ChatApp {
                     await this.loadTools();
                 } else {
                     this.showError('Failed to create backend session. Please try again.');
+                    this.isSendingMessage = false;
+                    this.updateSendButtonState();
                     return;
                 }
             } catch (error) {
                 console.error('Failed to create backend session:', error);
                 this.showError('Failed to create backend session. Please try again.');
+                this.isSendingMessage = false;
+                this.updateSendButtonState();
                 return;
             }
         }
@@ -278,6 +303,9 @@ class ChatApp {
             this.hideTypingIndicator();
             this.showError('Failed to get response. Please try again.');
             console.error('API Error:', error);
+        } finally {
+            this.isSendingMessage = false;
+            this.updateSendButtonState();
         }
     }
 
@@ -433,6 +461,7 @@ class ChatApp {
         
         this.isCreatingSession = true;
         this.updateNewChatButtonState();
+        this.updateSendButtonState();
         
         // Show loading state immediately
         this.clearMessages();
@@ -483,6 +512,7 @@ class ChatApp {
         } finally {
             this.isCreatingSession = false;
             this.updateNewChatButtonState();
+            this.updateSendButtonState();
             // Clear the loading message and show the normal welcome message
             this.clearMessages();
         }
@@ -721,6 +751,7 @@ class ChatApp {
 
         this.isLoadingTools = true;
         this.renderToolsLoading();
+        this.updateSendButtonState();
 
         const toolsUrl = `${this.apiBaseUrl}/${this.currentSession.sessionId}/tools`;
         console.log(`Loading tools from: ${toolsUrl}`);
@@ -746,6 +777,7 @@ class ChatApp {
         } finally {
             this.isLoadingTools = false;
             this.renderTools();
+            this.updateSendButtonState();
         }
     }
 
@@ -1263,9 +1295,9 @@ class ChatApp {
             });
         }
         
+        this.updateSendButtonState();
         this.messageInput.disabled = true;
         this.messageInput.placeholder = "Create a new chat to start messaging...";
-        this.updateSendButtonState();
         
         // Clear tools and debug state for no active session
         this.tools = [];

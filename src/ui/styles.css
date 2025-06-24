@@ -1028,6 +1028,15 @@ body.debug-panel-open .main-content {
     color: #999;
 }
 
+#messageInput.loading {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+#messageInput.loading::placeholder {
+    color: #aaa;
+}
+
 .send-btn {
     background: #10a37f;
     border: none;
