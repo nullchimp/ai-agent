@@ -67,6 +67,7 @@ class ChatApp {
     private isLoadingTools: boolean = false;
     private isSendingMessage: boolean = false;
     private isVerifyingSession: boolean = false;
+    private toolCategoryStates: Record<string, boolean> = {}; // Track collapse state per source
 
     private apiBaseUrl = 'http://localhost:5555/api';
 
@@ -811,6 +812,7 @@ class ChatApp {
     }
 
     private renderTools(): void {
+        console.log('renderTools() called');
         this.toolsList.innerHTML = '';
         
         // Check if there's no active session
@@ -858,12 +860,17 @@ class ChatApp {
         });
         
         sortedSources.forEach(source => {
+            console.log('Creating category for source:', source);
             const tools = toolsBySource[source];
             const sortedTools = [...tools].sort((a, b) => a.name.localeCompare(b.name));
             
+            // Check if this category should be expanded (default to true for new categories)
+            const isExpanded = this.toolCategoryStates[source] !== false;
+            
             // Create source category
             const sourceCategory = document.createElement('div');
-            sourceCategory.className = 'tool-source-category expanded'; // Start expanded by default
+            sourceCategory.className = `tool-source-category ${isExpanded ? 'expanded' : ''}`;
+            sourceCategory.dataset.source = source; // Add data attribute for identification
             
             // Source header
             const sourceHeader = document.createElement('div');
@@ -872,7 +879,7 @@ class ChatApp {
             const sourceExpand = document.createElement('div');
             sourceExpand.className = 'tool-source-expand';
             sourceExpand.innerHTML = `
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="transform: rotate(90deg);">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="transform: rotate(${isExpanded ? '90deg' : '0deg'});">
                     <polyline points="9,18 15,12 9,6"></polyline>
                 </svg>
             `;
@@ -883,6 +890,7 @@ class ChatApp {
             
             const sourceEnabledCount = tools.filter(tool => tool.enabled).length;
             const sourceTotalCount = tools.length;
+            
             const sourceAllEnabled = sourceEnabledCount === sourceTotalCount;
             
             const sourceCounter = document.createElement('div');
@@ -894,7 +902,12 @@ class ChatApp {
             sourceToggle.title = `Toggle all ${source} tools`;
             sourceToggle.addEventListener('click', (e) => {
                 e.stopPropagation();
-                this.toggleSourceTools(source, !sourceAllEnabled);
+                // Calculate current state dynamically instead of using closure variable
+                const currentSourceTools = this.tools.filter(tool => (tool.source || 'default') === source);
+                const currentSourceEnabledCount = currentSourceTools.filter(tool => tool.enabled).length;
+                const currentSourceAllEnabled = currentSourceEnabledCount === currentSourceTools.length;
+                console.log(`Toggling all tools for source: ${source}, current state: ${currentSourceAllEnabled}`);
+                this.toggleSourceTools(source, !currentSourceAllEnabled);
             });
             
             sourceHeader.appendChild(sourceExpand);
@@ -902,19 +915,26 @@ class ChatApp {
             sourceHeader.appendChild(sourceCounter);
             sourceHeader.appendChild(sourceToggle);
             
+            console.log('Adding event listener for source:', source);
+            
             // Make header clickable to expand/collapse
             sourceHeader.addEventListener('click', (e) => {
+                console.log('Header clicked for source:', source, 'Event target:', e.target);
                 // Don't trigger if clicking on the toggle button
                 if (e.target === sourceToggle || sourceToggle.contains(e.target as Node)) {
+                    console.log('Click was on toggle button, ignoring');
                     return;
                 }
+                console.log('Calling toggleSourceCategory for:', source);
                 this.toggleSourceCategory(sourceCategory);
             });
+            
+            console.log('Event listener added for source:', source, 'Header element:', sourceHeader);
             
             // Tools list for this source
             const sourceToolsList = document.createElement('div');
             sourceToolsList.className = 'tool-source-tools';
-            sourceToolsList.style.display = 'block'; // Start visible since expanded by default
+            sourceToolsList.style.display = isExpanded ? 'block' : 'none';
             
             sortedTools.forEach(tool => {
                 const toolItem = document.createElement('div');
@@ -950,20 +970,44 @@ class ChatApp {
     }
 
     private toggleSourceCategory(sourceCategory: HTMLElement): void {
+        const source = sourceCategory.dataset.source;
+        if (!source) return;
+        
+        console.log('toggleSourceCategory called for:', source);
+        console.log('Category element:', sourceCategory);
+        console.log('Current classes:', sourceCategory.className);
+        
         const isExpanded = sourceCategory.classList.contains('expanded');
+        const newState = !isExpanded;
+        
+        console.log('Current state:', isExpanded, 'New state:', newState);
+        
+        // Update the state tracking
+        this.toolCategoryStates[source] = newState;
+        
         const sourceHeader = sourceCategory.querySelector('.tool-source-header') as HTMLElement;
         const sourceToolsList = sourceCategory.querySelector('.tool-source-tools') as HTMLElement;
         const expandIcon = sourceHeader.querySelector('.tool-source-expand svg') as SVGElement;
         
-        if (isExpanded) {
-            sourceCategory.classList.remove('expanded');
-            sourceToolsList.style.display = 'none';
-            expandIcon.style.transform = 'rotate(0deg)';
-        } else {
+        console.log('Elements found:', {
+            sourceHeader: !!sourceHeader,
+            sourceToolsList: !!sourceToolsList,
+            expandIcon: !!expandIcon
+        });
+        
+        if (newState) {
             sourceCategory.classList.add('expanded');
             sourceToolsList.style.display = 'block';
             expandIcon.style.transform = 'rotate(90deg)';
+        } else {
+            sourceCategory.classList.remove('expanded');
+            sourceToolsList.style.display = 'none';
+            expandIcon.style.transform = 'rotate(0deg)';
         }
+        
+        console.log('After toggle - classes:', sourceCategory.className);
+        console.log('Display style:', sourceToolsList.style.display);
+        console.log('State tracking:', this.toolCategoryStates);
     }
 
     private async toggleTool(toolName: string, enabled: boolean): Promise<void> {
@@ -993,7 +1037,7 @@ class ChatApp {
                 const tool = this.tools.find(t => t.name === toolName);
                 if (tool) {
                     tool.enabled = enabled;
-                    this.renderTools();
+                    this.updateToolsUI();
                 }
                 console.log(`Successfully toggled tool ${toolName} to ${enabled}`);
             } else {
@@ -1036,7 +1080,88 @@ class ChatApp {
             }
         }
         
-        this.renderTools();
+        this.updateToolsUI();
+    }
+
+    private updateToolsUI(): void {
+        // Update the main tools counter
+        const enabledCount = this.tools.filter(tool => tool.enabled).length;
+        const totalCount = this.tools.length;
+        
+        const toolsLabelSpan = this.toolsHeader.querySelector('.tools-label span');
+        if (toolsLabelSpan) {
+            toolsLabelSpan.textContent = `Tools Configuration [${enabledCount}/${totalCount}]`;
+        }
+        
+        // Update each source category's counters and toggle states
+        const sourceCategories = this.toolsList.querySelectorAll('.tool-source-category');
+        sourceCategories.forEach(category => {
+            const source = (category as HTMLElement).dataset.source;
+            if (!source) return;
+            
+            // Preserve the current collapse/expand state
+            const currentlyExpanded = (category as HTMLElement).classList.contains('expanded');
+            const savedState = this.toolCategoryStates[source];
+            
+            // If there's a mismatch between DOM and saved state, fix it
+            if (savedState !== undefined && currentlyExpanded !== savedState) {
+                const sourceToolsList = category.querySelector('.tool-source-tools') as HTMLElement;
+                const expandIcon = category.querySelector('.tool-source-expand svg') as SVGElement;
+                
+                if (savedState) {
+                    (category as HTMLElement).classList.add('expanded');
+                    if (sourceToolsList) sourceToolsList.style.display = 'block';
+                    if (expandIcon) expandIcon.style.transform = 'rotate(90deg)';
+                } else {
+                    (category as HTMLElement).classList.remove('expanded');
+                    if (sourceToolsList) sourceToolsList.style.display = 'none';
+                    if (expandIcon) expandIcon.style.transform = 'rotate(0deg)';
+                }
+            }
+            
+            const sourceTools = this.tools.filter(tool => (tool.source || 'default') === source);
+            const sourceEnabledCount = sourceTools.filter(tool => tool.enabled).length;
+            const sourceTotalCount = sourceTools.length;
+            const sourceAllEnabled = sourceEnabledCount === sourceTotalCount;
+            
+            // Update counter
+            const counter = category.querySelector('.tool-source-counter');
+            if (counter) {
+                counter.textContent = `${sourceEnabledCount}/${sourceTotalCount}`;
+            }
+            
+            // Update source toggle
+            const sourceToggle = category.querySelector('.tool-source-toggle');
+            if (sourceToggle) {
+                if (sourceAllEnabled) {
+                    sourceToggle.classList.add('enabled');
+                } else {
+                    sourceToggle.classList.remove('enabled');
+                }
+            }
+            
+            // Update individual tool toggles and states
+            const toolItems = category.querySelectorAll('.tool-item');
+            toolItems.forEach(toolItem => {
+                const toolNameEl = toolItem.querySelector('.tool-name');
+                if (!toolNameEl) return;
+                
+                const toolName = toolNameEl.textContent;
+                const tool = this.tools.find(t => t.name === toolName);
+                if (!tool) return;
+                
+                const toolToggle = toolItem.querySelector('.tool-toggle');
+                if (toolToggle) {
+                    if (tool.enabled) {
+                        toolToggle.classList.add('enabled');
+                        toolItem.classList.add('enabled');
+                    } else {
+                        toolToggle.classList.remove('enabled');
+                        toolItem.classList.remove('enabled');
+                    }
+                }
+            });
+        });
     }
 
     private async toggleSourceTools(source: string, enabled: boolean): Promise<void> {
@@ -1045,7 +1170,7 @@ class ChatApp {
             return;
         }
 
-        const sourceTools = this.tools.filter(tool => tool.source === source);
+        const sourceTools = this.tools.filter(tool => (tool.source || 'default') === source);
         const toolsToChange = sourceTools.filter(tool => tool.enabled !== enabled);
         
         for (const tool of toolsToChange) {
@@ -1072,7 +1197,7 @@ class ChatApp {
             }
         }
         
-        this.renderTools();
+        this.updateToolsUI();
     }
 
     private async toggleDebugPanel(): Promise<void> {
