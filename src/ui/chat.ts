@@ -1391,7 +1391,7 @@ class ChatApp {
         return this.colorizeJsonData(data, 0);
     }
 
-    private colorizeJsonData(obj: any, depth: number = 0): string {
+    private colorizeJsonData(obj: any, depth: number = 0, keyPath: string = '', rootColorMetadata: Record<string, string> = {}): string {
         const indent = '  '.repeat(depth);
         
         if (obj === null) {
@@ -1418,7 +1418,7 @@ class ChatApp {
                     const mainText = item.substring(0, item.length - 14);
                     return `${indent}  "<span class="debug-color-white">${this.escapeHtml(mainText)}</span><span class="debug-truncated">...[truncated]</span>"`;
                 }
-                return `${indent}  ${this.colorizeJsonData(item, depth + 1)}`;
+                return `${indent}  ${this.colorizeJsonData(item, depth + 1, keyPath, rootColorMetadata)}`;
             });
             
             return `[\n${items.join(',\n')}\n${indent}]`;
@@ -1428,15 +1428,17 @@ class ChatApp {
             const entries = Object.entries(obj);
             if (entries.length === 0) return '{}';
             
-            // Extract color metadata if present
-            const colorMetadata = obj._debug_colors || {};
+            // If this is the root object, extract color metadata
+            const colorMetadata = depth === 0 ? (obj._debug_colors || {}) : rootColorMetadata;
             
             const items = entries
                 .filter(([key]) => key !== '_debug_colors') // Don't display color metadata
                 .map(([key, value]) => {
-                    // Determine color for this key
-                    const colorKey = `_${key}_color`;
-                    const color = colorMetadata[colorKey];
+                    // Build the full key path for nested lookups
+                    const currentKeyPath = keyPath ? `${keyPath}_${key}` : key;
+                    
+                    // Check for color using the full path
+                    const color = colorMetadata[`_${currentKeyPath}_color`];
                     
                     let keyHtml;
                     if (color) {
@@ -1445,7 +1447,7 @@ class ChatApp {
                         keyHtml = `<span class="debug-key">"${this.escapeHtml(key)}"</span>`;
                     }
                     
-                    const valueHtml = this.colorizeJsonData(value, depth + 1);
+                    const valueHtml = this.colorizeJsonData(value, depth + 1, currentKeyPath, colorMetadata);
                     return `${indent}  ${keyHtml}: ${valueHtml}`;
                 });
             
@@ -1453,6 +1455,17 @@ class ChatApp {
         }
         
         return this.escapeHtml(String(obj));
+    }
+
+    private findRootColorMetadata(obj: any): Record<string, string> {
+        // Recursively traverse up to find the root _debug_colors metadata
+        if (obj && typeof obj === 'object' && obj._debug_colors) {
+            return obj._debug_colors;
+        }
+        
+        // If this object doesn't have color metadata, check if any parent object does
+        // This is handled by ensuring we always pass the root color metadata down
+        return {};
     }
 
     public openDebugFullscreen(eventIndex: number): void {
