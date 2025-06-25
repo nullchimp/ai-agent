@@ -1,6 +1,7 @@
 # Custom Project Instructions
 
 * The repository can be found under: `https://github.com/nullchimp/ai-agent`
+* If tests are written, they MUST be placed in the `tests` folder.
 
 ## Folder Responsibilities
 * `.github` - Houses GitHub prompts (.github/prompts/), workflows(.github/workflows/), and Copilot instructions. Used by GitHub Actions and Copilot Chat.

@@ -47,42 +47,86 @@ def safe_serialize(obj: Any, max_length: int = 50000) -> Any:
             return True
         return False
     
-    try:
+    def truncate_json_strings(obj: Any, max_string_length: int = 100) -> Any:
+        """Truncate long strings in JSON data recursively"""
         if isinstance(obj, str):
-            if len(obj) > max_length:
-                return obj[:max_length] + "...[truncated]"
+            if len(obj) > max_string_length:
+                return obj[:max_string_length] + "...[truncated]"
             return obj
-        elif isinstance(obj, dict):
+        
+        if isinstance(obj, list):
+            return [truncate_json_strings(item, max_string_length) for item in obj]
+        
+        if isinstance(obj, dict):
             result = {}
-            color_metadata = {}
-            
             for key, value in obj.items():
-                if should_truncate_key(key, value):
-                    result[key] = "...[truncated]"
-                else:
-                    result[key] = safe_serialize(value, max(max_length // 5, 1000))
-                    
-                # Track color information for frontend
-                if key in color_scheme:
-                    color_metadata[f"_{key}_color"] = color_scheme[key]
-            
-            # Only add color metadata if there are colored attributes
-            if color_metadata:
-                result["_debug_colors"] = color_metadata
-                
+                result[key] = truncate_json_strings(value, max_string_length)
             return result
-        elif isinstance(obj, list):
-            if len(obj) > 50:  # Limit array size for unimportant lists
-                return [safe_serialize(item, max_length // 20) for item in obj[:10]] + ["...[truncated]"]
-            return [safe_serialize(item, max(max_length // 5, 1000)) for item in obj]
-        else:
-            # For other types, convert to string and check length
-            str_repr = str(obj)
-            if len(str_repr) > max_length:
-                return str_repr[:max_length] + "...[truncated]"
-            return obj
-    except Exception:
-        return "[Error serializing object]"
+        
+        return obj
+    
+    def serialize_with_colors(obj: Any, max_len: int, key_path: str = "") -> tuple[Any, dict]:
+        """Serialize object and return both the serialized object and collected color metadata"""
+        try:
+            if isinstance(obj, str):
+                if len(obj) > max_len:
+                    return obj[:max_len] + "...[truncated]", {}
+                return obj, {}
+            elif isinstance(obj, dict):
+                result = {}
+                all_color_metadata = {}
+                
+                for key, value in obj.items():
+                    current_key_path = f"{key_path}_{key}" if key_path else key
+                    
+                    if should_truncate_key(key, value):
+                        result[key] = "...[truncated]"
+                    else:
+                        serialized_value, nested_colors = serialize_with_colors(value, max(max_len // 5, 1000), current_key_path)
+                        result[key] = serialized_value
+                        all_color_metadata.update(nested_colors)
+                        
+                    # Track color information for this key at current path
+                    if key in color_scheme:
+                        all_color_metadata[f"_{current_key_path}_color"] = color_scheme[key]
+                
+                return result, all_color_metadata
+            elif isinstance(obj, list):
+                if len(obj) > 50:  # Limit array size for unimportant lists
+                    items = []
+                    all_colors = {}
+                    for item in obj[:10]:
+                        serialized_item, item_colors = serialize_with_colors(item, max_len // 20, key_path)
+                        items.append(serialized_item)
+                        all_colors.update(item_colors)
+                    items.append("...[truncated]")
+                    return items, all_colors
+                else:
+                    items = []
+                    all_colors = {}
+                    for item in obj:
+                        serialized_item, item_colors = serialize_with_colors(item, max(max_len // 5, 1000), key_path)
+                        items.append(serialized_item)
+                        all_colors.update(item_colors)
+                    return items, all_colors
+            else:
+                # For other types, convert to string and check length
+                str_repr = str(obj)
+                if len(str_repr) > max_len:
+                    return str_repr[:max_len] + "...[truncated]", {}
+                return obj, {}
+        except Exception:
+            return "[Error serializing object]", {}
+    
+    # First truncate long strings, then apply serialization with color metadata
+    truncated_obj = truncate_json_strings(obj, 100)
+    serialized_result, color_metadata = serialize_with_colors(truncated_obj, max_length, "")
+    
+    # Add color metadata to the root level only if we have any
+    if color_metadata and isinstance(serialized_result, dict):
+        serialized_result["_debug_colors"] = color_metadata
+    
+    return serialized_result
 
 class DebugEventType(str, Enum):
     AGENT_TO_MODEL = "agent_to_model"

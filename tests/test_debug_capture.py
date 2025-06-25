@@ -144,9 +144,12 @@ class TestDebugCapture:
         assert captured_payload["messages"][0]["role"] == "user"
         assert captured_payload["messages"][0]["content"] == "test"
         
-        # Check that color metadata is present
-        assert "_debug_colors" in captured_payload
-        assert "_messages_color" in captured_payload["_debug_colors"]
+        # Check that color metadata is present at the data root level with path-based keys
+        captured_data = events[0]["data"]
+        assert "_debug_colors" in captured_data
+        assert "_payload_messages_color" in captured_data["_debug_colors"]
+        assert "_payload_messages_role_color" in captured_data["_debug_colors"]
+        assert "_payload_messages_content_color" in captured_data["_debug_colors"]
 
     def test_capture_tool_call(self):
         capture = get_debug_capture_instance("test_session")
