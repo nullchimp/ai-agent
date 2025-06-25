@@ -6,6 +6,10 @@ class Tool:
     @property
     def name(self) -> str:
         return self._name
+    
+    @property
+    def source(self) -> str:
+        return self._source
 
     @property
     def description(self) -> str:
@@ -19,12 +23,15 @@ class Tool:
         name: str = None, 
         description: str = None, 
         parameters: dict = None, 
-        session = None
+        session = None,
+        source: str = None,
     ):
         self._name = name
         self._description = description
         self._parameters = parameters if parameters is not None else {}
         self._session = session
+        self._source = source or "default"
+
         self._enabled = False
 
     def enable(self) -> None:

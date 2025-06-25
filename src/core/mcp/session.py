@@ -48,7 +48,8 @@ class MCPSession:
                         session=self,
                         name=t.name,
                         description=t.description,
-                        parameters=t.inputSchema
+                        parameters=t.inputSchema,
+                        source=self.name
                     )
                     
                     self._tools.append(tool)

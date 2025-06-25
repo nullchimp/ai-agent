@@ -1,10 +1,6 @@
 # Custom Project Instructions
 
 * The repository can be found under: `https://github.com/nullchimp/ai-agent`
-* Context7 should be used to get coding best practices for Python
-* Every change that you make needs to be validated with tests.
-* You have to execute all tests and they need to pass before finishing the implementation.
-* Always create a virtual environment before executing any Python code.
 
 ## Folder Responsibilities
 * `.github` - Houses GitHub prompts (.github/prompts/), workflows(.github/workflows/), and Copilot instructions. Used by GitHub Actions and Copilot Chat.

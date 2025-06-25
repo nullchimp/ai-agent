@@ -12,6 +12,7 @@ class ToolInfo(BaseModel):
     name: str
     description: str
     enabled: bool
+    source: str
 
 class ToolsListResponse(BaseModel):
     tools: List[ToolInfo]

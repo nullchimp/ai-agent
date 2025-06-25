@@ -15,6 +15,7 @@ interface Tool {
     name: string;
     description: string;
     enabled: boolean;
+    source: string;
     parameters: Record<string, any>;
 }
 
@@ -830,21 +831,8 @@ class ChatApp {
             return;
         }
         
-        // Add toggle all item at the top
-        const toggleAllItem = document.createElement('div');
-        toggleAllItem.className = 'disable-all-item';
-        
-        const toggleAllName = document.createElement('div');
-        toggleAllName.className = 'disable-all-name';
-        toggleAllName.textContent = 'Toggle All Tools';
-        
-        const toggleAllDescription = document.createElement('div');
-        toggleAllDescription.className = 'disable-all-description';
-        toggleAllDescription.textContent = 'Enable or disable all tools at once';
-        
         const enabledCount = this.tools.filter(tool => tool.enabled).length;
         const totalCount = this.tools.length;
-        const allEnabled = enabledCount === totalCount;
         
         // Update the tools configuration text to show active/total format
         const toolsLabelSpan = this.toolsHeader.querySelector('.tools-label span');
@@ -852,48 +840,130 @@ class ChatApp {
             toolsLabelSpan.textContent = `Tools Configuration [${enabledCount}/${totalCount}]`;
         }
         
-        const toggleAllToggle = document.createElement('div');
-        toggleAllToggle.className = `tool-toggle ${allEnabled ? 'enabled' : ''}`;
-        toggleAllToggle.addEventListener('click', (e) => {
-            e.stopPropagation();
-            this.toggleAllTools(!allEnabled);
+        // Group tools by source
+        const toolsBySource = this.tools.reduce((groups, tool) => {
+            const source = tool.source || 'default';
+            if (!groups[source]) {
+                groups[source] = [];
+            }
+            groups[source].push(tool);
+            return groups;
+        }, {} as Record<string, Tool[]>);
+        
+        // Sort sources - 'default' first, then alphabetically
+        const sortedSources = Object.keys(toolsBySource).sort((a, b) => {
+            if (a === 'default') return -1;
+            if (b === 'default') return 1;
+            return a.localeCompare(b);
         });
         
-        toggleAllItem.appendChild(toggleAllName);
-        toggleAllItem.appendChild(toggleAllDescription);
-        toggleAllItem.appendChild(toggleAllToggle);
-        
-        this.toolsList.appendChild(toggleAllItem);
-        
-        // Sort tools alphabetically by name
-        const sortedTools = [...this.tools].sort((a, b) => a.name.localeCompare(b.name));
-        
-        sortedTools.forEach(tool => {
-            const toolItem = document.createElement('div');
-            toolItem.className = `tool-item ${tool.enabled ? 'enabled' : ''}`;
+        sortedSources.forEach(source => {
+            const tools = toolsBySource[source];
+            const sortedTools = [...tools].sort((a, b) => a.name.localeCompare(b.name));
             
-            const toolName = document.createElement('div');
-            toolName.className = 'tool-name';
-            toolName.textContent = tool.name;
+            // Create source category
+            const sourceCategory = document.createElement('div');
+            sourceCategory.className = 'tool-source-category expanded'; // Start expanded by default
             
-            const toolDescription = document.createElement('div');
-            toolDescription.className = 'tool-description';
-            toolDescription.textContent = tool.description;
-            toolDescription.title = tool.description; // Show full description on hover
+            // Source header
+            const sourceHeader = document.createElement('div');
+            sourceHeader.className = 'tool-source-header';
             
-            const toolToggle = document.createElement('div');
-            toolToggle.className = `tool-toggle ${tool.enabled ? 'enabled' : ''}`;
-            toolToggle.addEventListener('click', (e) => {
+            const sourceExpand = document.createElement('div');
+            sourceExpand.className = 'tool-source-expand';
+            sourceExpand.innerHTML = `
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="transform: rotate(90deg);">
+                    <polyline points="9,18 15,12 9,6"></polyline>
+                </svg>
+            `;
+            
+            const sourceTitle = document.createElement('div');
+            sourceTitle.className = 'tool-source-title';
+            sourceTitle.textContent = source === 'default' ? 'Built-in Tools' : `${source.charAt(0).toUpperCase() + source.slice(1)} Tools`;
+            
+            const sourceEnabledCount = tools.filter(tool => tool.enabled).length;
+            const sourceTotalCount = tools.length;
+            const sourceAllEnabled = sourceEnabledCount === sourceTotalCount;
+            
+            const sourceCounter = document.createElement('div');
+            sourceCounter.className = 'tool-source-counter';
+            sourceCounter.textContent = `${sourceEnabledCount}/${sourceTotalCount}`;
+            
+            const sourceToggle = document.createElement('div');
+            sourceToggle.className = `tool-source-toggle ${sourceAllEnabled ? 'enabled' : ''}`;
+            sourceToggle.title = `Toggle all ${source} tools`;
+            sourceToggle.addEventListener('click', (e) => {
                 e.stopPropagation();
-                this.toggleTool(tool.name, !tool.enabled);
+                this.toggleSourceTools(source, !sourceAllEnabled);
             });
             
-            toolItem.appendChild(toolName);
-            toolItem.appendChild(toolDescription);
-            toolItem.appendChild(toolToggle);
+            sourceHeader.appendChild(sourceExpand);
+            sourceHeader.appendChild(sourceTitle);
+            sourceHeader.appendChild(sourceCounter);
+            sourceHeader.appendChild(sourceToggle);
             
-            this.toolsList.appendChild(toolItem);
+            // Make header clickable to expand/collapse
+            sourceHeader.addEventListener('click', (e) => {
+                // Don't trigger if clicking on the toggle button
+                if (e.target === sourceToggle || sourceToggle.contains(e.target as Node)) {
+                    return;
+                }
+                this.toggleSourceCategory(sourceCategory);
+            });
+            
+            // Tools list for this source
+            const sourceToolsList = document.createElement('div');
+            sourceToolsList.className = 'tool-source-tools';
+            sourceToolsList.style.display = 'block'; // Start visible since expanded by default
+            
+            sortedTools.forEach(tool => {
+                const toolItem = document.createElement('div');
+                toolItem.className = `tool-item ${tool.enabled ? 'enabled' : ''}`;
+                
+                const toolName = document.createElement('div');
+                toolName.className = 'tool-name';
+                toolName.textContent = tool.name;
+                
+                const toolDescription = document.createElement('div');
+                toolDescription.className = 'tool-description';
+                toolDescription.textContent = tool.description;
+                toolDescription.title = tool.description;
+                
+                const toolToggle = document.createElement('div');
+                toolToggle.className = `tool-toggle ${tool.enabled ? 'enabled' : ''}`;
+                toolToggle.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    this.toggleTool(tool.name, !tool.enabled);
+                });
+                
+                toolItem.appendChild(toolName);
+                toolItem.appendChild(toolDescription);
+                toolItem.appendChild(toolToggle);
+                
+                sourceToolsList.appendChild(toolItem);
+            });
+            
+            sourceCategory.appendChild(sourceHeader);
+            sourceCategory.appendChild(sourceToolsList);
+            this.toolsList.appendChild(sourceCategory);
         });
+    }
+
+    private toggleSourceCategory(sourceCategory: HTMLElement): void {
+        const isExpanded = sourceCategory.classList.contains('expanded');
+        const sourceHeader = sourceCategory.querySelector('.tool-source-header') as HTMLElement;
+        const sourceToolsList = sourceCategory.querySelector('.tool-source-tools') as HTMLElement;
+        const expandIcon = sourceHeader.querySelector('.tool-source-expand svg') as SVGElement;
+        
+        if (isExpanded) {
+            sourceCategory.classList.remove('expanded');
+            sourceToolsList.style.display = 'none';
+            expandIcon.style.transform = 'rotate(0deg)';
+        } else {
+            sourceCategory.classList.add('expanded');
+            sourceToolsList.style.display = 'block';
+            expandIcon.style.transform = 'rotate(90deg)';
+        }
     }
 
     private async toggleTool(toolName: string, enabled: boolean): Promise<void> {
@@ -941,6 +1011,42 @@ class ChatApp {
         }
 
         const toolsToChange = this.tools.filter(tool => tool.enabled !== enabled);
+        
+        for (const tool of toolsToChange) {
+            try {
+                const response = await fetch(`${this.apiBaseUrl}/${this.currentSession.sessionId}/tools/toggle`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-API-Key': 'test_12345'
+                    },
+                    body: JSON.stringify({
+                        tool_name: tool.name,
+                        enabled: enabled
+                    })
+                });
+
+                if (response.ok) {
+                    tool.enabled = enabled;
+                } else {
+                    console.error(`Failed to ${enabled ? 'enable' : 'disable'} tool ${tool.name}:`, await response.text());
+                }
+            } catch (error) {
+                console.error(`Error ${enabled ? 'enabling' : 'disabling'} tool ${tool.name}:`, error);
+            }
+        }
+        
+        this.renderTools();
+    }
+
+    private async toggleSourceTools(source: string, enabled: boolean): Promise<void> {
+        if (!this.currentSession?.sessionId) {
+            console.error('No active session for tool toggle');
+            return;
+        }
+
+        const sourceTools = this.tools.filter(tool => tool.source === source);
+        const toolsToChange = sourceTools.filter(tool => tool.enabled !== enabled);
         
         for (const tool of toolsToChange) {
             try {
