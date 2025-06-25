@@ -114,10 +114,9 @@ jobs:
                 const result = await response.json();
                 const refinedContent = result.choices[0].message.content;
                 
-                const docsNote = "\n---\nAlways make sure to document your progress in Confluence! The space is called `SD`";
                 // Add AI refinement note
                 const aiNote = "\n\n---\n*✨ This issue has been enhanced by AI to provide more context and clarity.*";
-                const finalBody = refinedContent + docsNote + aiNote;
+                const finalBody = refinedContent + aiNote;
                 
                 // Update the issue
                 await github.rest.issues.update({
