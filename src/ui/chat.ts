@@ -1,3 +1,8 @@
+// Import service modules
+import { ApiService } from './apiService.js';
+import { ChatService } from './chatService.js';
+import { Utils } from './utils.js';
+
 // Type declaration for marked library
 declare const marked: {
     parse(markdown: string): string;
@@ -43,6 +48,7 @@ interface DebugInfo {
 }
 
 class ChatApp {
+    // DOM elements
     private messagesContainer: HTMLElement;
     private messageInput: HTMLTextAreaElement;
     private sendBtn: HTMLButtonElement;
@@ -59,8 +65,13 @@ class ChatApp {
     private debugFullscreenData: HTMLElement;
     private debugFullscreenTitle: HTMLElement;
     private debugFullscreenClose: HTMLButtonElement;
+    
+    // Services
+    private apiService: ApiService;
+    private chatService: ChatService;
+    
+    // UI state
     private currentSession: ChatSession | null = null;
-    private sessions: ChatSession[] = [];
     private tools: Tool[] = [];
     private debugEventsList: DebugEvent[] = [];
     private isCreatingSession: boolean = false;
@@ -69,9 +80,8 @@ class ChatApp {
     private isVerifyingSession: boolean = false;
     private toolCategoryStates: Record<string, boolean> = {}; // Track collapse state per source
 
-    private apiBaseUrl = 'http://localhost:5555/api';
-
     constructor() {
+        // Initialize DOM elements
         this.messagesContainer = document.getElementById('messagesContainer') as HTMLElement;
         this.messageInput = document.getElementById('messageInput') as HTMLTextAreaElement;
         this.sendBtn = document.getElementById('sendBtn') as HTMLButtonElement;
@@ -93,25 +103,29 @@ class ChatApp {
         this.debugFullscreenTitle = document.getElementById('debugFullscreenTitle') as HTMLElement;
         this.debugFullscreenClose = document.getElementById('debugFullscreenClose') as HTMLButtonElement;
 
+        // Initialize services
+        this.apiService = new ApiService();
+        this.chatService = new ChatService();
+
         this.init();
     }
 
     private async init(): Promise<void> {
-        this.loadChatHistory();
         this.setupEventListeners();
         
-        console.log('ChatApp initialized with', this.sessions.length, 'sessions loaded.');
+        const sessions = this.chatService.getSessions();
+        console.log('ChatApp initialized with', sessions.length, 'sessions loaded.');
 
         // Only create a new session if no sessions exist
-        if (this.sessions.length === 0) {
+        if (this.chatService.shouldCreateNewSession()) {
             await this.createNewSession();
         } else {
             // Load the most recent session
-            this.currentSession = this.sessions[0];
+            this.currentSession = this.chatService.getMostRecentSession();
             
-            console.log('Loading existing session:', this.currentSession.sessionId);
+            console.log('Loading existing session:', this.currentSession?.sessionId);
             // If the session has a backend sessionId, verify it exists
-            if (this.currentSession.sessionId) {
+            if (this.currentSession?.sessionId) {
                 this.isVerifyingSession = true;
                 this.updateSendButtonState();
                 this.showSessionVerificationLoading();
@@ -121,7 +135,9 @@ class ChatApp {
                 this.hideSessionVerificationLoading();
             }
             
-            await this.loadSession(this.currentSession.id);
+            if (this.currentSession) {
+                await this.loadSession(this.currentSession.id);
+            }
         }
         
         this.renderChatHistory();
@@ -264,7 +280,7 @@ class ChatApp {
         }
 
         const userMessage: Message = {
-            id: this.generateId(),
+            id: Utils.generateId(),
             content,
             role: 'user',
             timestamp: new Date()
@@ -284,7 +300,7 @@ class ChatApp {
             this.hideTypingIndicator();
 
             const assistantMessage: Message = {
-                id: this.generateId(),
+                id: Utils.generateId(),
                 content: apiResponse.response,
                 role: 'assistant',
                 timestamp: new Date(),
@@ -470,32 +486,11 @@ class ChatApp {
         
         try {
             // Create a new backend session
-            const response = await fetch(`${this.apiBaseUrl}/session/new`, {
-                method: 'GET',
-                headers: {
-                    'Content-Type': 'application/json'
-                }
-            });
-
-            if (!response.ok) {
-                throw new Error(`Failed to create session: ${response.status}`);
-            }
-
-            const sessionData = await response.json();
+            const backendSessionId = await this.apiService.createNewSession();
             
-            const session: ChatSession = {
-                id: this.generateId(),
-                sessionId: sessionData.session_id,  // Backend session ID
-                title: 'New Chat',
-                messages: [],
-                createdAt: new Date(),
-                debugPanelOpen: false,
-                debugEnabled: false
-            };
-
-            this.sessions.unshift(session);
+            // Create the session using the service
+            const session = this.chatService.createSession(backendSessionId);
             this.currentSession = session;
-            this.saveChatHistory(); // Save immediately after creating session
             this.renderChatHistory();
             
             // Re-enable input for the new session
@@ -558,7 +553,8 @@ class ChatApp {
     private renderChatHistory(): void {
         this.chatHistory.innerHTML = '';
         
-        this.sessions.forEach(session => {
+        const sessions = this.chatService.getSessions();
+        sessions.forEach(session => {
             const item = document.createElement('div');
             item.className = 'chat-item';
             if (session.id === this.currentSession?.id) {
@@ -642,56 +638,7 @@ class ChatApp {
         }
     }
 
-    private saveChatHistory(): void {
-        try {
-            const sessionsToSave = this.sessions.map(session => ({
-                id: session.id,
-                sessionId: session.sessionId, // Ensure backend session ID is saved
-                title: session.title,
-                messages: session.messages,
-                createdAt: session.createdAt,
-                debugPanelOpen: session.debugPanelOpen || false,
-                debugEnabled: session.debugEnabled || false
-            }));
-            
-            localStorage.setItem('chatSessions', JSON.stringify(sessionsToSave));
-            console.log('Saved chat history:', sessionsToSave.length, 'sessions');
-        } catch (error) {
-            console.error('Failed to save chat history:', error);
-        }
-    }
 
-    private loadChatHistory(): void {
-        const saved = localStorage.getItem('chatSessions');
-        if (saved) {
-            try {
-                const parsed = JSON.parse(saved);
-                this.sessions = parsed.map((session: any) => ({
-                    ...session,
-                    sessionId: session.sessionId || null, // Handle existing sessions without sessionId
-                    createdAt: new Date(session.createdAt),
-                    debugPanelOpen: session.debugPanelOpen || false,
-                    debugEnabled: session.debugEnabled || false,
-                    messages: session.messages.map((msg: any) => ({
-                        ...msg,
-                        timestamp: new Date(msg.timestamp)
-                    }))
-                }));
-                
-                console.log('Loaded chat history:', this.sessions.length, 'sessions');
-                this.sessions.forEach(session => {
-                    console.log(`Session ${session.id}: backend sessionId = ${session.sessionId}, debugPanel = ${session.debugPanelOpen}, debugEnabled = ${session.debugEnabled}`);
-                });
-            } catch (error) {
-                console.error('Failed to load chat history:', error);
-                this.sessions = [];
-            }
-        }
-    }
-
-    private generateId(): string {
-        return Date.now().toString(36) + Math.random().toString(36).substr(2);
-    }
 
     private async deleteSession(sessionId: string): Promise<void> {
         const sessionIndex = this.sessions.findIndex(s => s.id === sessionId);
@@ -1361,7 +1308,7 @@ class ChatApp {
                 const colorizedData = this.applyColorSchemeToData(event.data);
                 
                 // Properly escape HTML characters
-                const escapedMessage = this.escapeHtml(event.message);
+                const escapedMessage = Utils.escapeHtml(event.message);
                 
                 return `
                     <div class="debug-event">
@@ -1401,9 +1348,9 @@ class ChatApp {
         if (typeof obj === 'string') {
             if (obj.endsWith('...[truncated]')) {
                 const mainText = obj.substring(0, obj.length - 14); // Remove "...[truncated]"
-                return `"<span class="debug-color-white">${this.escapeHtml(mainText)}</span><span class="debug-truncated">...[truncated]</span>"`;
+                return `"<span class="debug-color-white">${Utils.escapeHtml(mainText)}</span><span class="debug-truncated">...[truncated]</span>"`;
             }
-            return `"<span class="debug-color-white">${this.escapeHtml(obj)}</span>"`;
+            return `"<span class="debug-color-white">${Utils.escapeHtml(obj)}</span>"`;
         }
         
         if (typeof obj === 'number' || typeof obj === 'boolean') {
@@ -1416,7 +1363,7 @@ class ChatApp {
             const items = obj.map(item => {
                 if (typeof item === 'string' && item.endsWith('...[truncated]')) {
                     const mainText = item.substring(0, item.length - 14);
-                    return `${indent}  "<span class="debug-color-white">${this.escapeHtml(mainText)}</span><span class="debug-truncated">...[truncated]</span>"`;
+                    return `${indent}  "<span class="debug-color-white">${Utils.escapeHtml(mainText)}</span><span class="debug-truncated">...[truncated]</span>"`;
                 }
                 return `${indent}  ${this.colorizeJsonData(item, depth + 1, keyPath, rootColorMetadata)}`;
             });
@@ -1442,9 +1389,9 @@ class ChatApp {
                     
                     let keyHtml;
                     if (color) {
-                        keyHtml = `<span class="debug-key debug-color-${color}">"${this.escapeHtml(key)}"</span>`;
+                        keyHtml = `<span class="debug-key debug-color-${color}">"${Utils.escapeHtml(key)}"</span>`;
                     } else {
-                        keyHtml = `<span class="debug-key">"${this.escapeHtml(key)}"</span>`;
+                        keyHtml = `<span class="debug-key">"${Utils.escapeHtml(key)}"</span>`;
                     }
                     
                     const valueHtml = this.colorizeJsonData(value, depth + 1, currentKeyPath, colorMetadata);
@@ -1454,7 +1401,7 @@ class ChatApp {
             return `{\n${items.join(',\n')}\n${indent}}`;
         }
         
-        return this.escapeHtml(String(obj));
+        return Utils.escapeHtml(String(obj));
     }
 
     private findRootColorMetadata(obj: any): Record<string, string> {
@@ -1487,14 +1434,7 @@ class ChatApp {
         document.body.style.overflow = ''; // Restore scrolling
     }
 
-    private escapeHtml(unsafe: string): string {
-        return unsafe
-            .replace(/&/g, "&amp;")
-            .replace(/</g, "&lt;")
-            .replace(/>/g, "&gt;")
-            .replace(/"/g, "&quot;")
-            .replace(/'/g, "&#039;");
-    }
+
 
     // Debug state management per session
     private getCurrentDebugPanelState(): boolean {
