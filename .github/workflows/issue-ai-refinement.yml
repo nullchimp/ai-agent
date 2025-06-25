@@ -26,7 +26,8 @@ jobs:
             }
 
             const comment = context.payload.comment.body.trim();
-            if (!comment.toLowerCase().includes('#airefine')) {
+            const commentWords = comment.toLowerCase().split(/\s+/);
+            if (!commentWords.some(word => word === '#airefine')) {
               console.log('Comment does not trigger AI refinement. Skipping.');
               process.exit(0);
             }
