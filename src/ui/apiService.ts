@@ -30,7 +30,7 @@ interface DebugInfo {
 }
 
 export class ApiService {
-    private apiBaseUrl: string;
+    public apiBaseUrl: string;
 
     constructor(apiBaseUrl: string = 'http://localhost:5555/api') {
         this.apiBaseUrl = apiBaseUrl;

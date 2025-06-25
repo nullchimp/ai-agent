@@ -243,6 +243,13 @@ class ChatApp {
         const content = this.messageInput.value.trim();
         if (!content || !this.currentSession) return;
 
+        // Validate message using the service
+        const validation = this.chatService.validateMessage(content);
+        if (!validation.isValid) {
+            this.showError(validation.error || 'Invalid message');
+            return;
+        }
+
         this.isSendingMessage = true;
         this.updateSendButtonState();
 
@@ -250,26 +257,11 @@ class ChatApp {
         if (!this.currentSession.sessionId) {
             console.log('Creating backend session for existing frontend session...');
             try {
-                const response = await fetch(`${this.apiBaseUrl}/session/new`, {
-                    method: 'GET',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    }
-                });
-
-                if (response.ok) {
-                    const sessionData = await response.json();
-                    this.currentSession.sessionId = sessionData.session_id;
-                    console.log(`Created backend session: ${sessionData.session_id}`);
-                    this.saveChatHistory();
-                    // Reload tools for the new session
-                    await this.loadTools();
-                } else {
-                    this.showError('Failed to create backend session. Please try again.');
-                    this.isSendingMessage = false;
-                    this.updateSendButtonState();
-                    return;
-                }
+                const backendSessionId = await this.apiService.createNewSession();
+                this.chatService.updateSessionBackendId(this.currentSession, backendSessionId);
+                console.log(`Created backend session: ${backendSessionId}`);
+                // Reload tools for the new session
+                await this.loadTools();
             } catch (error) {
                 console.error('Failed to create backend session:', error);
                 this.showError('Failed to create backend session. Please try again.');
@@ -279,38 +271,30 @@ class ChatApp {
             }
         }
 
-        const userMessage: Message = {
-            id: Utils.generateId(),
-            content,
-            role: 'user',
-            timestamp: new Date()
-        };
-
-        this.currentSession.messages.push(userMessage);
+        // Create and add user message
+        const userMessage = this.chatService.createMessage(content, 'user');
+        this.chatService.addMessage(this.currentSession, userMessage);
         this.displayMessage(userMessage);
+        this.renderChatHistory();
+        
         this.messageInput.value = '';
         this.adjustTextareaHeight();
         this.updateSendButtonState();
-
         this.showTypingIndicator();
 
         try {
             console.log(`Sending message to session: ${this.currentSession.sessionId}`);
-            const apiResponse = await this.callAPI(content);
+            const apiResponse = await this.apiService.callChatAPI(content, this.currentSession.sessionId!);
             this.hideTypingIndicator();
 
-            const assistantMessage: Message = {
-                id: Utils.generateId(),
-                content: apiResponse.response,
-                role: 'assistant',
-                timestamp: new Date(),
-                usedTools: apiResponse.usedTools
-            };
-
-            this.currentSession.messages.push(assistantMessage);
+            const assistantMessage = this.chatService.createMessage(
+                apiResponse.response, 
+                'assistant', 
+                apiResponse.usedTools
+            );
+            
+            this.chatService.addMessage(this.currentSession, assistantMessage);
             this.displayMessage(assistantMessage);
-            this.updateSessionTitle();
-            this.saveChatHistory();
             this.renderChatHistory();
             
             // Load debug events after message processing
@@ -327,44 +311,7 @@ class ChatApp {
         }
     }
 
-    private async callAPI(message: string): Promise<{response: string, usedTools: string[]}> {
-        if (!this.currentSession?.sessionId) {
-            throw new Error('No active session');
-        }
 
-        const apiUrl = `${this.apiBaseUrl}/${this.currentSession.sessionId}/ask`;
-        console.log(`Making API call to: ${apiUrl}`);
-
-        try {
-            const response = await fetch(apiUrl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-API-Key': 'test_12345'
-                },
-                body: JSON.stringify({ query: message })
-            });
-
-            console.log('API response status:', response.status);
-
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
-            const data = await response.json();
-            console.log('API Response Data:', data); // Debug log
-            return {
-                response: data.response || 'Sorry, I couldn\'t process your request.',
-                usedTools: data.used_tools || []
-            };
-        } catch (error) {
-            console.error('API call failed:', error);
-            return {
-                response: 'An error occurred while communicating with the AI.',
-                usedTools: []
-            };
-        }
-    }
 
     private displayMessage(message: Message): void {
         const messageEl = document.createElement('div');
@@ -538,17 +485,7 @@ class ChatApp {
         }
     }
 
-    private updateSessionTitle(): void {
-        if (!this.currentSession || this.currentSession.messages.length === 0) return;
 
-        const firstUserMessage = this.currentSession.messages.find(m => m.role === 'user');
-        if (firstUserMessage && this.currentSession.title === 'New Chat') {
-            this.currentSession.title = firstUserMessage.content.substring(0, 50) + 
-                (firstUserMessage.content.length > 50 ? '...' : '');
-            this.renderChatHistory();
-            this.saveChatHistory();
-        }
-    }
 
     private renderChatHistory(): void {
         this.chatHistory.innerHTML = '';
@@ -589,7 +526,7 @@ class ChatApp {
     }
 
     private async loadSession(sessionId: string): Promise<void> {
-        const session = this.sessions.find(s => s.id === sessionId);
+        const session = this.chatService.getSessions().find(s => s.id === sessionId);
         if (!session) return;
 
         this.currentSession = session;
@@ -641,27 +578,16 @@ class ChatApp {
 
 
     private async deleteSession(sessionId: string): Promise<void> {
-        const sessionIndex = this.sessions.findIndex(s => s.id === sessionId);
-        if (sessionIndex === -1) return;
+        const session = this.chatService.getSessionById(sessionId);
+        if (!session) return;
         
-        const session = this.sessions[sessionIndex];
         console.log(`Deleting session: frontend ID=${session.id}, backend ID=${session.sessionId}`);
         
         try {
             // Delete the backend session
             if (session.sessionId) {
-                const deleteUrl = `${this.apiBaseUrl}/session/${session.sessionId}`;
-                console.log(`Deleting backend session at: ${deleteUrl}`);
-                
-                const response = await fetch(deleteUrl, {
-                    method: 'DELETE'
-                });
-                
-                if (!response.ok && response.status !== 404) {
-                    console.warn(`Failed to delete backend session ${session.sessionId}: ${response.status}`);
-                } else {
-                    console.log(`Successfully deleted backend session ${session.sessionId}`);
-                }
+                await this.apiService.deleteSession(session.sessionId);
+                console.log(`Successfully deleted backend session ${session.sessionId}`);
             } else {
                 console.log('No backend session ID to delete');
             }
@@ -670,14 +596,15 @@ class ChatApp {
             // Continue with frontend cleanup even if backend deletion fails
         }
         
-        // Remove the session from the array
-        this.sessions.splice(sessionIndex, 1);
+        // Remove the session using the service
+        const deletedSession = this.chatService.deleteSession(sessionId);
         
         // If we deleted the current session, switch to another one or show empty state
         if (this.currentSession?.id === sessionId) {
-            if (this.sessions.length > 0) {
+            const remainingSessions = this.chatService.getSessions();
+            if (remainingSessions.length > 0) {
                 // Load the first available session
-                this.currentSession = this.sessions[0];
+                this.currentSession = remainingSessions[0];
                 await this.loadSession(this.currentSession.id);
             } else {
                 // No sessions left, show empty state
@@ -686,7 +613,6 @@ class ChatApp {
             }
         }
         
-        this.saveChatHistory();
         this.renderChatHistory();
     }
 
@@ -703,24 +629,9 @@ class ChatApp {
         this.renderToolsLoading();
         this.updateSendButtonState();
 
-        const toolsUrl = `${this.apiBaseUrl}/${this.currentSession.sessionId}/tools`;
-        console.log(`Loading tools from: ${toolsUrl}`);
-
         try {
-            const response = await fetch(toolsUrl, {
-                headers: {
-                    'X-API-Key': 'test_12345'
-                }
-            });
-
-            if (response.ok) {
-                const data = await response.json();
-                this.tools = data.tools || [];
-                console.log(`Loaded ${this.tools.length} tools:`, this.tools.map(t => t.name));
-            } else {
-                console.error(`Failed to load tools: ${response.status}`);
-                this.tools = [];
-            }
+            this.tools = await this.apiService.loadTools(this.currentSession.sessionId);
+            console.log(`Loaded ${this.tools.length} tools:`, this.tools.map(t => t.name));
         } catch (error) {
             console.error('Failed to load tools:', error);
             this.tools = [];
@@ -963,33 +874,16 @@ class ChatApp {
             return;
         }
 
-        const toggleUrl = `${this.apiBaseUrl}/${this.currentSession.sessionId}/tools/toggle`;
-        console.log(`Toggling tool ${toolName} to ${enabled} at: ${toggleUrl}`);
-
         try {
-            const response = await fetch(toggleUrl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-API-Key': 'test_12345'
-                },
-                body: JSON.stringify({
-                    tool_name: toolName,
-                    enabled: enabled
-                })
-            });
-
-            if (response.ok) {
-                // Update the local tool state
-                const tool = this.tools.find(t => t.name === toolName);
-                if (tool) {
-                    tool.enabled = enabled;
-                    this.updateToolsUI();
-                }
-                console.log(`Successfully toggled tool ${toolName} to ${enabled}`);
-            } else {
-                console.error('Failed to toggle tool:', await response.text());
+            await this.apiService.toggleTool(this.currentSession.sessionId, toolName, enabled);
+            
+            // Update the local tool state
+            const tool = this.tools.find(t => t.name === toolName);
+            if (tool) {
+                tool.enabled = enabled;
+                this.updateToolsUI();
             }
+            console.log(`Successfully toggled tool ${toolName} to ${enabled}`);
         } catch (error) {
             console.error('Error toggling tool:', error);
         }
@@ -1001,33 +895,18 @@ class ChatApp {
             return;
         }
 
-        const toolsToChange = this.tools.filter(tool => tool.enabled !== enabled);
-        
-        for (const tool of toolsToChange) {
-            try {
-                const response = await fetch(`${this.apiBaseUrl}/${this.currentSession.sessionId}/tools/toggle`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-API-Key': 'test_12345'
-                    },
-                    body: JSON.stringify({
-                        tool_name: tool.name,
-                        enabled: enabled
-                    })
-                });
-
-                if (response.ok) {
-                    tool.enabled = enabled;
-                } else {
-                    console.error(`Failed to ${enabled ? 'enable' : 'disable'} tool ${tool.name}:`, await response.text());
-                }
-            } catch (error) {
-                console.error(`Error ${enabled ? 'enabling' : 'disabling'} tool ${tool.name}:`, error);
-            }
+        try {
+            await this.apiService.toggleAllTools(this.currentSession.sessionId, enabled);
+            
+            // Update all local tool states
+            this.tools.forEach(tool => {
+                tool.enabled = enabled;
+            });
+            
+            this.updateToolsUI();
+        } catch (error) {
+            console.error(`Error ${enabled ? 'enabling' : 'disabling'} all tools:`, error);
         }
-        
-        this.updateToolsUI();
     }
 
     private updateToolsUI(): void {
@@ -1117,34 +996,19 @@ class ChatApp {
             return;
         }
 
-        const sourceTools = this.tools.filter(tool => (tool.source || 'default') === source);
-        const toolsToChange = sourceTools.filter(tool => tool.enabled !== enabled);
-        
-        for (const tool of toolsToChange) {
-            try {
-                const response = await fetch(`${this.apiBaseUrl}/${this.currentSession.sessionId}/tools/toggle`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-API-Key': 'test_12345'
-                    },
-                    body: JSON.stringify({
-                        tool_name: tool.name,
-                        enabled: enabled
-                    })
-                });
-
-                if (response.ok) {
-                    tool.enabled = enabled;
-                } else {
-                    console.error(`Failed to ${enabled ? 'enable' : 'disable'} tool ${tool.name}:`, await response.text());
-                }
-            } catch (error) {
-                console.error(`Error ${enabled ? 'enabling' : 'disabling'} tool ${tool.name}:`, error);
-            }
+        try {
+            await this.apiService.toggleSourceTools(this.currentSession.sessionId, source, enabled);
+            
+            // Update local tool states for this source
+            const sourceTools = this.tools.filter(tool => (tool.source || 'default') === source);
+            sourceTools.forEach(tool => {
+                tool.enabled = enabled;
+            });
+            
+            this.updateToolsUI();
+        } catch (error) {
+            console.error(`Error ${enabled ? 'enabling' : 'disabling'} tools for source ${source}:`, error);
         }
-        
-        this.updateToolsUI();
     }
 
     private async toggleDebugPanel(): Promise<void> {
@@ -1187,24 +1051,9 @@ class ChatApp {
         }
 
         try {
-            const response = await fetch(`${this.apiBaseUrl}/${this.currentSession.sessionId}/debug/toggle`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-API-Key': 'test_12345'
-                },
-                body: JSON.stringify({
-                    enabled: enabled
-                })
-            });
-
-            if (response.ok) {
-                const result = await response.json();
-                this.setCurrentDebugEnabled(result.enabled);
-                this.updateDebugUI();
-            } else {
-                console.error('Failed to set debug mode:', await response.text());
-            }
+            await this.apiService.setDebugMode(this.currentSession.sessionId, enabled);
+            this.setCurrentDebugEnabled(enabled);
+            this.updateDebugUI();
         } catch (error) {
             console.error('Error setting debug mode:', error);
         }
@@ -1217,19 +1066,9 @@ class ChatApp {
         }
 
         try {
-            const response = await fetch(`${this.apiBaseUrl}/${this.currentSession.sessionId}/debug`, {
-                method: 'DELETE',
-                headers: {
-                    'X-API-Key': 'test_12345'
-                }
-            });
-
-            if (response.ok) {
-                this.debugEventsList = [];
-                this.renderDebugEvents();
-            } else {
-                console.error('Failed to clear debug events:', await response.text());
-            }
+            await this.apiService.clearDebugEvents(this.currentSession.sessionId);
+            this.debugEventsList = [];
+            this.renderDebugEvents();
         } catch (error) {
             console.error('Error clearing debug events:', error);
         }
@@ -1242,21 +1081,11 @@ class ChatApp {
         }
 
         try {
-            const response = await fetch(`${this.apiBaseUrl}/${this.currentSession.sessionId}/debug`, {
-                headers: {
-                    'X-API-Key': 'test_12345'
-                }
-            });
-
-            if (response.ok) {
-                const result = await response.json();
-                this.debugEventsList = result.events;
-                this.setCurrentDebugEnabled(result.enabled);
-                this.updateDebugUI();
-                this.renderDebugEvents();
-            } else {
-                console.error('Failed to load debug events:', await response.text());
-            }
+            const result = await this.apiService.loadDebugEvents(this.currentSession.sessionId);
+            this.debugEventsList = result.events;
+            this.setCurrentDebugEnabled(result.enabled);
+            this.updateDebugUI();
+            this.renderDebugEvents();
         } catch (error) {
             console.error('Error loading debug events:', error);
         }
@@ -1305,7 +1134,7 @@ class ChatApp {
             .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
             .map((event, index) => {
                 const timestamp = new Date(event.timestamp).toLocaleTimeString();
-                const colorizedData = this.applyColorSchemeToData(event.data);
+                const colorizedData = this.applyDebugColorScheme(event.data);
                 
                 // Properly escape HTML characters
                 const escapedMessage = Utils.escapeHtml(event.message);
@@ -1333,12 +1162,12 @@ class ChatApp {
         this.debugEventsContainer.scrollTop = this.debugEventsContainer.scrollHeight;
     }
 
-    private applyColorSchemeToData(data: Record<string, any>): string {
+    private applyDebugColorScheme(data: Record<string, any>): string {
         // Apply color scheme directly - truncation is now handled by backend
-        return this.colorizeJsonData(data, 0);
+        return this.colorizeDebugJsonData(data, 0);
     }
 
-    private colorizeJsonData(obj: any, depth: number = 0, keyPath: string = '', rootColorMetadata: Record<string, string> = {}): string {
+    private colorizeDebugJsonData(obj: any, depth: number = 0, keyPath: string = '', rootColorMetadata: Record<string, string> = {}): string {
         const indent = '  '.repeat(depth);
         
         if (obj === null) {
@@ -1365,7 +1194,7 @@ class ChatApp {
                     const mainText = item.substring(0, item.length - 14);
                     return `${indent}  "<span class="debug-color-white">${Utils.escapeHtml(mainText)}</span><span class="debug-truncated">...[truncated]</span>"`;
                 }
-                return `${indent}  ${this.colorizeJsonData(item, depth + 1, keyPath, rootColorMetadata)}`;
+                return `${indent}  ${this.colorizeDebugJsonData(item, depth + 1, keyPath, rootColorMetadata)}`;
             });
             
             return `[\n${items.join(',\n')}\n${indent}]`;
@@ -1394,7 +1223,7 @@ class ChatApp {
                         keyHtml = `<span class="debug-key">"${Utils.escapeHtml(key)}"</span>`;
                     }
                     
-                    const valueHtml = this.colorizeJsonData(value, depth + 1, currentKeyPath, colorMetadata);
+                    const valueHtml = this.colorizeDebugJsonData(value, depth + 1, currentKeyPath, colorMetadata);
                     return `${indent}  ${keyHtml}: ${valueHtml}`;
                 });
             
@@ -1422,7 +1251,7 @@ class ChatApp {
         const timestamp = new Date(event.timestamp).toLocaleString();
         this.debugFullscreenTitle.textContent = `${event.event_type} - ${timestamp}`;
         
-        const colorizedData = this.applyColorSchemeToData(event.data);
+        const colorizedData = this.applyDebugColorScheme(event.data);
         this.debugFullscreenData.innerHTML = colorizedData;
         
         this.debugFullscreenOverlay.classList.add('active');
@@ -1444,7 +1273,7 @@ class ChatApp {
     private setCurrentDebugPanelState(open: boolean): void {
         if (this.currentSession) {
             this.currentSession.debugPanelOpen = open;
-            this.saveChatHistory();
+            
         }
     }
 
@@ -1455,7 +1284,7 @@ class ChatApp {
     private setCurrentDebugEnabled(enabled: boolean): void {
         if (this.currentSession) {
             this.currentSession.debugEnabled = enabled;
-            this.saveChatHistory();
+            
         }
     }
 
@@ -1501,15 +1330,9 @@ class ChatApp {
     private async verifyBackendSession(sessionId: string): Promise<void> {
         try {
             console.log(`Verifying backend session: ${sessionId}`);
-            const response = await fetch(`${this.apiBaseUrl}/session/${sessionId}`, {
-                method: 'GET',
-                headers: {
-                    'Content-Type': 'application/json'
-                }
-            });
+            const isValid = await this.apiService.verifySession(sessionId);
 
-            if (response.ok) {
-                const sessionData = await response.json();
+            if (isValid) {
                 console.log(`Backend session ${sessionId} verified and reinitialized`);
                 // Session exists and is reinitialized
                 return;
@@ -1517,16 +1340,14 @@ class ChatApp {
                 console.warn(`Backend session ${sessionId} not found, will create new session when needed`);
                 // Clear the sessionId since backend session doesn't exist
                 if (this.currentSession) {
-                    this.currentSession.sessionId = undefined;
-                    this.saveChatHistory();
+                    this.chatService.updateSessionBackendId(this.currentSession, undefined);
                 }
             }
         } catch (error) {
             console.error(`Failed to verify backend session ${sessionId}:`, error);
             // Clear the sessionId since we can't verify
             if (this.currentSession) {
-                this.currentSession.sessionId = undefined;
-                this.saveChatHistory();
+                this.chatService.updateSessionBackendId(this.currentSession, undefined);
             }
         }
     }
