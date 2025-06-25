@@ -10,27 +10,25 @@ jobs:
     permissions:
       issues: write
       contents: read
+    if: github.event.comment.user.login == github.event.issue.user.login && contains(github.event.comment.body, '#airefine')
     
     steps:
-      - name: Check if comment contains thumbs up and is from issue creator
-        id: check-thumbs-up
+      - name: Validate trigger conditions
+        id: validate
         uses: actions/github-script@v7
         with:
           script: |
-            const commenterLogin = context.payload.comment.user.login;
-            const issueCreatorLogin = context.payload.issue.user.login;
-            
-            if (commenterLogin !== issueCreatorLogin) {
-              console.log('Comment is not from the issue creator. Only the issue creator can trigger AI refinement. Skipping.');
-              process.exit(0);
-            }
-
             const comment = context.payload.comment.body.trim();
             const commentWords = comment.toLowerCase().split(/\s+/);
-            if (!commentWords.some(word => word === '#airefine')) {
-              console.log('Comment does not trigger AI refinement. Skipping.');
-              process.exit(0);
+            const hasAiRefine = commentWords.some(word => word === '#airefine');
+            
+            if (!hasAiRefine) {
+              console.log('Comment does not contain exact #airefine trigger. Skipping.');
+              core.setFailed('Comment does not contain exact #airefine trigger');
+              return;
             }
+            
+            console.log('✅ Valid #airefine trigger detected from issue creator');
       - name: Add eye emoji reaction
         uses: actions/github-script@v7
         with:
