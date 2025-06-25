@@ -49,7 +49,8 @@ class TestMCPSession:
                     session=session,
                     name="test_tool",
                     description="Test tool",
-                    parameters={"type": "object"}
+                    parameters={"type": "object"},
+                    source="test_server"
                 )
                 assert result == [mock_tool_instance]
 

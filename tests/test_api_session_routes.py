@@ -169,6 +169,7 @@ class TestSessionBasedRoutes:
         mock_tool_info.name = "test_tool"
         mock_tool_info.description = "Test tool description"
         mock_tool_info.enabled = True
+        mock_tool_info.source = "test_source"
         
         mock_agent = MagicMock()
         mock_agent.get_tools.return_value = [mock_tool_info]
