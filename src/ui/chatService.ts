@@ -1,22 +1,5 @@
-import { Utils } from './utils.js';
-
-interface Message {
-    id: string;
-    content: string;
-    role: 'user' | 'assistant';
-    timestamp: Date;
-    usedTools?: string[];
-}
-
-interface ChatSession {
-    id: string;
-    sessionId?: string;
-    title: string;
-    messages: Message[];
-    createdAt: Date;
-    debugPanelOpen?: boolean;
-    debugEnabled?: boolean;
-}
+import { Utils } from './utils';
+import { Message, ChatSession } from './types';
 
 export class ChatService {
     private sessions: ChatSession[] = [];

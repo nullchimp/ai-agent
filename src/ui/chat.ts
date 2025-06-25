@@ -1,51 +1,15 @@
 // Import service modules
-import { ApiService } from './apiService.js';
-import { ChatService } from './chatService.js';
-import { Utils } from './utils.js';
+import { ApiService } from './apiService';
+import { ChatService } from './chatService';
+import { Utils } from './utils';
+import { Message, Tool, ChatSession, DebugEvent, DebugInfo } from './types';
 
 // Type declaration for marked library
 declare const marked: {
     parse(markdown: string): string;
 };
 
-interface Message {
-    id: string;
-    content: string;
-    role: 'user' | 'assistant';
-    timestamp: Date;
-    usedTools?: string[];
-}
 
-interface Tool {
-    name: string;
-    description: string;
-    enabled: boolean;
-    source: string;
-    parameters: Record<string, any>;
-}
-
-interface ChatSession {
-    id: string;
-    sessionId?: string;  // Backend session ID (optional for backward compatibility)
-    title: string;
-    messages: Message[];
-    createdAt: Date;
-    debugPanelOpen?: boolean;  // Debug panel state per session
-    debugEnabled?: boolean;    // Debug enabled state per session
-}
-
-interface DebugEvent {
-    event_type: string;
-    message: string;
-    data: Record<string, any>;
-    timestamp: string;
-    session_id?: string;
-}
-
-interface DebugInfo {
-    events: DebugEvent[];
-    enabled: boolean;
-}
 
 class ChatApp {
     // DOM elements

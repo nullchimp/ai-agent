@@ -10,6 +10,7 @@ __pycache__
 .terraform*
 
 dist
+src/ui/dist
 node_modules
 terraform.tfvars
 

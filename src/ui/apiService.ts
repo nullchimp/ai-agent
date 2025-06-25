@@ -1,33 +1,4 @@
-interface ApiResponse {
-    response: string;
-    usedTools: string[];
-}
-
-interface CreateSessionResponse {
-    session_id: string;
-    message: string;
-}
-
-interface Tool {
-    name: string;
-    description: string;
-    enabled: boolean;
-    source: string;
-    parameters: Record<string, any>;
-}
-
-interface DebugEvent {
-    event_type: string;
-    message: string;
-    data: Record<string, any>;
-    timestamp: string;
-    session_id?: string;
-}
-
-interface DebugInfo {
-    events: DebugEvent[];
-    enabled: boolean;
-}
+import { ApiResponse, CreateSessionResponse, Tool, DebugEvent, DebugInfo } from './types';
 
 export class ApiService {
     public apiBaseUrl: string;

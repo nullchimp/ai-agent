@@ -8,7 +8,8 @@ def test_service_modules_exist():
     service_files = [
         'src/ui/apiService.ts',
         'src/ui/chatService.ts', 
-        'src/ui/utils.ts'
+        'src/ui/utils.ts',
+        'src/ui/types.ts'
     ]
     
     for file_path in service_files:

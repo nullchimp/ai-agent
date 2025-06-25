@@ -9,8 +9,9 @@
     "test": "tests"
   },
   "scripts": {
-    "ui:build:chat": "npx tsc src/ui/chat.ts --target ES2020 --lib ES2020,DOM --outDir src/ui/dist",
-    "ui:build": "npm run ui:build:chat && cp src/ui/index.html src/ui/dist/index.html && cp src/ui/styles.css src/ui/dist/styles.css",
+    "ui:build": "npx tsc && cp src/ui/index.html src/ui/dist/index.html && cp src/ui/styles.css src/ui/dist/styles.css",
+    "ui:clean": "rm -rf src/ui/dist",
+    "ui:dev": "npm run ui:clean && npm run ui:build",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
