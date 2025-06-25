@@ -1387,13 +1387,7 @@ class ChatApp {
     }
 
     private applyColorSchemeToData(data: Record<string, any>): string {
-        const maxLength = 10000;
-        const jsonStr = JSON.stringify(data, null, 2);
-        
-        if (jsonStr.length > maxLength) {
-            return this.escapeHtml(jsonStr.substring(0, maxLength) + '\n... [truncated - response too large]');
-        }
-        
+        // Apply color scheme directly - truncation is now handled by backend
         return this.colorizeJsonData(data, 0);
     }
 
@@ -1405,8 +1399,9 @@ class ChatApp {
         }
         
         if (typeof obj === 'string') {
-            if (obj === '...[truncated]') {
-                return `<span class="debug-truncated">"${this.escapeHtml(obj)}"</span>`;
+            if (obj.endsWith('...[truncated]')) {
+                const mainText = obj.substring(0, obj.length - 14); // Remove "...[truncated]"
+                return `"<span class="debug-color-white">${this.escapeHtml(mainText)}</span><span class="debug-truncated">...[truncated]</span>"`;
             }
             return `"<span class="debug-color-white">${this.escapeHtml(obj)}</span>"`;
         }
@@ -1419,8 +1414,9 @@ class ChatApp {
             if (obj.length === 0) return '[]';
             
             const items = obj.map(item => {
-                if (typeof item === 'string' && item === '...[truncated]') {
-                    return `${indent}  <span class="debug-truncated">"${item}"</span>`;
+                if (typeof item === 'string' && item.endsWith('...[truncated]')) {
+                    const mainText = item.substring(0, item.length - 14);
+                    return `${indent}  "<span class="debug-color-white">${this.escapeHtml(mainText)}</span><span class="debug-truncated">...[truncated]</span>"`;
                 }
                 return `${indent}  ${this.colorizeJsonData(item, depth + 1)}`;
             });
