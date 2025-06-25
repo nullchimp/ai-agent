@@ -81,7 +81,7 @@ export class ChatService {
         };
     }
 
-    private saveChatHistory(): void {
+    saveChatHistory(): void {
         try {
             const sessionsToSave = this.sessions.map(session => ({
                 id: session.id,
