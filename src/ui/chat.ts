@@ -1,4 +1,6 @@
-// Type declaration for marked library
+// =================================================================================
+// I. INTERFACES & TYPE DECLARATIONS
+// =================================================================================
 declare const marked: {
     parse(markdown: string): string;
 };
@@ -21,12 +23,12 @@ interface Tool {
 
 interface ChatSession {
     id: string;
-    sessionId?: string;  // Backend session ID (optional for backward compatibility)
+    sessionId?: string;  // Backend session ID
     title: string;
     messages: Message[];
     createdAt: Date;
-    debugPanelOpen?: boolean;  // Debug panel state per session
-    debugEnabled?: boolean;    // Debug enabled state per session
+    debugPanelOpen?: boolean;
+    debugEnabled?: boolean;
 }
 
 interface DebugEvent {
@@ -37,306 +39,58 @@ interface DebugEvent {
     session_id?: string;
 }
 
-interface DebugInfo {
-    events: DebugEvent[];
-    enabled: boolean;
-}
-
-class ChatApp {
-    private messagesContainer: HTMLElement;
-    private messageInput: HTMLTextAreaElement;
-    private sendBtn: HTMLButtonElement;
-    private chatHistory: HTMLElement;
-    private newChatBtn: HTMLButtonElement;
-    private toolsHeader: HTMLElement;
-    private toolsList: HTMLElement;
-    private debugPanelToggle: HTMLButtonElement;
-    private debugPanelOverlay: HTMLElement;
-    private debugEventsContainer: HTMLElement;
-    private debugClearBtn: HTMLButtonElement;
-    private debugPanelClose: HTMLButtonElement;
-    private debugFullscreenOverlay: HTMLElement;
-    private debugFullscreenData: HTMLElement;
-    private debugFullscreenTitle: HTMLElement;
-    private debugFullscreenClose: HTMLButtonElement;
-    private currentSession: ChatSession | null = null;
-    private sessions: ChatSession[] = [];
-    private tools: Tool[] = [];
-    private debugEventsList: DebugEvent[] = [];
-    private isCreatingSession: boolean = false;
-    private isLoadingTools: boolean = false;
-    private isSendingMessage: boolean = false;
-    private isVerifyingSession: boolean = false;
-    private toolCategoryStates: Record<string, boolean> = {}; // Track collapse state per source
-
+// =================================================================================
+// II. API MANAGER
+// =================================================================================
+class ApiManager {
     private apiBaseUrl = 'http://localhost:5555/api';
 
-    constructor() {
-        this.messagesContainer = document.getElementById('messagesContainer') as HTMLElement;
-        this.messageInput = document.getElementById('messageInput') as HTMLTextAreaElement;
-        this.sendBtn = document.getElementById('sendBtn') as HTMLButtonElement;
-        this.chatHistory = document.getElementById('chatHistory') as HTMLElement;
-        this.newChatBtn = document.getElementById('newChatBtn') as HTMLButtonElement;
-        this.toolsHeader = document.getElementById('toolsHeader') as HTMLElement;
-        this.toolsList = document.getElementById('toolsList') as HTMLElement;
-        
-        // Debug elements
-        this.debugPanelToggle = document.getElementById('debugPanelToggle') as HTMLButtonElement;
-        this.debugPanelOverlay = document.getElementById('debugPanelOverlay') as HTMLElement;
-        this.debugEventsContainer = document.getElementById('debugEvents') as HTMLElement;
-        this.debugClearBtn = document.getElementById('debugClearBtn') as HTMLButtonElement;
-        this.debugPanelClose = document.getElementById('debugPanelClose') as HTMLButtonElement;
-        
-        // Debug fullscreen elements
-        this.debugFullscreenOverlay = document.getElementById('debugFullscreenOverlay') as HTMLElement;
-        this.debugFullscreenData = document.getElementById('debugFullscreenData') as HTMLElement;
-        this.debugFullscreenTitle = document.getElementById('debugFullscreenTitle') as HTMLElement;
-        this.debugFullscreenClose = document.getElementById('debugFullscreenClose') as HTMLButtonElement;
-
-        this.init();
+    public async createNewBackendSession(): Promise<{ session_id: string }> {
+        const response = await fetch(`${this.apiBaseUrl}/session/new`, {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        if (!response.ok) {
+            throw new Error(`Failed to create session: ${response.status}`);
+        }
+        return response.json();
     }
 
-    private async init(): Promise<void> {
-        this.loadChatHistory();
-        this.setupEventListeners();
-        
-        console.log('ChatApp initialized with', this.sessions.length, 'sessions loaded.');
-
-        // Only create a new session if no sessions exist
-        if (this.sessions.length === 0) {
-            await this.createNewSession();
+    public async verifyBackendSession(sessionId: string): Promise<any> {
+        const response = await fetch(`${this.apiBaseUrl}/session/${sessionId}`, {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        if (response.ok) {
+            return response.json();
+        }
+        throw new Error(`Backend session ${sessionId} not found`);
+    }
+    
+    public async deleteBackendSession(sessionId: string): Promise<void> {
+        const deleteUrl = `${this.apiBaseUrl}/session/${sessionId}`;
+        console.log(`Deleting backend session at: ${deleteUrl}`);
+        const response = await fetch(deleteUrl, { method: 'DELETE' });
+        if (!response.ok && response.status !== 404) {
+            console.warn(`Failed to delete backend session ${sessionId}: ${response.status}`);
         } else {
-            // Load the most recent session
-            this.currentSession = this.sessions[0];
-            
-            console.log('Loading existing session:', this.currentSession.sessionId);
-            // If the session has a backend sessionId, verify it exists
-            if (this.currentSession.sessionId) {
-                this.isVerifyingSession = true;
-                this.updateSendButtonState();
-                this.showSessionVerificationLoading();
-                await this.verifyBackendSession(this.currentSession.sessionId);
-                this.isVerifyingSession = false;
-                this.updateSendButtonState();
-                this.hideSessionVerificationLoading();
-            }
-            
-            await this.loadSession(this.currentSession.id);
-        }
-        
-        this.renderChatHistory();
-    }
-
-    private setupEventListeners(): void {
-        this.sendBtn.addEventListener('click', () => this.sendMessage());
-        
-        this.messageInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                this.sendMessage();
-            }
-        });
-
-        this.messageInput.addEventListener('input', () => {
-            this.adjustTextareaHeight();
-            this.updateSendButtonState();
-        });
-
-        this.newChatBtn.addEventListener('click', () => {
-            if (!this.isCreatingSession) {
-                this.createNewSession();
-            }
-        });
-
-        this.toolsHeader.addEventListener('click', () => this.toggleToolsSection());
-        
-        // Debug event listeners
-        this.debugPanelToggle.addEventListener('click', (e) => {
-            e.stopPropagation(); // Prevent triggering tools section toggle
-            this.toggleDebugPanel();
-        });
-        this.debugPanelClose.addEventListener('click', () => this.closeDebugPanel());
-        this.debugClearBtn.addEventListener('click', () => this.clearDebugEvents());
-        
-        // Debug fullscreen event listeners
-        this.debugFullscreenClose.addEventListener('click', () => this.closeDebugFullscreen());
-        this.debugFullscreenOverlay.addEventListener('click', (e) => {
-            if (e.target === this.debugFullscreenOverlay) {
-                this.closeDebugFullscreen();
-            }
-        });
-        
-        // Keyboard shortcut for closing fullscreen
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && this.debugFullscreenOverlay.classList.contains('active')) {
-                this.closeDebugFullscreen();
-            }
-        });
-    }
-
-    private adjustTextareaHeight(): void {
-        this.messageInput.style.height = 'auto';
-        this.messageInput.style.height = Math.min(this.messageInput.scrollHeight, 120) + 'px';
-    }
-
-    private updateSendButtonState(): void {
-        const hasContent = this.messageInput.value.trim().length > 0;
-        const hasActiveSession = this.currentSession !== null;
-        const isLoading = this.isLoadingTools || this.isSendingMessage || this.isCreatingSession || this.isVerifyingSession;
-        
-        this.sendBtn.disabled = !hasContent || !hasActiveSession || isLoading;
-        this.messageInput.disabled = isLoading;
-        
-        // Add visual feedback for loading state
-        if (isLoading) {
-            this.messageInput.placeholder = 'Please wait...';
-            this.messageInput.classList.add('loading');
-        } else {
-            this.messageInput.placeholder = 'Type your message...';
-            this.messageInput.classList.remove('loading');
+            console.log(`Successfully deleted backend session ${sessionId}`);
         }
     }
 
-    private updateNewChatButtonState(): void {
-        const button = this.newChatBtn;
-        const icon = button.querySelector('svg');
-        const span = button.querySelector('span');
-        
-        if (this.isCreatingSession) {
-            button.disabled = true;
-            button.classList.add('loading');
-            if (icon) {
-                icon.style.display = 'none';
-            }
-            if (span) {
-                span.textContent = 'Creating...';
-            }
-        } else {
-            button.disabled = false;
-            button.classList.remove('loading');
-            if (icon) {
-                icon.style.display = 'block';
-            }
-            if (span) {
-                span.textContent = 'New chat';
-            }
-        }
-    }
-
-    private async sendMessage(): Promise<void> {
-        const content = this.messageInput.value.trim();
-        if (!content || !this.currentSession) return;
-
-        this.isSendingMessage = true;
-        this.updateSendButtonState();
-
-        // If the current session doesn't have a backend session ID, create one
-        if (!this.currentSession.sessionId) {
-            console.log('Creating backend session for existing frontend session...');
-            try {
-                const response = await fetch(`${this.apiBaseUrl}/session/new`, {
-                    method: 'GET',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    }
-                });
-
-                if (response.ok) {
-                    const sessionData = await response.json();
-                    this.currentSession.sessionId = sessionData.session_id;
-                    console.log(`Created backend session: ${sessionData.session_id}`);
-                    this.saveChatHistory();
-                    // Reload tools for the new session
-                    await this.loadTools();
-                } else {
-                    this.showError('Failed to create backend session. Please try again.');
-                    this.isSendingMessage = false;
-                    this.updateSendButtonState();
-                    return;
-                }
-            } catch (error) {
-                console.error('Failed to create backend session:', error);
-                this.showError('Failed to create backend session. Please try again.');
-                this.isSendingMessage = false;
-                this.updateSendButtonState();
-                return;
-            }
-        }
-
-        const userMessage: Message = {
-            id: this.generateId(),
-            content,
-            role: 'user',
-            timestamp: new Date()
-        };
-
-        this.currentSession.messages.push(userMessage);
-        this.displayMessage(userMessage);
-        this.messageInput.value = '';
-        this.adjustTextareaHeight();
-        this.updateSendButtonState();
-
-        this.showTypingIndicator();
-
-        try {
-            console.log(`Sending message to session: ${this.currentSession.sessionId}`);
-            const apiResponse = await this.callAPI(content);
-            this.hideTypingIndicator();
-
-            const assistantMessage: Message = {
-                id: this.generateId(),
-                content: apiResponse.response,
-                role: 'assistant',
-                timestamp: new Date(),
-                usedTools: apiResponse.usedTools
-            };
-
-            this.currentSession.messages.push(assistantMessage);
-            this.displayMessage(assistantMessage);
-            this.updateSessionTitle();
-            this.saveChatHistory();
-            this.renderChatHistory();
-            
-            // Load debug events after message processing
-            if (this.getCurrentDebugEnabled()) {
-                this.loadDebugEvents();
-            }
-        } catch (error) {
-            this.hideTypingIndicator();
-            this.showError('Failed to get response. Please try again.');
-            console.error('API Error:', error);
-        } finally {
-            this.isSendingMessage = false;
-            this.updateSendButtonState();
-        }
-    }
-
-    private async callAPI(message: string): Promise<{response: string, usedTools: string[]}> {
-        if (!this.currentSession?.sessionId) {
-            throw new Error('No active session');
-        }
-
-        const apiUrl = `${this.apiBaseUrl}/${this.currentSession.sessionId}/ask`;
+    public async ask(sessionId: string, message: string): Promise<{ response: string, usedTools: string[] }> {
+        const apiUrl = `${this.apiBaseUrl}/${sessionId}/ask`;
         console.log(`Making API call to: ${apiUrl}`);
-
         try {
             const response = await fetch(apiUrl, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-API-Key': 'test_12345'
-                },
+                headers: { 'Content-Type': 'application/json', 'X-API-Key': 'test_12345' },
                 body: JSON.stringify({ query: message })
             });
-
-            console.log('API response status:', response.status);
-
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
-
             const data = await response.json();
-            console.log('API Response Data:', data); // Debug log
             return {
                 response: data.response || 'Sorry, I couldn\'t process your request.',
                 usedTools: data.used_tools || []
@@ -350,214 +104,181 @@ class ChatApp {
         }
     }
 
-    private displayMessage(message: Message): void {
-        const messageEl = document.createElement('div');
-        messageEl.className = `message ${message.role}`;
-        
-        const avatar = document.createElement('div');
-        avatar.className = 'message-avatar';
-        avatar.textContent = message.role === 'user' ? 'U' : 'AI';
-        
-        const content = document.createElement('div');
-        content.className = 'message-content';
-
-        // Add tool tags at the top for assistant messages
-        if (message.role === 'assistant' && message.usedTools && message.usedTools.length > 0) {
-            console.log('Adding tool tags:', message.usedTools); // Debug log
-            const toolsContainer = document.createElement('div');
-            toolsContainer.className = 'tool-tags';
-            
-            message.usedTools.forEach(tool => {
-                const toolTag = document.createElement('span');
-                toolTag.className = 'tool-tag';
-                toolTag.textContent = tool.toLowerCase();
-                toolsContainer.appendChild(toolTag);
-            });
-            
-            content.appendChild(toolsContainer);
-        }
-        
-        const text = document.createElement('div');
-        text.className = 'message-text';
-        
-        if (message.role === 'assistant') {
-            // Render markdown for assistant messages
-            text.innerHTML = marked.parse(message.content);
-        } else {
-            // Keep user messages as plain text for security
-            text.textContent = message.content;
-        }
-        
-        content.appendChild(text);
-        
-        messageEl.appendChild(avatar);
-        messageEl.appendChild(content);
-        
-        this.hideWelcomeMessage();
-        this.messagesContainer.appendChild(messageEl);
-        this.scrollToBottom();
-    }
-
-    private showTypingIndicator(): void {
-        const typingEl = document.createElement('div');
-        typingEl.className = 'message assistant';
-        typingEl.id = 'typingIndicator';
-        
-        const avatar = document.createElement('div');
-        avatar.className = 'message-avatar';
-        avatar.textContent = 'AI';
-        
-        const content = document.createElement('div');
-        content.className = 'message-content';
-        
-        const indicator = document.createElement('div');
-        indicator.className = 'typing-indicator';
-        
-        for (let i = 0; i < 3; i++) {
-            const dot = document.createElement('div');
-            dot.className = 'typing-dot';
-            indicator.appendChild(dot);
-        }
-        
-        content.appendChild(indicator);
-        typingEl.appendChild(avatar);
-        typingEl.appendChild(content);
-        
-        this.hideWelcomeMessage();
-        this.messagesContainer.appendChild(typingEl);
-        this.scrollToBottom();
-    }
-
-    private hideTypingIndicator(): void {
-        const typingEl = document.getElementById('typingIndicator');
-        if (typingEl) {
-            typingEl.remove();
-        }
-    }
-
-    private hideWelcomeMessage(): void {
-        const welcomeEl = this.messagesContainer.querySelector('.welcome-message') as HTMLElement;
-        if (welcomeEl) {
-            welcomeEl.style.display = 'none';
-        }
-    }
-
-    private showError(message: string): void {
-        const errorEl = document.createElement('div');
-        errorEl.className = 'error-message';
-        errorEl.textContent = message;
-        this.messagesContainer.appendChild(errorEl);
-        this.scrollToBottom();
-        
-        setTimeout(() => {
-            errorEl.remove();
-        }, 5000);
-    }
-
-    private scrollToBottom(): void {
-        this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight;
-    }
-
-    private async createNewSession(): Promise<void> {
-        if (this.isCreatingSession) return;
-        
-        this.isCreatingSession = true;
-        this.updateNewChatButtonState();
-        this.updateSendButtonState();
-        
-        // Show loading state immediately
-        this.clearMessages();
-        
+    public async loadTools(sessionId: string): Promise<Tool[]> {
+        const toolsUrl = `${this.apiBaseUrl}/${sessionId}/tools`;
+        console.log(`Loading tools from: ${toolsUrl}`);
         try {
-            // Create a new backend session
-            const response = await fetch(`${this.apiBaseUrl}/session/new`, {
-                method: 'GET',
-                headers: {
-                    'Content-Type': 'application/json'
-                }
-            });
-
-            if (!response.ok) {
-                throw new Error(`Failed to create session: ${response.status}`);
+            const response = await fetch(toolsUrl, { headers: { 'X-API-Key': 'test_12345' } });
+            if (response.ok) {
+                const data = await response.json();
+                return data.tools || [];
             }
-
-            const sessionData = await response.json();
-            
-            const session: ChatSession = {
-                id: this.generateId(),
-                sessionId: sessionData.session_id,  // Backend session ID
-                title: 'New Chat',
-                messages: [],
-                createdAt: new Date(),
-                debugPanelOpen: false,
-                debugEnabled: false
-            };
-
-            this.sessions.unshift(session);
-            this.currentSession = session;
-            this.saveChatHistory(); // Save immediately after creating session
-            this.renderChatHistory();
-            
-            // Re-enable input for the new session
-            this.enableInput();
-            
-            // Reload tools for the new session
-            await this.loadTools();
-            // Restore debug state for the new session
-            await this.restoreDebugState();
-            
-            // Focus input after everything is loaded
-            this.messageInput.focus();
+            console.error(`Failed to load tools: ${response.status}`);
         } catch (error) {
-            console.error('Failed to create new session:', error);
-            this.showError('Failed to create new chat session. Please try again.');
-        } finally {
-            this.isCreatingSession = false;
-            this.updateNewChatButtonState();
-            this.updateSendButtonState();
-            // Clear the loading message and show the normal welcome message
-            this.clearMessages();
+            console.error('Failed to load tools:', error);
         }
+        return [];
     }
 
-    private clearMessages(): void {
-        if (this.isCreatingSession) {
-            this.messagesContainer.innerHTML = `
-                <div class="welcome-message">
-                    <div class="session-loading">
-                        <div class="loading-spinner"></div>
-                        <h1>Setting up your new chat...</h1>
-                        <p>Initializing tools and preparing the session for you.</p>
-                    </div>
-                </div>
-            `;
-        } else if (!this.currentSession) {
-            this.showEmptyState();
-        } else {
-            this.messagesContainer.innerHTML = `
-                <div class="welcome-message">
-                    <h1>AI Agent</h1>
-                    <p>How can I help you today?</p>
-                </div>
-            `;
+    public async toggleTool(sessionId: string, toolName: string, enabled: boolean): Promise<boolean> {
+        const toggleUrl = `${this.apiBaseUrl}/${sessionId}/tools/toggle`;
+        console.log(`Toggling tool ${toolName} to ${enabled} at: ${toggleUrl}`);
+        try {
+            const response = await fetch(toggleUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-API-Key': 'test_12345' },
+                body: JSON.stringify({ tool_name: toolName, enabled: enabled })
+            });
+            if (response.ok) {
+                console.log(`Successfully toggled tool ${toolName} to ${enabled}`);
+                return true;
+            }
+            console.error('Failed to toggle tool:', await response.text());
+        } catch (error) {
+            console.error('Error toggling tool:', error);
         }
+        return false;
     }
 
-    private updateSessionTitle(): void {
+    public async setDebugMode(sessionId: string, enabled: boolean): Promise<{ enabled: boolean } | null> {
+        try {
+            const response = await fetch(`${this.apiBaseUrl}/${sessionId}/debug/toggle`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-API-Key': 'test_12345' },
+                body: JSON.stringify({ enabled: enabled })
+            });
+            if (response.ok) {
+                return await response.json();
+            }
+            console.error('Failed to set debug mode:', await response.text());
+        } catch (error) {
+            console.error('Error setting debug mode:', error);
+        }
+        return null;
+    }
+
+    public async loadDebugEvents(sessionId: string): Promise<{ events: DebugEvent[], enabled: boolean } | null> {
+        try {
+            const response = await fetch(`${this.apiBaseUrl}/${sessionId}/debug`, {
+                headers: { 'X-API-Key': 'test_12345' }
+            });
+            if (response.ok) {
+                return await response.json();
+            }
+            console.error('Failed to load debug events:', await response.text());
+        } catch (error) {
+            console.error('Error loading debug events:', error);
+        }
+        return null;
+    }
+
+    public async clearDebugEvents(sessionId: string): Promise<boolean> {
+        try {
+            const response = await fetch(`${this.apiBaseUrl}/${sessionId}/debug`, {
+                method: 'DELETE',
+                headers: { 'X-API-Key': 'test_12345' }
+            });
+            if (response.ok) {
+                return true;
+            }
+            console.error('Failed to clear debug events:', await response.text());
+        } catch (error) {
+            console.error('Error clearing debug events:', error);
+        }
+        return false;
+    }
+}
+
+// =================================================================================
+// III. SESSION MANAGER
+// =================================================================================
+class SessionManager {
+    public sessions: ChatSession[] = [];
+    public currentSession: ChatSession | null = null;
+    private chatHistory: HTMLElement;
+
+    constructor(private apiManager: ApiManager, private onSessionChanged: () => Promise<void>) {
+        this.chatHistory = document.getElementById('chatHistory') as HTMLElement;
+        this.loadChatHistory();
+    }
+
+    public async createNewSession(): Promise<ChatSession> {
+        const sessionData = await this.apiManager.createNewBackendSession();
+        const session: ChatSession = {
+            id: this.generateId(),
+            sessionId: sessionData.session_id,
+            title: 'New Chat',
+            messages: [],
+            createdAt: new Date(),
+            debugPanelOpen: false,
+            debugEnabled: false
+        };
+
+        this.sessions.unshift(session);
+        this.currentSession = session;
+        this.saveChatHistory();
+        this.renderChatHistory();
+        await this.onSessionChanged();
+        return session;
+    }
+
+    public async loadSession(sessionId: string): Promise<void> {
+        const session = this.sessions.find(s => s.id === sessionId);
+        if (!session) return;
+
+        this.currentSession = session;
+        this.renderChatHistory();
+        await this.onSessionChanged();
+    }
+
+    public async deleteSession(sessionId: string): Promise<void> {
+        const sessionIndex = this.sessions.findIndex(s => s.id === sessionId);
+        if (sessionIndex === -1) return;
+
+        const session = this.sessions[sessionIndex];
+        if (session.sessionId) {
+            try {
+                await this.apiManager.deleteBackendSession(session.sessionId);
+            } catch (error) {
+                console.error('Failed to delete backend session:', error);
+            }
+        }
+
+        this.sessions.splice(sessionIndex, 1);
+
+        if (this.currentSession?.id === sessionId) {
+            if (this.sessions.length > 0) {
+                await this.loadSession(this.sessions[0].id);
+            } else {
+                this.currentSession = null;
+                await this.onSessionChanged();
+            }
+        }
+
+        this.saveChatHistory();
+        this.renderChatHistory();
+    }
+
+    public updateSessionTitle(): void {
         if (!this.currentSession || this.currentSession.messages.length === 0) return;
 
         const firstUserMessage = this.currentSession.messages.find(m => m.role === 'user');
         if (firstUserMessage && this.currentSession.title === 'New Chat') {
-            this.currentSession.title = firstUserMessage.content.substring(0, 50) + 
+            this.currentSession.title = firstUserMessage.content.substring(0, 50) +
                 (firstUserMessage.content.length > 50 ? '...' : '');
             this.renderChatHistory();
             this.saveChatHistory();
         }
     }
 
-    private renderChatHistory(): void {
+    public addMessageToCurrentSession(message: Message): void {
+        if (!this.currentSession) return;
+        this.currentSession.messages.push(message);
+        this.saveChatHistory();
+    }
+
+    public renderChatHistory(): void {
         this.chatHistory.innerHTML = '';
-        
         this.sessions.forEach(session => {
             const item = document.createElement('div');
             item.className = 'chat-item';
@@ -568,7 +289,7 @@ class ChatApp {
             const title = document.createElement('span');
             title.className = 'chat-title';
             title.textContent = session.title;
-            
+
             const deleteBtn = document.createElement('button');
             deleteBtn.className = 'chat-delete-btn';
             deleteBtn.innerHTML = `
@@ -577,85 +298,36 @@ class ChatApp {
                     <path d="M19,6V20a2,2,0,0,1-2,2H7a2,2,0,0,1-2-2V6M8,6V4a2,2,0,0,1,2-2h4a2,2,0,0,1,2,2V6"></path>
                     <line x1="10" y1="11" x2="10" y2="17"></line>
                     <line x1="14" y1="11" x2="14" y2="17"></line>
-                </svg>
-            `;
+                </svg>`;
             deleteBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 this.deleteSession(session.id);
             });
-            
+
             item.appendChild(title);
             item.appendChild(deleteBtn);
             item.addEventListener('click', () => this.loadSession(session.id));
-            
             this.chatHistory.appendChild(item);
         });
     }
 
-    private async loadSession(sessionId: string): Promise<void> {
-        const session = this.sessions.find(s => s.id === sessionId);
-        if (!session) return;
-
-        this.currentSession = session;
-        this.clearMessages();
-        
-        session.messages.forEach(message => {
-            this.displayMessage(message);
-        });
-
-        this.renderChatHistory();
-        
-        // Re-enable input for the loaded session
-        this.enableInput();
-        
-        // Load tools for the current session
-        await this.loadTools();
-        
-        // Restore debug panel state for this session
-        await this.restoreDebugState();
-    }
-
-    private async restoreDebugState(): Promise<void> {
-        if (!this.currentSession) return;
-        
-        const debugPanelShouldBeOpen = this.getCurrentDebugPanelState();
-        
-        // Update UI to match session state
-        if (debugPanelShouldBeOpen) {
-            this.debugPanelOverlay.classList.add('active');
-            this.debugPanelToggle.classList.add('active');
-            document.body.classList.add('debug-panel-open');
-            
-            // Load debug events and ensure debug mode is enabled
-            await this.setDebugMode(true);
-            await this.loadDebugEvents();
-        } else {
-            this.debugPanelOverlay.classList.remove('active');
-            this.debugPanelToggle.classList.remove('active');
-            document.body.classList.remove('debug-panel-open');
-            
-            // Ensure debug mode reflects session state
-            const sessionDebugEnabled = this.getCurrentDebugEnabled();
-            if (sessionDebugEnabled) {
-                await this.setDebugMode(true);
+    public async verifyCurrentSession(): Promise<void> {
+        if (this.currentSession?.sessionId) {
+            try {
+                await this.apiManager.verifyBackendSession(this.currentSession.sessionId);
+                console.log(`Backend session ${this.currentSession.sessionId} verified.`);
+            } catch (error) {
+                console.warn(`Backend session ${this.currentSession.sessionId} not found, will create new session when needed.`);
+                this.currentSession.sessionId = undefined;
+                this.saveChatHistory();
             }
         }
     }
 
     private saveChatHistory(): void {
         try {
-            const sessionsToSave = this.sessions.map(session => ({
-                id: session.id,
-                sessionId: session.sessionId, // Ensure backend session ID is saved
-                title: session.title,
-                messages: session.messages,
-                createdAt: session.createdAt,
-                debugPanelOpen: session.debugPanelOpen || false,
-                debugEnabled: session.debugEnabled || false
-            }));
-            
+            const sessionsToSave = this.sessions.map(s => ({ ...s }));
             localStorage.setItem('chatSessions', JSON.stringify(sessionsToSave));
-            console.log('Saved chat history:', sessionsToSave.length, 'sessions');
         } catch (error) {
             console.error('Failed to save chat history:', error);
         }
@@ -668,20 +340,15 @@ class ChatApp {
                 const parsed = JSON.parse(saved);
                 this.sessions = parsed.map((session: any) => ({
                     ...session,
-                    sessionId: session.sessionId || null, // Handle existing sessions without sessionId
                     createdAt: new Date(session.createdAt),
-                    debugPanelOpen: session.debugPanelOpen || false,
-                    debugEnabled: session.debugEnabled || false,
                     messages: session.messages.map((msg: any) => ({
                         ...msg,
                         timestamp: new Date(msg.timestamp)
                     }))
                 }));
-                
-                console.log('Loaded chat history:', this.sessions.length, 'sessions');
-                this.sessions.forEach(session => {
-                    console.log(`Session ${session.id}: backend sessionId = ${session.sessionId}, debugPanel = ${session.debugPanelOpen}, debugEnabled = ${session.debugEnabled}`);
-                });
+                if (this.sessions.length > 0) {
+                    this.currentSession = this.sessions[0];
+                }
             } catch (error) {
                 console.error('Failed to load chat history:', error);
                 this.sessions = [];
@@ -692,534 +359,303 @@ class ChatApp {
     private generateId(): string {
         return Date.now().toString(36) + Math.random().toString(36).substr(2);
     }
+}
 
-    private async deleteSession(sessionId: string): Promise<void> {
-        const sessionIndex = this.sessions.findIndex(s => s.id === sessionId);
-        if (sessionIndex === -1) return;
-        
-        const session = this.sessions[sessionIndex];
-        console.log(`Deleting session: frontend ID=${session.id}, backend ID=${session.sessionId}`);
-        
-        try {
-            // Delete the backend session
-            if (session.sessionId) {
-                const deleteUrl = `${this.apiBaseUrl}/session/${session.sessionId}`;
-                console.log(`Deleting backend session at: ${deleteUrl}`);
-                
-                const response = await fetch(deleteUrl, {
-                    method: 'DELETE'
-                });
-                
-                if (!response.ok && response.status !== 404) {
-                    console.warn(`Failed to delete backend session ${session.sessionId}: ${response.status}`);
-                } else {
-                    console.log(`Successfully deleted backend session ${session.sessionId}`);
-                }
-            } else {
-                console.log('No backend session ID to delete');
-            }
-        } catch (error) {
-            console.error('Failed to delete backend session:', error);
-            // Continue with frontend cleanup even if backend deletion fails
-        }
-        
-        // Remove the session from the array
-        this.sessions.splice(sessionIndex, 1);
-        
-        // If we deleted the current session, switch to another one or show empty state
-        if (this.currentSession?.id === sessionId) {
-            if (this.sessions.length > 0) {
-                // Load the first available session
-                this.currentSession = this.sessions[0];
-                await this.loadSession(this.currentSession.id);
-            } else {
-                // No sessions left, show empty state
-                this.currentSession = null;
-                this.showEmptyState();
-            }
-        }
-        
-        this.saveChatHistory();
-        this.renderChatHistory();
+// =================================================================================
+// IV. TOOLS MANAGER
+// =================================================================================
+class ToolsManager {
+    private tools: Tool[] = [];
+    private toolsHeader: HTMLElement;
+    private toolsList: HTMLElement;
+    private toolCategoryStates: Record<string, boolean> = {};
+
+    constructor(private apiManager: ApiManager, private sessionManager: SessionManager) {
+        this.toolsHeader = document.getElementById('toolsHeader') as HTMLElement;
+        this.toolsList = document.getElementById('toolsList') as HTMLElement;
+        this.toolsHeader.addEventListener('click', () => this.toggleToolsSection());
     }
 
-    // Tool management methods
-    private async loadTools(): Promise<void> {
-        if (!this.currentSession?.sessionId) {
-            console.log('No session ID available for loading tools');
+    public async loadTools(): Promise<void> {
+        if (!this.sessionManager.currentSession?.sessionId) {
             this.tools = [];
             this.renderTools();
             return;
         }
-
-        this.isLoadingTools = true;
         this.renderToolsLoading();
-        this.updateSendButtonState();
+        this.tools = await this.apiManager.loadTools(this.sessionManager.currentSession.sessionId);
+        this.renderTools();
+    }
 
-        const toolsUrl = `${this.apiBaseUrl}/${this.currentSession.sessionId}/tools`;
-        console.log(`Loading tools from: ${toolsUrl}`);
-
-        try {
-            const response = await fetch(toolsUrl, {
-                headers: {
-                    'X-API-Key': 'test_12345'
-                }
-            });
-
-            if (response.ok) {
-                const data = await response.json();
-                this.tools = data.tools || [];
-                console.log(`Loaded ${this.tools.length} tools:`, this.tools.map(t => t.name));
-            } else {
-                console.error(`Failed to load tools: ${response.status}`);
-                this.tools = [];
+    public async toggleTool(toolName: string, enabled: boolean): Promise<void> {
+        if (!this.sessionManager.currentSession?.sessionId) return;
+        const success = await this.apiManager.toggleTool(this.sessionManager.currentSession.sessionId, toolName, enabled);
+        if (success) {
+            const tool = this.tools.find(t => t.name === toolName);
+            if (tool) {
+                tool.enabled = enabled;
+                this.updateToolsUI();
             }
-        } catch (error) {
-            console.error('Failed to load tools:', error);
-            this.tools = [];
-        } finally {
-            this.isLoadingTools = false;
-            this.renderTools();
-            this.updateSendButtonState();
+        }
+    }
+
+    public async toggleSourceTools(source: string, enabled: boolean): Promise<void> {
+        if (!this.sessionManager.currentSession?.sessionId) return;
+        const sourceTools = this.tools.filter(tool => (tool.source || 'default') === source);
+        for (const tool of sourceTools) {
+            if (tool.enabled !== enabled) {
+                await this.toggleTool(tool.name, enabled);
+            }
         }
     }
 
     private toggleToolsSection(): void {
-        const isExpanded = this.toolsHeader.classList.contains('expanded');
-        
-        if (isExpanded) {
-            this.toolsHeader.classList.remove('expanded');
-            this.toolsList.classList.remove('expanded');
-        } else {
-            this.toolsHeader.classList.add('expanded');
-            this.toolsList.classList.add('expanded');
-        }
+        const isExpanded = this.toolsHeader.classList.toggle('expanded');
+        this.toolsList.classList.toggle('expanded', isExpanded);
     }
 
     private renderToolsLoading(): void {
-        this.toolsList.innerHTML = `
-            <div class="tools-loading">
-                <div class="loading-spinner"></div>
-                <span>Loading tools...</span>
-            </div>
-        `;
-        
-        // Update the tools configuration text to show loading state
+        this.toolsList.innerHTML = `<div class="tools-loading"><div class="loading-spinner"></div><span>Loading tools...</span></div>`;
         const toolsLabelSpan = this.toolsHeader.querySelector('.tools-label span');
-        if (toolsLabelSpan) {
-            toolsLabelSpan.textContent = 'Tools Configuration [Loading...]';
-        }
+        if (toolsLabelSpan) toolsLabelSpan.textContent = 'Tools Configuration [Loading...]';
     }
 
     private renderTools(): void {
-        console.log('renderTools() called');
         this.toolsList.innerHTML = '';
-        
-        // Check if there's no active session
-        if (!this.currentSession) {
-            this.toolsList.innerHTML = `
-                <div class="tools-no-session">
-                    <div class="tools-no-session-message">
-                        No active session. Create a new chat to configure tools.
-                    </div>
-                </div>
-            `;
-            
-            // Update the tools configuration text to show no session state
+        if (!this.sessionManager.currentSession) {
+            this.toolsList.innerHTML = `<div class="tools-no-session"><div class="tools-no-session-message">No active session. Create a new chat to configure tools.</div></div>`;
             const toolsLabelSpan = this.toolsHeader.querySelector('.tools-label span');
-            if (toolsLabelSpan) {
-                toolsLabelSpan.textContent = 'Tools Configuration [No Session]';
-            }
+            if (toolsLabelSpan) toolsLabelSpan.textContent = 'Tools Configuration [No Session]';
             return;
         }
-        
+
         const enabledCount = this.tools.filter(tool => tool.enabled).length;
         const totalCount = this.tools.length;
-        
-        // Update the tools configuration text to show active/total format
         const toolsLabelSpan = this.toolsHeader.querySelector('.tools-label span');
-        if (toolsLabelSpan) {
-            toolsLabelSpan.textContent = `Tools Configuration [${enabledCount}/${totalCount}]`;
-        }
-        
-        // Group tools by source
+        if (toolsLabelSpan) toolsLabelSpan.textContent = `Tools Configuration [${enabledCount}/${totalCount}]`;
+
         const toolsBySource = this.tools.reduce((groups, tool) => {
             const source = tool.source || 'default';
-            if (!groups[source]) {
-                groups[source] = [];
-            }
+            if (!groups[source]) groups[source] = [];
             groups[source].push(tool);
             return groups;
         }, {} as Record<string, Tool[]>);
-        
-        // Sort sources - 'default' first, then alphabetically
+
         const sortedSources = Object.keys(toolsBySource).sort((a, b) => {
             if (a === 'default') return -1;
             if (b === 'default') return 1;
             return a.localeCompare(b);
         });
-        
+
         sortedSources.forEach(source => {
-            console.log('Creating category for source:', source);
             const tools = toolsBySource[source];
-            const sortedTools = [...tools].sort((a, b) => a.name.localeCompare(b.name));
-            
-            // Check if this category should be expanded (default to true for new categories)
             const isExpanded = this.toolCategoryStates[source] !== false;
-            
-            // Create source category
-            const sourceCategory = document.createElement('div');
-            sourceCategory.className = `tool-source-category ${isExpanded ? 'expanded' : ''}`;
-            sourceCategory.dataset.source = source; // Add data attribute for identification
-            
-            // Source header
-            const sourceHeader = document.createElement('div');
-            sourceHeader.className = 'tool-source-header';
-            
-            const sourceExpand = document.createElement('div');
-            sourceExpand.className = 'tool-source-expand';
-            sourceExpand.innerHTML = `
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="transform: rotate(${isExpanded ? '90deg' : '0deg'});">
-                    <polyline points="9,18 15,12 9,6"></polyline>
-                </svg>
-            `;
-            
-            const sourceTitle = document.createElement('div');
-            sourceTitle.className = 'tool-source-title';
-            sourceTitle.textContent = source === 'default' ? 'Built-in Tools' : `${source.charAt(0).toUpperCase() + source.slice(1)} Tools`;
-            
-            const sourceEnabledCount = tools.filter(tool => tool.enabled).length;
-            const sourceTotalCount = tools.length;
-            
-            const sourceAllEnabled = sourceEnabledCount === sourceTotalCount;
-            
-            const sourceCounter = document.createElement('div');
-            sourceCounter.className = 'tool-source-counter';
-            sourceCounter.textContent = `${sourceEnabledCount}/${sourceTotalCount}`;
-            
-            const sourceToggle = document.createElement('div');
-            sourceToggle.className = `tool-source-toggle ${sourceAllEnabled ? 'enabled' : ''}`;
-            sourceToggle.title = `Toggle all ${source} tools`;
-            sourceToggle.addEventListener('click', (e) => {
-                e.stopPropagation();
-                // Calculate current state dynamically instead of using closure variable
-                const currentSourceTools = this.tools.filter(tool => (tool.source || 'default') === source);
-                const currentSourceEnabledCount = currentSourceTools.filter(tool => tool.enabled).length;
-                const currentSourceAllEnabled = currentSourceEnabledCount === currentSourceTools.length;
-                console.log(`Toggling all tools for source: ${source}, current state: ${currentSourceAllEnabled}`);
-                this.toggleSourceTools(source, !currentSourceAllEnabled);
-            });
-            
-            sourceHeader.appendChild(sourceExpand);
-            sourceHeader.appendChild(sourceTitle);
-            sourceHeader.appendChild(sourceCounter);
-            sourceHeader.appendChild(sourceToggle);
-            
-            console.log('Adding event listener for source:', source);
-            
-            // Make header clickable to expand/collapse
-            sourceHeader.addEventListener('click', (e) => {
-                console.log('Header clicked for source:', source, 'Event target:', e.target);
-                // Don't trigger if clicking on the toggle button
-                if (e.target === sourceToggle || sourceToggle.contains(e.target as Node)) {
-                    console.log('Click was on toggle button, ignoring');
-                    return;
-                }
-                console.log('Calling toggleSourceCategory for:', source);
-                this.toggleSourceCategory(sourceCategory);
-            });
-            
-            console.log('Event listener added for source:', source, 'Header element:', sourceHeader);
-            
-            // Tools list for this source
-            const sourceToolsList = document.createElement('div');
-            sourceToolsList.className = 'tool-source-tools';
-            sourceToolsList.style.display = isExpanded ? 'block' : 'none';
-            
-            sortedTools.forEach(tool => {
-                const toolItem = document.createElement('div');
-                toolItem.className = `tool-item ${tool.enabled ? 'enabled' : ''}`;
-                
-                const toolName = document.createElement('div');
-                toolName.className = 'tool-name';
-                toolName.textContent = tool.name;
-                
-                const toolDescription = document.createElement('div');
-                toolDescription.className = 'tool-description';
-                toolDescription.textContent = tool.description;
-                toolDescription.title = tool.description;
-                
-                const toolToggle = document.createElement('div');
-                toolToggle.className = `tool-toggle ${tool.enabled ? 'enabled' : ''}`;
-                toolToggle.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    this.toggleTool(tool.name, !tool.enabled);
-                });
-                
-                toolItem.appendChild(toolName);
-                toolItem.appendChild(toolDescription);
-                toolItem.appendChild(toolToggle);
-                
-                sourceToolsList.appendChild(toolItem);
-            });
-            
-            sourceCategory.appendChild(sourceHeader);
-            sourceCategory.appendChild(sourceToolsList);
+            const sourceCategory = this.createToolCategory(source, tools, isExpanded);
             this.toolsList.appendChild(sourceCategory);
         });
     }
 
-    private toggleSourceCategory(sourceCategory: HTMLElement): void {
-        const source = sourceCategory.dataset.source;
-        if (!source) return;
-        
-        console.log('toggleSourceCategory called for:', source);
-        console.log('Category element:', sourceCategory);
-        console.log('Current classes:', sourceCategory.className);
-        
-        const isExpanded = sourceCategory.classList.contains('expanded');
-        const newState = !isExpanded;
-        
-        console.log('Current state:', isExpanded, 'New state:', newState);
-        
-        // Update the state tracking
-        this.toolCategoryStates[source] = newState;
-        
-        const sourceHeader = sourceCategory.querySelector('.tool-source-header') as HTMLElement;
-        const sourceToolsList = sourceCategory.querySelector('.tool-source-tools') as HTMLElement;
-        const expandIcon = sourceHeader.querySelector('.tool-source-expand svg') as SVGElement;
-        
-        console.log('Elements found:', {
-            sourceHeader: !!sourceHeader,
-            sourceToolsList: !!sourceToolsList,
-            expandIcon: !!expandIcon
+    private createToolCategory(source: string, tools: Tool[], isExpanded: boolean): HTMLElement {
+        const sourceCategory = document.createElement('div');
+        sourceCategory.className = `tool-source-category ${isExpanded ? 'expanded' : ''}`;
+        sourceCategory.dataset.source = source;
+
+        const sourceHeader = this.createToolCategoryHeader(source, tools, isExpanded);
+        sourceCategory.appendChild(sourceHeader);
+
+        const sourceToolsList = document.createElement('div');
+        sourceToolsList.className = 'tool-source-tools';
+        sourceToolsList.style.display = isExpanded ? 'block' : 'none';
+        tools.sort((a, b) => a.name.localeCompare(b.name)).forEach(tool => {
+            sourceToolsList.appendChild(this.createToolItem(tool));
         });
-        
-        if (newState) {
-            sourceCategory.classList.add('expanded');
-            sourceToolsList.style.display = 'block';
-            expandIcon.style.transform = 'rotate(90deg)';
-        } else {
-            sourceCategory.classList.remove('expanded');
-            sourceToolsList.style.display = 'none';
-            expandIcon.style.transform = 'rotate(0deg)';
-        }
-        
-        console.log('After toggle - classes:', sourceCategory.className);
-        console.log('Display style:', sourceToolsList.style.display);
-        console.log('State tracking:', this.toolCategoryStates);
+        sourceCategory.appendChild(sourceToolsList);
+
+        return sourceCategory;
     }
 
-    private async toggleTool(toolName: string, enabled: boolean): Promise<void> {
-        if (!this.currentSession?.sessionId) {
-            console.error('No active session for tool toggle');
-            return;
-        }
+    private createToolCategoryHeader(source: string, tools: Tool[], isExpanded: boolean): HTMLElement {
+        const sourceHeader = document.createElement('div');
+        sourceHeader.className = 'tool-source-header';
+        const sourceEnabledCount = tools.filter(tool => tool.enabled).length;
+        const sourceAllEnabled = sourceEnabledCount === tools.length;
 
-        const toggleUrl = `${this.apiBaseUrl}/${this.currentSession.sessionId}/tools/toggle`;
-        console.log(`Toggling tool ${toolName} to ${enabled} at: ${toggleUrl}`);
+        sourceHeader.innerHTML = `
+            <div class="tool-source-expand">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="transform: rotate(${isExpanded ? '90deg' : '0deg'});">
+                    <polyline points="9,18 15,12 9,6"></polyline>
+                </svg>
+            </div>
+            <div class="tool-source-title">${source === 'default' ? 'Built-in Tools' : `${source.charAt(0).toUpperCase() + source.slice(1)} Tools`}</div>
+            <div class="tool-source-counter">${sourceEnabledCount}/${tools.length}</div>
+        `;
 
-        try {
-            const response = await fetch(toggleUrl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-API-Key': 'test_12345'
-                },
-                body: JSON.stringify({
-                    tool_name: toolName,
-                    enabled: enabled
-                })
-            });
+        const sourceToggle = document.createElement('div');
+        sourceToggle.className = `tool-source-toggle ${sourceAllEnabled ? 'enabled' : ''}`;
+        sourceToggle.title = `Toggle all ${source} tools`;
+        sourceToggle.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const currentSourceTools = this.tools.filter(tool => (tool.source || 'default') === source);
+            const currentSourceEnabledCount = currentSourceTools.filter(tool => tool.enabled).length;
+            this.toggleSourceTools(source, currentSourceEnabledCount !== currentSourceTools.length);
+        });
+        sourceHeader.appendChild(sourceToggle);
 
-            if (response.ok) {
-                // Update the local tool state
-                const tool = this.tools.find(t => t.name === toolName);
-                if (tool) {
-                    tool.enabled = enabled;
-                    this.updateToolsUI();
-                }
-                console.log(`Successfully toggled tool ${toolName} to ${enabled}`);
-            } else {
-                console.error('Failed to toggle tool:', await response.text());
+        sourceHeader.addEventListener('click', (e) => {
+            if (!sourceToggle.contains(e.target as Node)) {
+                this.toggleSourceCategory(source);
             }
-        } catch (error) {
-            console.error('Error toggling tool:', error);
-        }
+        });
+
+        return sourceHeader;
     }
 
-    private async toggleAllTools(enabled: boolean): Promise<void> {
-        if (!this.currentSession?.sessionId) {
-            console.error('No active session for tool toggle');
-            return;
-        }
+    private createToolItem(tool: Tool): HTMLElement {
+        const toolItem = document.createElement('div');
+        toolItem.className = `tool-item ${tool.enabled ? 'enabled' : ''}`;
+        toolItem.innerHTML = `
+            <div class="tool-name">${tool.name}</div>
+            <div class="tool-description" title="${tool.description}">${tool.description}</div>
+        `;
+        const toolToggle = document.createElement('div');
+        toolToggle.className = `tool-toggle ${tool.enabled ? 'enabled' : ''}`;
+        toolToggle.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.toggleTool(tool.name, !tool.enabled);
+        });
+        toolItem.appendChild(toolToggle);
+        return toolItem;
+    }
 
-        const toolsToChange = this.tools.filter(tool => tool.enabled !== enabled);
-        
-        for (const tool of toolsToChange) {
-            try {
-                const response = await fetch(`${this.apiBaseUrl}/${this.currentSession.sessionId}/tools/toggle`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-API-Key': 'test_12345'
-                    },
-                    body: JSON.stringify({
-                        tool_name: tool.name,
-                        enabled: enabled
-                    })
-                });
-
-                if (response.ok) {
-                    tool.enabled = enabled;
-                } else {
-                    console.error(`Failed to ${enabled ? 'enable' : 'disable'} tool ${tool.name}:`, await response.text());
-                }
-            } catch (error) {
-                console.error(`Error ${enabled ? 'enabling' : 'disabling'} tool ${tool.name}:`, error);
-            }
-        }
-        
+    private toggleSourceCategory(source: string): void {
+        this.toolCategoryStates[source] = !this.toolCategoryStates[source];
         this.updateToolsUI();
     }
 
     private updateToolsUI(): void {
-        // Update the main tools counter
         const enabledCount = this.tools.filter(tool => tool.enabled).length;
-        const totalCount = this.tools.length;
-        
         const toolsLabelSpan = this.toolsHeader.querySelector('.tools-label span');
-        if (toolsLabelSpan) {
-            toolsLabelSpan.textContent = `Tools Configuration [${enabledCount}/${totalCount}]`;
-        }
-        
-        // Update each source category's counters and toggle states
+        if (toolsLabelSpan) toolsLabelSpan.textContent = `Tools Configuration [${enabledCount}/${this.tools.length}]`;
+
         const sourceCategories = this.toolsList.querySelectorAll('.tool-source-category');
-        sourceCategories.forEach(category => {
-            const source = (category as HTMLElement).dataset.source;
+        sourceCategories.forEach(categoryEl => {
+            const category = categoryEl as HTMLElement;
+            const source = category.dataset.source;
             if (!source) return;
-            
-            // Preserve the current collapse/expand state
-            const currentlyExpanded = (category as HTMLElement).classList.contains('expanded');
-            const savedState = this.toolCategoryStates[source];
-            
-            // If there's a mismatch between DOM and saved state, fix it
-            if (savedState !== undefined && currentlyExpanded !== savedState) {
-                const sourceToolsList = category.querySelector('.tool-source-tools') as HTMLElement;
-                const expandIcon = category.querySelector('.tool-source-expand svg') as SVGElement;
-                
-                if (savedState) {
-                    (category as HTMLElement).classList.add('expanded');
-                    if (sourceToolsList) sourceToolsList.style.display = 'block';
-                    if (expandIcon) expandIcon.style.transform = 'rotate(90deg)';
-                } else {
-                    (category as HTMLElement).classList.remove('expanded');
-                    if (sourceToolsList) sourceToolsList.style.display = 'none';
-                    if (expandIcon) expandIcon.style.transform = 'rotate(0deg)';
-                }
-            }
-            
+
+            const isExpanded = this.toolCategoryStates[source] !== false;
+            category.classList.toggle('expanded', isExpanded);
+            const sourceToolsList = category.querySelector('.tool-source-tools') as HTMLElement;
+            if (sourceToolsList) sourceToolsList.style.display = isExpanded ? 'block' : 'none';
+            const expandIcon = category.querySelector('.tool-source-expand svg') as SVGElement;
+            if (expandIcon) expandIcon.style.transform = `rotate(${isExpanded ? '90deg' : '0deg'})`;
+
             const sourceTools = this.tools.filter(tool => (tool.source || 'default') === source);
             const sourceEnabledCount = sourceTools.filter(tool => tool.enabled).length;
-            const sourceTotalCount = sourceTools.length;
-            const sourceAllEnabled = sourceEnabledCount === sourceTotalCount;
-            
-            // Update counter
             const counter = category.querySelector('.tool-source-counter');
-            if (counter) {
-                counter.textContent = `${sourceEnabledCount}/${sourceTotalCount}`;
-            }
-            
-            // Update source toggle
+            if (counter) counter.textContent = `${sourceEnabledCount}/${sourceTools.length}`;
+
             const sourceToggle = category.querySelector('.tool-source-toggle');
-            if (sourceToggle) {
-                if (sourceAllEnabled) {
-                    sourceToggle.classList.add('enabled');
-                } else {
-                    sourceToggle.classList.remove('enabled');
-                }
-            }
-            
-            // Update individual tool toggles and states
-            const toolItems = category.querySelectorAll('.tool-item');
-            toolItems.forEach(toolItem => {
-                const toolNameEl = toolItem.querySelector('.tool-name');
-                if (!toolNameEl) return;
-                
-                const toolName = toolNameEl.textContent;
-                const tool = this.tools.find(t => t.name === toolName);
-                if (!tool) return;
-                
-                const toolToggle = toolItem.querySelector('.tool-toggle');
-                if (toolToggle) {
-                    if (tool.enabled) {
-                        toolToggle.classList.add('enabled');
-                        toolItem.classList.add('enabled');
-                    } else {
-                        toolToggle.classList.remove('enabled');
-                        toolItem.classList.remove('enabled');
-                    }
+            if (sourceToggle) sourceToggle.classList.toggle('enabled', sourceEnabledCount === sourceTools.length);
+
+            sourceTools.forEach(tool => {
+                const toolItem = Array.from(category.querySelectorAll('.tool-item')).find(item => item.querySelector('.tool-name')?.textContent === tool.name);
+                if (toolItem) {
+                    toolItem.classList.toggle('enabled', tool.enabled);
+                    toolItem.querySelector('.tool-toggle')?.classList.toggle('enabled', tool.enabled);
                 }
             });
         });
     }
+}
 
-    private async toggleSourceTools(source: string, enabled: boolean): Promise<void> {
-        if (!this.currentSession?.sessionId) {
-            console.error('No active session for tool toggle');
-            return;
-        }
+// =================================================================================
+// V. DEBUG MANAGER
+// =================================================================================
+class DebugManager {
+    private debugEventsList: DebugEvent[] = [];
+    private debugPanelToggle: HTMLButtonElement;
+    private debugPanelOverlay: HTMLElement;
+    private debugEventsContainer: HTMLElement;
+    private debugClearBtn: HTMLButtonElement;
+    private debugPanelClose: HTMLButtonElement;
+    private debugFullscreenOverlay: HTMLElement;
+    private debugFullscreenData: HTMLElement;
+    private debugFullscreenTitle: HTMLElement;
+    private debugFullscreenClose: HTMLButtonElement;
 
-        const sourceTools = this.tools.filter(tool => (tool.source || 'default') === source);
-        const toolsToChange = sourceTools.filter(tool => tool.enabled !== enabled);
-        
-        for (const tool of toolsToChange) {
-            try {
-                const response = await fetch(`${this.apiBaseUrl}/${this.currentSession.sessionId}/tools/toggle`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-API-Key': 'test_12345'
-                    },
-                    body: JSON.stringify({
-                        tool_name: tool.name,
-                        enabled: enabled
-                    })
-                });
-
-                if (response.ok) {
-                    tool.enabled = enabled;
-                } else {
-                    console.error(`Failed to ${enabled ? 'enable' : 'disable'} tool ${tool.name}:`, await response.text());
-                }
-            } catch (error) {
-                console.error(`Error ${enabled ? 'enabling' : 'disabling'} tool ${tool.name}:`, error);
-            }
-        }
-        
-        this.updateToolsUI();
+    constructor(private apiManager: ApiManager, private sessionManager: SessionManager) {
+        this.debugPanelToggle = document.getElementById('debugPanelToggle') as HTMLButtonElement;
+        this.debugPanelOverlay = document.getElementById('debugPanelOverlay') as HTMLElement;
+        this.debugEventsContainer = document.getElementById('debugEvents') as HTMLElement;
+        this.debugClearBtn = document.getElementById('debugClearBtn') as HTMLButtonElement;
+        this.debugPanelClose = document.getElementById('debugPanelClose') as HTMLButtonElement;
+        this.debugFullscreenOverlay = document.getElementById('debugFullscreenOverlay') as HTMLElement;
+        this.debugFullscreenData = document.getElementById('debugFullscreenData') as HTMLElement;
+        this.debugFullscreenTitle = document.getElementById('debugFullscreenTitle') as HTMLElement;
+        this.debugFullscreenClose = document.getElementById('debugFullscreenClose') as HTMLButtonElement;
+        this.setupEventListeners();
     }
 
-    private async toggleDebugPanel(): Promise<void> {
-        const currentState = this.getCurrentDebugPanelState();
-        const newState = !currentState;
-        this.setCurrentDebugPanelState(newState);
-        
-        if (newState) {
+    private setupEventListeners(): void {
+        this.debugPanelToggle.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.toggleDebugPanel();
+        });
+        this.debugPanelClose.addEventListener('click', () => this.closeDebugPanel());
+        this.debugClearBtn.addEventListener('click', () => this.clearDebugEvents());
+        this.debugFullscreenClose.addEventListener('click', () => this.closeDebugFullscreen());
+        this.debugFullscreenOverlay.addEventListener('click', (e) => {
+            if (e.target === this.debugFullscreenOverlay) this.closeDebugFullscreen();
+        });
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && this.debugFullscreenOverlay.classList.contains('active')) {
+                this.closeDebugFullscreen();
+            }
+        });
+    }
+
+    public async restoreDebugState(): Promise<void> {
+        if (!this.sessionManager.currentSession) return;
+        const debugPanelShouldBeOpen = this.sessionManager.currentSession.debugPanelOpen;
+        if (debugPanelShouldBeOpen) {
             this.debugPanelOverlay.classList.add('active');
             this.debugPanelToggle.classList.add('active');
             document.body.classList.add('debug-panel-open');
-            
-            // Automatically enable debug mode when panel opens
             await this.setDebugMode(true);
-            this.loadDebugEvents();
+            await this.loadDebugEvents();
         } else {
             this.debugPanelOverlay.classList.remove('active');
             this.debugPanelToggle.classList.remove('active');
             document.body.classList.remove('debug-panel-open');
-            
-            // Automatically disable debug mode when panel closes
-            await this.setDebugMode(false);
+            if (this.sessionManager.currentSession.debugEnabled) {
+                await this.setDebugMode(true);
+            }
+        }
+    }
+
+    public async loadDebugEvents(): Promise<void> {
+        if (!this.sessionManager.currentSession?.sessionId) return;
+        const result = await this.apiManager.loadDebugEvents(this.sessionManager.currentSession.sessionId);
+        if (result) {
+            this.debugEventsList = result.events;
+            this.setCurrentDebugEnabled(result.enabled);
+            this.updateDebugUI();
+            this.renderDebugEvents();
+        }
+    }
+
+    private async toggleDebugPanel(): Promise<void> {
+        const newState = !this.getCurrentDebugPanelState();
+        this.setCurrentDebugPanelState(newState);
+        if (newState) {
+            this.debugPanelOverlay.classList.add('active');
+            this.debugPanelToggle.classList.add('active');
+            document.body.classList.add('debug-panel-open');
+            await this.setDebugMode(true);
+            this.loadDebugEvents();
+        } else {
+            this.closeDebugPanel();
         }
     }
 
@@ -1228,392 +664,445 @@ class ChatApp {
         this.debugPanelOverlay.classList.remove('active');
         this.debugPanelToggle.classList.remove('active');
         document.body.classList.remove('debug-panel-open');
-        
-        // Automatically disable debug mode when panel closes
         await this.setDebugMode(false);
     }
 
     private async setDebugMode(enabled: boolean): Promise<void> {
-        if (!this.currentSession?.sessionId) {
-            console.error('No active session for debug mode');
-            return;
-        }
-
-        try {
-            const response = await fetch(`${this.apiBaseUrl}/${this.currentSession.sessionId}/debug/toggle`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-API-Key': 'test_12345'
-                },
-                body: JSON.stringify({
-                    enabled: enabled
-                })
-            });
-
-            if (response.ok) {
-                const result = await response.json();
-                this.setCurrentDebugEnabled(result.enabled);
-                this.updateDebugUI();
-            } else {
-                console.error('Failed to set debug mode:', await response.text());
-            }
-        } catch (error) {
-            console.error('Error setting debug mode:', error);
+        if (!this.sessionManager.currentSession?.sessionId) return;
+        const result = await this.apiManager.setDebugMode(this.sessionManager.currentSession.sessionId, enabled);
+        if (result) {
+            this.setCurrentDebugEnabled(result.enabled);
+            this.updateDebugUI();
         }
     }
 
     private async clearDebugEvents(): Promise<void> {
-        if (!this.currentSession?.sessionId) {
-            console.error('No active session for debug events');
-            return;
-        }
-
-        try {
-            const response = await fetch(`${this.apiBaseUrl}/${this.currentSession.sessionId}/debug`, {
-                method: 'DELETE',
-                headers: {
-                    'X-API-Key': 'test_12345'
-                }
-            });
-
-            if (response.ok) {
-                this.debugEventsList = [];
-                this.renderDebugEvents();
-            } else {
-                console.error('Failed to clear debug events:', await response.text());
-            }
-        } catch (error) {
-            console.error('Error clearing debug events:', error);
-        }
-    }
-
-    private async loadDebugEvents(): Promise<void> {
-        if (!this.currentSession?.sessionId) {
-            console.error('No active session for debug events');
-            return;
-        }
-
-        try {
-            const response = await fetch(`${this.apiBaseUrl}/${this.currentSession.sessionId}/debug`, {
-                headers: {
-                    'X-API-Key': 'test_12345'
-                }
-            });
-
-            if (response.ok) {
-                const result = await response.json();
-                this.debugEventsList = result.events;
-                this.setCurrentDebugEnabled(result.enabled);
-                this.updateDebugUI();
-                this.renderDebugEvents();
-            } else {
-                console.error('Failed to load debug events:', await response.text());
-            }
-        } catch (error) {
-            console.error('Error loading debug events:', error);
+        if (!this.sessionManager.currentSession?.sessionId) return;
+        const success = await this.apiManager.clearDebugEvents(this.sessionManager.currentSession.sessionId);
+        if (success) {
+            this.debugEventsList = [];
+            this.renderDebugEvents();
         }
     }
 
     private updateDebugUI(): void {
-        if (!this.currentSession) {
-            this.debugEventsContainer.innerHTML = `
-                <div class="debug-disabled-message">
-                    No active session. Create a new chat to enable debug mode.
-                </div>
-            `;
+        if (!this.sessionManager.currentSession) {
+            this.debugEventsContainer.innerHTML = `<div class="debug-disabled-message">No active session.</div>`;
             return;
         }
-        
         if (!this.getCurrentDebugEnabled()) {
-            this.debugEventsContainer.innerHTML = `
-                <div class="debug-disabled-message">
-                    Debug mode is automatically enabled when this panel is open.
-                </div>
-            `;
+            this.debugEventsContainer.innerHTML = `<div class="debug-disabled-message">Debug mode is automatically enabled when this panel is open.</div>`;
         }
     }
 
     private renderDebugEvents(): void {
-        if (!this.currentSession) {
+        if (!this.sessionManager.currentSession || !this.getCurrentDebugEnabled()) {
             this.updateDebugUI();
             return;
         }
-        
-        if (!this.getCurrentDebugEnabled()) {
-            this.updateDebugUI();
-            return;
-        }
-
         if (this.debugEventsList.length === 0) {
-            this.debugEventsContainer.innerHTML = `
-                <div class="debug-disabled-message">
-                    No debug events captured yet. Send a message to see the communication flow.
-                </div>
-            `;
+            this.debugEventsContainer.innerHTML = `<div class="debug-disabled-message">No debug events captured yet.</div>`;
             return;
         }
-
         const eventsHtml = this.debugEventsList
             .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
-            .map((event, index) => {
-                const timestamp = new Date(event.timestamp).toLocaleTimeString();
-                const colorizedData = this.applyColorSchemeToData(event.data);
-                
-                // Properly escape HTML characters
-                const escapedMessage = this.escapeHtml(event.message);
-                
-                return `
-                    <div class="debug-event">
-                        <div class="debug-event-header">
-                            <span class="debug-event-type ${event.event_type}">${event.event_type}</span>
-                            <span class="debug-event-timestamp">${timestamp}</span>
-                            <button class="debug-event-fullscreen-btn" onclick="window.chatApp.openDebugFullscreen(${index})">
-                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
-                                </svg>
-                                Expand
-                            </button>
-                        </div>
-                        <div class="debug-event-message">${escapedMessage}</div>
-                        <div class="debug-event-data">${colorizedData}</div>
-                    </div>
-                `;
-            })
+            .map((event, index) => this.createDebugEventElement(event, index))
             .join('');
-
         this.debugEventsContainer.innerHTML = eventsHtml;
         this.debugEventsContainer.scrollTop = this.debugEventsContainer.scrollHeight;
     }
 
-    private applyColorSchemeToData(data: Record<string, any>): string {
-        // Apply color scheme directly - truncation is now handled by backend
-        return this.colorizeJsonData(data, 0);
-    }
-
-    private colorizeJsonData(obj: any, depth: number = 0, keyPath: string = '', rootColorMetadata: Record<string, string> = {}): string {
-        const indent = '  '.repeat(depth);
-        
-        if (obj === null) {
-            return '<span class="debug-color-grey">null</span>';
-        }
-        
-        if (typeof obj === 'string') {
-            if (obj.endsWith('...[truncated]')) {
-                const mainText = obj.substring(0, obj.length - 14); // Remove "...[truncated]"
-                return `"<span class="debug-color-white">${this.escapeHtml(mainText)}</span><span class="debug-truncated">...[truncated]</span>"`;
-            }
-            return `"<span class="debug-color-white">${this.escapeHtml(obj)}</span>"`;
-        }
-        
-        if (typeof obj === 'number' || typeof obj === 'boolean') {
-            return `<span class="debug-color-yellow">${obj}</span>`;
-        }
-        
-        if (Array.isArray(obj)) {
-            if (obj.length === 0) return '[]';
-            
-            const items = obj.map(item => {
-                if (typeof item === 'string' && item.endsWith('...[truncated]')) {
-                    const mainText = item.substring(0, item.length - 14);
-                    return `${indent}  "<span class="debug-color-white">${this.escapeHtml(mainText)}</span><span class="debug-truncated">...[truncated]</span>"`;
-                }
-                return `${indent}  ${this.colorizeJsonData(item, depth + 1, keyPath, rootColorMetadata)}`;
-            });
-            
-            return `[\n${items.join(',\n')}\n${indent}]`;
-        }
-        
-        if (typeof obj === 'object' && obj !== null) {
-            const entries = Object.entries(obj);
-            if (entries.length === 0) return '{}';
-            
-            // If this is the root object, extract color metadata
-            const colorMetadata = depth === 0 ? (obj._debug_colors || {}) : rootColorMetadata;
-            
-            const items = entries
-                .filter(([key]) => key !== '_debug_colors') // Don't display color metadata
-                .map(([key, value]) => {
-                    // Build the full key path for nested lookups
-                    const currentKeyPath = keyPath ? `${keyPath}_${key}` : key;
-                    
-                    // Check for color using the full path
-                    const color = colorMetadata[`_${currentKeyPath}_color`];
-                    
-                    let keyHtml;
-                    if (color) {
-                        keyHtml = `<span class="debug-key debug-color-${color}">"${this.escapeHtml(key)}"</span>`;
-                    } else {
-                        keyHtml = `<span class="debug-key">"${this.escapeHtml(key)}"</span>`;
-                    }
-                    
-                    const valueHtml = this.colorizeJsonData(value, depth + 1, currentKeyPath, colorMetadata);
-                    return `${indent}  ${keyHtml}: ${valueHtml}`;
-                });
-            
-            return `{\n${items.join(',\n')}\n${indent}}`;
-        }
-        
-        return this.escapeHtml(String(obj));
-    }
-
-    private findRootColorMetadata(obj: any): Record<string, string> {
-        // Recursively traverse up to find the root _debug_colors metadata
-        if (obj && typeof obj === 'object' && obj._debug_colors) {
-            return obj._debug_colors;
-        }
-        
-        // If this object doesn't have color metadata, check if any parent object does
-        // This is handled by ensuring we always pass the root color metadata down
-        return {};
+    private createDebugEventElement(event: DebugEvent, index: number): string {
+        const timestamp = new Date(event.timestamp).toLocaleTimeString();
+        const colorizedData = this.colorizeJsonData(event.data);
+        const escapedMessage = this.escapeHtml(event.message);
+        return `
+            <div class="debug-event">
+                <div class="debug-event-header">
+                    <span class="debug-event-type ${event.event_type}">${event.event_type}</span>
+                    <span class="debug-event-timestamp">${timestamp}</span>
+                    <button class="debug-event-fullscreen-btn" onclick="window.chatApp.debugManager.openDebugFullscreen(${index})">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
+                        </svg>
+                        Expand
+                    </button>
+                </div>
+                <div class="debug-event-message">${escapedMessage}</div>
+                <div class="debug-event-data">${colorizedData}</div>
+            </div>`;
     }
 
     public openDebugFullscreen(eventIndex: number): void {
         const event = this.debugEventsList[eventIndex];
         if (!event) return;
-        
         const timestamp = new Date(event.timestamp).toLocaleString();
         this.debugFullscreenTitle.textContent = `${event.event_type} - ${timestamp}`;
-        
-        const colorizedData = this.applyColorSchemeToData(event.data);
-        this.debugFullscreenData.innerHTML = colorizedData;
-        
+        this.debugFullscreenData.innerHTML = this.colorizeJsonData(event.data);
         this.debugFullscreenOverlay.classList.add('active');
-        document.body.style.overflow = 'hidden'; // Prevent background scrolling
+        document.body.style.overflow = 'hidden';
     }
 
     private closeDebugFullscreen(): void {
         this.debugFullscreenOverlay.classList.remove('active');
-        document.body.style.overflow = ''; // Restore scrolling
+        document.body.style.overflow = '';
+    }
+
+    private colorizeJsonData(obj: any, depth: number = 0, keyPath: string = '', rootColorMetadata: Record<string, string> = {}): string {
+        const indent = '  '.repeat(depth);
+        if (obj === null) return '<span class="debug-color-grey">null</span>';
+        if (typeof obj === 'string') {
+            if (obj.endsWith('...[truncated]')) {
+                const mainText = obj.substring(0, obj.length - 14);
+                return `"<span class="debug-color-white">${this.escapeHtml(mainText)}</span><span class="debug-truncated">...[truncated]</span>"`;
+            }
+            return `"<span class="debug-color-white">${this.escapeHtml(obj)}</span>"`;
+        }
+        if (typeof obj === 'number' || typeof obj === 'boolean') {
+            return `<span class="debug-color-yellow">${obj}</span>`;
+        }
+        if (Array.isArray(obj)) {
+            if (obj.length === 0) return '[]';
+            const items = obj.map(item => `${indent}  ${this.colorizeJsonData(item, depth + 1, keyPath, rootColorMetadata)}`);
+            return `[\n${items.join(',\n')}\n${indent}]`;
+        }
+        if (typeof obj === 'object' && obj !== null) {
+            const entries = Object.entries(obj);
+            if (entries.length === 0) return '{}';
+            const colorMetadata = depth === 0 ? (obj._debug_colors || {}) : rootColorMetadata;
+            const items = entries
+                .filter(([key]) => key !== '_debug_colors')
+                .map(([key, value]) => {
+                    const currentKeyPath = keyPath ? `${keyPath}_${key}` : key;
+                    const color = colorMetadata[`_${currentKeyPath}_color`];
+                    const keyHtml = color ? `<span class="debug-key debug-color-${color}">"${this.escapeHtml(key)}"</span>` : `<span class="debug-key">"${this.escapeHtml(key)}"</span>`;
+                    return `${indent}  ${keyHtml}: ${this.colorizeJsonData(value, depth + 1, currentKeyPath, colorMetadata)}`;
+                });
+            return `{\n${items.join(',\n')}\n${indent}}`;
+        }
+        return this.escapeHtml(String(obj));
     }
 
     private escapeHtml(unsafe: string): string {
-        return unsafe
-            .replace(/&/g, "&amp;")
-            .replace(/</g, "&lt;")
-            .replace(/>/g, "&gt;")
-            .replace(/"/g, "&quot;")
-            .replace(/'/g, "&#039;");
+        return unsafe.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
     }
 
-    // Debug state management per session
     private getCurrentDebugPanelState(): boolean {
-        return this.currentSession?.debugPanelOpen || false;
+        return this.sessionManager.currentSession?.debugPanelOpen || false;
     }
 
     private setCurrentDebugPanelState(open: boolean): void {
-        if (this.currentSession) {
-            this.currentSession.debugPanelOpen = open;
-            this.saveChatHistory();
+        if (this.sessionManager.currentSession) {
+            this.sessionManager.currentSession.debugPanelOpen = open;
+            // This will be saved by the session manager
         }
     }
 
     private getCurrentDebugEnabled(): boolean {
-        return this.currentSession?.debugEnabled || false;
+        return this.sessionManager.currentSession?.debugEnabled || false;
     }
 
     private setCurrentDebugEnabled(enabled: boolean): void {
-        if (this.currentSession) {
-            this.currentSession.debugEnabled = enabled;
-            this.saveChatHistory();
+        if (this.sessionManager.currentSession) {
+            this.sessionManager.currentSession.debugEnabled = enabled;
+            // This will be saved by the session manager
         }
     }
+}
 
-    private showEmptyState(): void {
+// =================================================================================
+// VI. CHAT UI MANAGER
+// =================================================================================
+class ChatUIManager {
+    private messagesContainer: HTMLElement;
+
+    constructor() {
+        this.messagesContainer = document.getElementById('messagesContainer') as HTMLElement;
+    }
+
+    public displayMessage(message: Message): void {
+        const messageEl = document.createElement('div');
+        messageEl.className = `message ${message.role}`;
+        messageEl.innerHTML = `
+            <div class="message-avatar">${message.role === 'user' ? 'U' : 'AI'}</div>
+            <div class="message-content">
+                ${message.role === 'assistant' && message.usedTools && message.usedTools.length > 0 ?
+                    `<div class="tool-tags">${message.usedTools.map(tool => `<span class="tool-tag">${tool.toLowerCase()}</span>`).join('')}</div>` : ''
+                }
+                <div class="message-text">${message.role === 'assistant' ? marked.parse(message.content) : this.escapeHtml(message.content)}</div>
+            </div>
+        `;
+        this.hideWelcomeMessage();
+        this.messagesContainer.appendChild(messageEl);
+        this.scrollToBottom();
+    }
+
+    public showTypingIndicator(): void {
+        const typingEl = document.createElement('div');
+        typingEl.className = 'message assistant';
+        typingEl.id = 'typingIndicator';
+        typingEl.innerHTML = `
+            <div class="message-avatar">AI</div>
+            <div class="message-content">
+                <div class="typing-indicator">
+                    <div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div>
+                </div>
+            </div>
+        `;
+        this.hideWelcomeMessage();
+        this.messagesContainer.appendChild(typingEl);
+        this.scrollToBottom();
+    }
+
+    public hideTypingIndicator(): void {
+        document.getElementById('typingIndicator')?.remove();
+    }
+
+    public clearMessages(): void {
+        this.messagesContainer.innerHTML = '';
+    }
+
+    public showWelcomeMessage(): void {
+        this.messagesContainer.innerHTML = `
+            <div class="welcome-message">
+                <h1>AI Agent</h1>
+                <p>How can I help you today?</p>
+            </div>`;
+    }
+
+    public showEmptyState(onCreateNew: () => void): void {
         this.messagesContainer.innerHTML = `
             <div class="welcome-message empty-state">
                 <h1>AI Agent</h1>
                 <p>No active chat sessions.</p>
                 <p>Click <span class="new-chat-link" id="newChatLink">New chat</span> to start a conversation.</p>
-            </div>
-        `;
-        
-        // Add click handler for the new chat link
-        const newChatLink = document.getElementById('newChatLink');
-        if (newChatLink) {
-            newChatLink.addEventListener('click', () => {
-                this.createNewSession();
-            });
-        }
-        
-        this.updateSendButtonState();
-        this.messageInput.disabled = true;
-        this.messageInput.placeholder = "Create a new chat to start messaging...";
-        
-        // Clear tools and debug state for no active session
-        this.tools = [];
-        this.debugEventsList = [];
-        this.renderTools();
-        this.updateDebugUI();
-        
-        // Close debug panel if it's open
-        this.debugPanelOverlay.classList.remove('active');
-        this.debugPanelToggle.classList.remove('active');
-        document.body.classList.remove('debug-panel-open');
+            </div>`;
+        document.getElementById('newChatLink')?.addEventListener('click', onCreateNew);
     }
 
-    private enableInput(): void {
-        this.messageInput.disabled = false;
-        this.messageInput.placeholder = "Message AI Agent...";
-        this.updateSendButtonState();
-    }
-
-    private async verifyBackendSession(sessionId: string): Promise<void> {
-        try {
-            console.log(`Verifying backend session: ${sessionId}`);
-            const response = await fetch(`${this.apiBaseUrl}/session/${sessionId}`, {
-                method: 'GET',
-                headers: {
-                    'Content-Type': 'application/json'
-                }
-            });
-
-            if (response.ok) {
-                const sessionData = await response.json();
-                console.log(`Backend session ${sessionId} verified and reinitialized`);
-                // Session exists and is reinitialized
-                return;
-            } else {
-                console.warn(`Backend session ${sessionId} not found, will create new session when needed`);
-                // Clear the sessionId since backend session doesn't exist
-                if (this.currentSession) {
-                    this.currentSession.sessionId = undefined;
-                    this.saveChatHistory();
-                }
-            }
-        } catch (error) {
-            console.error(`Failed to verify backend session ${sessionId}:`, error);
-            // Clear the sessionId since we can't verify
-            if (this.currentSession) {
-                this.currentSession.sessionId = undefined;
-                this.saveChatHistory();
-            }
-        }
-    }
-
-    private showSessionVerificationLoading(): void {
+    public showLoadingState(message: string, details: string): void {
         this.messagesContainer.innerHTML = `
             <div class="welcome-message">
-                <div class="session-verification-loading">
+                <div class="session-loading">
                     <div class="loading-spinner"></div>
-                    <h1>Verifying session...</h1>
-                    <p>Checking if your previous session is still available.</p>
+                    <h1>${message}</h1>
+                    <p>${details}</p>
                 </div>
-            </div>
-        `;
+            </div>`;
     }
 
-    private hideSessionVerificationLoading(): void {
-        // Clear the loading message - it will be replaced by the actual session content
-        const loadingEl = this.messagesContainer.querySelector('.session-verification-loading');
-        if (loadingEl) {
-            loadingEl.parentElement?.remove();
-        }
+    public showError(message: string): void {
+        const errorEl = document.createElement('div');
+        errorEl.className = 'error-message';
+        errorEl.textContent = message;
+        this.messagesContainer.appendChild(errorEl);
+        this.scrollToBottom();
+        setTimeout(() => errorEl.remove(), 5000);
+    }
+
+    private hideWelcomeMessage(): void {
+        this.messagesContainer.querySelector('.welcome-message')?.remove();
+    }
+
+    private scrollToBottom(): void {
+        this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight;
+    }
+
+    private escapeHtml(unsafe: string): string {
+        return unsafe.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
     }
 }
 
+// =================================================================================
+// VII. MAIN CHAT APP
+// =================================================================================
+class ChatApp {
+    public debugManager: DebugManager;
+    private apiManager: ApiManager;
+    private sessionManager: SessionManager;
+    private toolsManager: ToolsManager;
+    private uiManager: ChatUIManager;
+
+    private messageInput: HTMLTextAreaElement;
+    private sendBtn: HTMLButtonElement;
+    private newChatBtn: HTMLButtonElement;
+
+    private isSendingMessage: boolean = false;
+    private isCreatingSession: boolean = false;
+    private isVerifyingSession: boolean = false;
+
+    constructor() {
+        this.messageInput = document.getElementById('messageInput') as HTMLTextAreaElement;
+        this.sendBtn = document.getElementById('sendBtn') as HTMLButtonElement;
+        this.newChatBtn = document.getElementById('newChatBtn') as HTMLButtonElement;
+
+        this.apiManager = new ApiManager();
+        this.uiManager = new ChatUIManager();
+        this.sessionManager = new SessionManager(this.apiManager, () => this.onSessionChanged());
+        this.toolsManager = new ToolsManager(this.apiManager, this.sessionManager);
+        this.debugManager = new DebugManager(this.apiManager, this.sessionManager);
+
+        this.init();
+    }
+
+    private async init(): Promise<void> {
+        this.setupEventListeners();
+        if (this.sessionManager.sessions.length === 0) {
+            await this.createNewSession();
+        } else {
+            this.isVerifyingSession = true;
+            this.updateButtonStates();
+            this.uiManager.showLoadingState('Verifying session...', 'Checking if your previous session is still available.');
+            await this.sessionManager.verifyCurrentSession();
+            this.isVerifyingSession = false;
+            await this.onSessionChanged();
+        }
+        this.sessionManager.renderChatHistory();
+    }
+
+    private setupEventListeners(): void {
+        this.sendBtn.addEventListener('click', () => this.sendMessage());
+        this.messageInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                this.sendMessage();
+            }
+        });
+        this.messageInput.addEventListener('input', () => {
+            this.adjustTextareaHeight();
+            this.updateButtonStates();
+        });
+        this.newChatBtn.addEventListener('click', () => {
+            if (!this.isCreatingSession) {
+                this.createNewSession();
+            }
+        });
+    }
+
+    private async createNewSession(): Promise<void> {
+        this.isCreatingSession = true;
+        this.updateButtonStates();
+        this.uiManager.showLoadingState('Setting up your new chat...', 'Initializing tools and preparing the session for you.');
+        try {
+            await this.sessionManager.createNewSession();
+        } catch (error) {
+            console.error('Failed to create new session:', error);
+            this.uiManager.showError('Failed to create new chat session. Please try again.');
+            this.handleEmptyState();
+        } finally {
+            this.isCreatingSession = false;
+            this.updateButtonStates();
+            this.messageInput.focus();
+        }
+    }
+
+    private async sendMessage(): Promise<void> {
+        const content = this.messageInput.value.trim();
+        if (!content || !this.sessionManager.currentSession) return;
+
+        this.isSendingMessage = true;
+        this.updateButtonStates();
+
+        if (!this.sessionManager.currentSession.sessionId) {
+            console.log('Creating backend session for existing frontend session...');
+            try {
+                const sessionData = await this.apiManager.createNewBackendSession();
+                this.sessionManager.currentSession.sessionId = sessionData.session_id;
+                await this.toolsManager.loadTools();
+            } catch (error) {
+                this.uiManager.showError('Failed to create backend session. Please try again.');
+                this.isSendingMessage = false;
+                this.updateButtonStates();
+                return;
+            }
+        }
+
+        const userMessage: Message = { id: this.generateId(), content, role: 'user', timestamp: new Date() };
+        this.sessionManager.addMessageToCurrentSession(userMessage);
+        this.uiManager.displayMessage(userMessage);
+        this.messageInput.value = '';
+        this.adjustTextareaHeight();
+        this.updateButtonStates();
+        this.uiManager.showTypingIndicator();
+
+        try {
+            const apiResponse = await this.apiManager.ask(this.sessionManager.currentSession.sessionId!, content);
+            this.uiManager.hideTypingIndicator();
+            const assistantMessage: Message = {
+                id: this.generateId(),
+                content: apiResponse.response,
+                role: 'assistant',
+                timestamp: new Date(),
+                usedTools: apiResponse.usedTools
+            };
+            this.sessionManager.addMessageToCurrentSession(assistantMessage);
+            this.uiManager.displayMessage(assistantMessage);
+            this.sessionManager.updateSessionTitle();
+            if (this.sessionManager.currentSession.debugEnabled) {
+                await this.debugManager.loadDebugEvents();
+            }
+        } catch (error) {
+            this.uiManager.hideTypingIndicator();
+            this.uiManager.showError('Failed to get response. Please try again.');
+        } finally {
+            this.isSendingMessage = false;
+            this.updateButtonStates();
+        }
+    }
+
+    private async onSessionChanged(): Promise<void> {
+        this.uiManager.clearMessages();
+        if (this.sessionManager.currentSession) {
+            this.sessionManager.currentSession.messages.forEach(msg => this.uiManager.displayMessage(msg));
+            if (this.sessionManager.currentSession.messages.length === 0) {
+                this.uiManager.showWelcomeMessage();
+            }
+            await this.toolsManager.loadTools();
+            await this.debugManager.restoreDebugState();
+        } else {
+            this.handleEmptyState();
+        }
+        this.updateButtonStates();
+    }
+
+    private handleEmptyState(): void {
+        this.uiManager.showEmptyState(() => this.createNewSession());
+        this.toolsManager.loadTools(); // This will render the 'no session' state
+        this.debugManager.restoreDebugState(); // This will render the 'no session' state
+    }
+
+    private updateButtonStates(): void {
+        const hasContent = this.messageInput.value.trim().length > 0;
+        const hasActiveSession = this.sessionManager.currentSession !== null;
+        const isLoading = this.isSendingMessage || this.isCreatingSession || this.isVerifyingSession;
+
+        this.sendBtn.disabled = !hasContent || !hasActiveSession || isLoading;
+        this.messageInput.disabled = isLoading || !hasActiveSession;
+        this.messageInput.placeholder = isLoading ? 'Please wait...' : (hasActiveSession ? 'Type your message...' : 'Create a new chat to start messaging...');
+        this.messageInput.classList.toggle('loading', isLoading);
+
+        this.newChatBtn.disabled = this.isCreatingSession;
+        this.newChatBtn.classList.toggle('loading', this.isCreatingSession);
+        const newChatIcon = this.newChatBtn.querySelector('svg');
+        const newChatSpan = this.newChatBtn.querySelector('span');
+        if (newChatIcon) newChatIcon.style.display = this.isCreatingSession ? 'none' : 'block';
+        if (newChatSpan) newChatSpan.textContent = this.isCreatingSession ? 'Creating...' : 'New chat';
+    }
+
+    private adjustTextareaHeight(): void {
+        this.messageInput.style.height = 'auto';
+        this.messageInput.style.height = Math.min(this.messageInput.scrollHeight, 120) + 'px';
+    }
+
+    private generateId(): string {
+        return Date.now().toString(36) + Math.random().toString(36).substr(2);
+    }
+}
+
+// =================================================================================
+// VIII. APP INITIALIZATION
+// =================================================================================
 document.addEventListener('DOMContentLoaded', () => {
     const chatApp = new ChatApp();
-    // Make it globally accessible for onclick handlers
     (window as any).chatApp = chatApp;
 });
