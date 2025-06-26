@@ -1,0 +1,6 @@
+// Main SCSS file that imports all component styles
+@use 'styles/base';
+@use 'styles/chat';
+@use 'styles/session';
+@use 'styles/tools';
+@use 'styles/debug';
