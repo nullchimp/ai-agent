@@ -20,7 +20,14 @@ def test_ui_files_exist():
     assert (ui_dir / "index.html").exists(), "index.html should exist"
     assert (ui_dir / "styles.css").exists(), "styles.css should exist"
     assert (dist_dir / "chat.js").exists(), "chat.js should exist"
-    assert (ui_dir / "chat.ts").exists(), "chat.ts should exist"
+    
+    # Check for new modular TypeScript structure
+    assert (ui_dir / "types.ts").exists(), "types.ts should exist"
+    assert (ui_dir / "ChatApp.ts").exists(), "ChatApp.ts should exist"
+    assert (ui_dir / "ChatComponent.ts").exists(), "ChatComponent.ts should exist"
+    assert (ui_dir / "SessionComponent.ts").exists(), "SessionComponent.ts should exist"
+    assert (ui_dir / "ToolsComponent.ts").exists(), "ToolsComponent.ts should exist"
+    assert (ui_dir / "DebugComponent.ts").exists(), "DebugComponent.ts should exist"
 
 
 def test_html_structure():
@@ -58,22 +65,39 @@ def test_css_contains_chatgpt_styling():
 
 
 def test_typescript_compiles():
-    """Test that TypeScript file exists and has proper structure"""
+    """Test that TypeScript components exist and compile to proper structure"""
     ui_dir = Path(__file__).parent.parent / "src" / "ui"
-    ts_file = ui_dir / "chat.ts"
     js_file = ui_dir / "dist" / "chat.js"
 
-    ts_content = ts_file.read_text()
+    # Check that TypeScript components exist
+    assert (ui_dir / "types.ts").exists(), "Should have types.ts with interfaces"
+    assert (ui_dir / "ChatApp.ts").exists(), "Should have ChatApp.ts"
+    assert (ui_dir / "SessionComponent.ts").exists(), "Should have SessionComponent.ts"
+    assert (ui_dir / "ToolsComponent.ts").exists(), "Should have ToolsComponent.ts"
+    assert (ui_dir / "DebugComponent.ts").exists(), "Should have DebugComponent.ts"
+    assert (ui_dir / "ChatComponent.ts").exists(), "Should have ChatComponent.ts"
 
-    # Check TypeScript structure
-    assert 'interface Message' in ts_content, "Should define Message interface"
-    assert 'interface ChatSession' in ts_content, "Should define ChatSession interface"
-    assert 'class ChatApp' in ts_content, "Should define ChatApp class"
-    assert 'private apiBaseUrl' in ts_content, "Should have API configuration"
-    assert 'addEventListener' in ts_content, "Should set up event listeners"
+    # Check types.ts structure
+    types_content = (ui_dir / "types.ts").read_text()
+    assert 'interface Message' in types_content, "Should define Message interface"
+    assert 'interface ChatSession' in types_content, "Should define ChatSession interface"
+    assert 'class EventEmitter' in types_content, "Should define EventEmitter class"
 
-    # Check that JavaScript was compiled
+    # Check ChatApp.ts structure
+    chatapp_content = (ui_dir / "ChatApp.ts").read_text()
+    assert 'class ChatApp' in chatapp_content, "Should define ChatApp class"
+    assert 'DOMContentLoaded' in chatapp_content, "Should set up initialization"
+
+    # Check that JavaScript was compiled and bundled
     assert js_file.exists(), "JavaScript file should be compiled from TypeScript"
+    
+    js_content = js_file.read_text()
+    assert 'EventEmitter' in js_content, "Should include EventEmitter"
+    assert 'SessionComponent' in js_content, "Should include SessionComponent"
+    assert 'ToolsComponent' in js_content, "Should include ToolsComponent"
+    assert 'DebugComponent' in js_content, "Should include DebugComponent"
+    assert 'ChatComponent' in js_content, "Should include ChatComponent"
+    assert 'ChatApp' in js_content, "Should include ChatApp"
 
 
 def test_api_serves_static_files():
@@ -140,18 +164,33 @@ def test_ui_responsive_design():
 
 
 def test_chat_functionality_structure():
-    """Test that TypeScript defines proper chat functionality"""
+    """Test that TypeScript defines proper chat functionality in components"""
     ui_dir = Path(__file__).parent.parent / "src" / "ui"
-    ts_file = ui_dir / "chat.ts"
-
-    content = ts_file.read_text()
-
-    # Check for essential methods
-    assert 'sendMessage' in content, "Should have sendMessage method"
-    assert 'displayMessage' in content, "Should have displayMessage method"
-    assert 'createNewSession' in content, "Should have session management"
-    assert 'localStorage' in content, "Should persist chat history"
-    assert 'typing-indicator' in content or 'typingIndicator' in content, "Should show typing indicators"
+    
+    # Check ChatComponent has message functionality
+    chat_content = (ui_dir / "ChatComponent.ts").read_text()
+    assert 'sendMessage' in chat_content, "Should have sendMessage method"
+    assert 'displayMessage' in chat_content, "Should have displayMessage method"
+    
+    # Check SessionComponent has session management
+    session_content = (ui_dir / "SessionComponent.ts").read_text()
+    assert 'createNewSession' in session_content, "Should have session management"
+    assert 'localStorage' in session_content, "Should persist chat history"
+    
+    # Check ToolsComponent has tool management
+    tools_content = (ui_dir / "ToolsComponent.ts").read_text()
+    assert 'loadTools' in tools_content, "Should have tool loading"
+    assert 'toggleTool' in tools_content, "Should have tool toggling"
+    
+    # Check DebugComponent has debug functionality
+    debug_content = (ui_dir / "DebugComponent.ts").read_text()
+    assert 'loadDebugEvents' in debug_content, "Should have debug event loading"
+    assert 'toggleDebugPanel' in debug_content, "Should have debug panel control"
+    
+    # Check compiled JavaScript has typing indicators
+    js_file = ui_dir / "dist" / "chat.js"
+    js_content = js_file.read_text()
+    assert 'typing-indicator' in js_content or 'typingIndicator' in js_content, "Should show typing indicators"
 
 
 def test_package_json_scripts():
