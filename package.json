@@ -9,9 +9,10 @@
     "test": "tests"
   },
   "scripts": {
-    "ui:build:chat": "npx tsc src/ui/chat.ts --target ES2020 --lib ES2020,DOM --outDir src/ui/dist",
+    "ui:build:ts": "npx tsc src/ui/*.ts --target ES2020 --lib ES2020,DOM --outDir src/ui/dist",
+    "ui:build:bundle": "cat src/ui/dist/types.js src/ui/dist/SessionComponent.js src/ui/dist/ToolsComponent.js src/ui/dist/DebugComponent.js src/ui/dist/ChatComponent.js src/ui/dist/ChatApp.js > src/ui/dist/chat.js",
     "ui:build:scss": "npx sass src/ui/styles.scss src/ui/dist/styles.css",
-    "ui:build": "npm run ui:build:chat && npm run ui:build:scss && cp src/ui/index.html src/ui/dist/index.html",
+    "ui:build": "npm run ui:build:ts && npm run ui:build:bundle && npm run ui:build:scss && cp src/ui/index.html src/ui/dist/index.html",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
