@@ -1,5 +1,5 @@
-import { ChatSession, Message } from './types';
-import { ApiManager } from './api-manager';
+import { ChatSession, Message } from '../types';
+import { ApiManager } from './api';
 
 export class SessionManager {
     public sessions: ChatSession[] = [];

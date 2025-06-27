@@ -1,4 +1,4 @@
-import { Tool, DebugEvent } from './types';
+import { Tool, DebugEvent } from '../types';
 
 export class ApiManager {
     private apiBaseUrl = 'http://localhost:5555/api';

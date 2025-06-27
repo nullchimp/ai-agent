@@ -1,6 +1,6 @@
-import { Tool } from './types';
-import { ApiManager } from './api-manager';
-import { SessionManager } from './session-manager';
+import { Tool } from '../types';
+import { ApiManager } from './api';
+import { SessionManager } from './session';
 
 export class ToolsManager {
     private tools: Tool[] = [];

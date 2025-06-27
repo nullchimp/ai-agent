@@ -13,6 +13,6 @@
     "sourceMap": false,
     "noEmit": true
   },
-  "include": ["src/ui/*.ts"],
+  "include": ["src/ui/*.ts", "src/ui/libs/api.ts", "src/ui/libs/chat-ui.ts", "src/ui/libs/debug.ts", "src/ui/libs/session.ts", "src/ui/libs/tools.ts"],
   "exclude": ["node_modules", "**/*.spec.ts", "**/*.test.ts"]
 }

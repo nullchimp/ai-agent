@@ -1,4 +1,4 @@
-import { Message } from './types';
+import { Message } from '../types';
 
 declare const marked: {
     parse(markdown: string): string;

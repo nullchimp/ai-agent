@@ -1,9 +1,9 @@
 import { Message } from './types';
-import { ApiManager } from './api-manager';
-import { SessionManager } from './session-manager';
-import { ToolsManager } from './tools-manager';
-import { DebugManager } from './debug-manager';
-import { ChatUIManager } from './chat-ui-manager';
+import { ApiManager } from './libs/api';
+import { SessionManager } from './libs/session';
+import { ToolsManager } from './libs/tools';
+import { DebugManager } from './libs/debug';
+import { ChatUIManager } from './libs/chat-ui';
 
 // =================================================================================
 // MAIN CHAT APP

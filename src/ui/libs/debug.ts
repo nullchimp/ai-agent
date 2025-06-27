@@ -1,6 +1,6 @@
-import { DebugEvent } from './types';
-import { ApiManager } from './api-manager';
-import { SessionManager } from './session-manager';
+import { DebugEvent } from '../types';
+import { ApiManager } from './api';
+import { SessionManager } from './session';
 
 export class DebugManager {
     private debugEventsList: DebugEvent[] = [];
