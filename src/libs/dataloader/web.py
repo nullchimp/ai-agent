@@ -14,20 +14,19 @@ from core.rag.schema import Document, DocumentChunk, Source
 
 
 class WebLoader(Loader):
-    def __init__(self, 
-                url: str, 
-                url_pattern: Optional[str] = None, 
-                max_urls: int = 10000, 
-                chunk_size: int = 1024, 
-                chunk_overlap: int = 200):
+    def __init__(self,
+                 url: str,
+                 max_urls: int = 10000,
+                 chunk_size: int = 1024,
+                 chunk_overlap: int = 200):
         
         self.url = url
-        self.url_pattern = re.compile(url_pattern) if url_pattern else None
         self.max_urls = max_urls
         self.path = url  # For compatibility with Loader parent class
         self.chunk_size = chunk_size
         self.chunk_overlap = chunk_overlap
 
+        self.replace_map: Dict[str, str] = {}
         self.visited_urls: Set[str] = set()
         self.found_urls: Set[str] = set()
         
@@ -36,6 +35,9 @@ class WebLoader(Loader):
             chunk_size=chunk_size,
             chunk_overlap=chunk_overlap
         )
+
+    def replace(self, original: str, replacement: str):
+        self.replace_map[original] = replacement
 
     def create_source(self, source_url) -> Source:
         parsed_url = urlparse(source_url)
@@ -123,9 +125,22 @@ class WebLoader(Loader):
         try:
             urls_to_process = [self.url]
             
+            processed_count = 0
+            while urls_to_process:
+                processed_count += 1
+
+                if processed_count > self.max_urls:
+                    print(f"Reached max URL limit: {self.max_urls}. Stopping further processing.")
+                    break
+                
             while urls_to_process:
                 current_url = urls_to_process.pop(0)
-                display_url = current_url.replace("http://localhost:4000", "https://docs.github.com")
+                display_url = current_url
+
+                for pattern, replacement in self.replace_map.items():
+                    if re.search(pattern, current_url):
+                        display_url = re.sub(pattern, replacement, current_url)
+                        break
 
                 source = self.create_source(display_url)
                 print(f"Processing URL: {current_url}")
