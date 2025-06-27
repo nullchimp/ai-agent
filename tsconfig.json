@@ -4,14 +4,14 @@
     "module": "ES2020",
     "moduleResolution": "node",
     "lib": ["ES2020", "DOM"],
-    "outDir": "./src/ui",
-    "rootDir": "./src/ui",
     "strict": true,
     "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "declaration": false,
-    "sourceMap": false
+    "sourceMap": false,
+    "noEmit": true
   },
   "include": ["src/ui/*.ts"],
   "exclude": ["node_modules", "**/*.spec.ts", "**/*.test.ts"]
