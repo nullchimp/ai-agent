@@ -4,7 +4,7 @@ declare const marked: {
     parse(markdown: string): string;
 };
 
-export class ChatUIManager {
+export class ChatManager {
     private messagesContainer: HTMLElement;
 
     constructor() {

@@ -3,17 +3,17 @@ import { ApiManager } from './libs/api';
 import { SessionManager } from './libs/session';
 import { ToolsManager } from './libs/tools';
 import { DebugManager } from './libs/debug';
-import { ChatUIManager } from './libs/chat-ui';
+import { ChatManager } from './libs/chat';
 
 // =================================================================================
 // MAIN CHAT APP
 // =================================================================================
-export class ChatApp {
+export class AgentApp {
     public debugManager: DebugManager;
     private apiManager: ApiManager;
     private sessionManager: SessionManager;
     private toolsManager: ToolsManager;
-    private uiManager: ChatUIManager;
+    private uiManager: ChatManager;
 
     private messageInput: HTMLTextAreaElement;
     private sendBtn: HTMLButtonElement;
@@ -29,7 +29,7 @@ export class ChatApp {
         this.newChatBtn = document.getElementById('newChatBtn') as HTMLButtonElement;
 
         this.apiManager = new ApiManager();
-        this.uiManager = new ChatUIManager();
+        this.uiManager = new ChatManager();
         this.sessionManager = new SessionManager(this.apiManager, () => this.onSessionChanged());
         this.toolsManager = new ToolsManager(this.apiManager, this.sessionManager);
         this.debugManager = new DebugManager(this.apiManager, this.sessionManager);
@@ -195,6 +195,6 @@ export class ChatApp {
 // APP INITIALIZATION
 // =================================================================================
 document.addEventListener('DOMContentLoaded', () => {
-    const chatApp = new ChatApp();
+    const chatApp = new AgentApp();
     (window as any).chatApp = chatApp;
 });
