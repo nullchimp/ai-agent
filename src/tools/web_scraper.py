@@ -27,7 +27,7 @@ class WebScraper(Tool):
         for source, doc, chunks in loader.load_data():
             data.append({
                 "source": source.uri,
-                "text": doc.content
+                "content": doc.content
             })
         
         return data

@@ -127,14 +127,16 @@ class WebLoader(Loader):
             
             processed_count = 0
             while urls_to_process:
-                processed_count += 1
-
-                if processed_count > self.max_urls:
-                    print(f"Reached max URL limit: {self.max_urls}. Stopping further processing.")
-                    break
-                
-            while urls_to_process:
                 current_url = urls_to_process.pop(0)
+                if current_url in self.visited_urls:
+                    print(f"Skipping already visited URL: {current_url}")
+                    continue
+
+                if processed_count >= self.max_urls:
+                    print(f"Reached maximum URL limit: {self.max_urls}")
+                    break
+
+                processed_count += 1
                 display_url = current_url
 
                 for pattern, replacement in self.replace_map.items():
@@ -143,7 +145,6 @@ class WebLoader(Loader):
                         break
 
                 source = self.create_source(display_url)
-                print(f"Processing URL: {current_url}")
                 
                 # Extract links from the current URL
                 content, new_urls = self._visit_site(current_url)
@@ -157,9 +158,6 @@ class WebLoader(Loader):
                     if not url in self.found_urls:
                         urls_to_process.append(url)
                         self.found_urls.add(url)
-                
-                print(f"Pending URLs: {len(urls_to_process)}")
-                print(f"Content: {content[:100]}...")  # Print first 100 characters of content
 
                 parsed_url = urlparse(current_url)
                 title = parsed_url.path.split('/')[-1] or parsed_url.netloc
