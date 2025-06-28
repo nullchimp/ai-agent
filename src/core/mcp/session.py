@@ -20,7 +20,7 @@ class MCPSession:
         self.server_params = StdioServerParameters(
             command=server_config.get("command", None),  # Executable
             args=server_config.get("args", []),  # Optional command line arguments
-            env=server_config.get("env", None),  # Optional environment variables
+            env=self._parse_env(server_config.get("env", None)),  # Optional environment variables
         )
 
         self._session = None
@@ -96,3 +96,19 @@ class MCPSession:
         self._session = await self.exit_stack.enter_async_context(ClientSession(stdio, write))
         
         return self._session
+    
+    def _parse_env(self, env: dict) -> dict:
+        import os
+        if not env:
+            return None
+        
+        parsed_env = {}
+        for key, value in env.items():
+            parsed_env[key] = value
+
+            # Check if the value is a string and starts with '$' indicating an environment variable
+            if isinstance(value, str) and value.startswith("$"):
+                # Replace with environment variable value
+                parsed_env[key] = os.getenv(value[1:], "")
+
+        return parsed_env
