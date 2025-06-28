@@ -12,6 +12,7 @@ from core.mcp.sessions_manager import MCPSessionManager
 from tools import Tool
 from tools.github_search import GitHubKnowledgebase
 from tools.google_search import GoogleSearch
+from tools.web_scraper import WebScraper
 from tools.read_file import ReadFile
 from tools.write_file import WriteFile
 from tools.list_files import ListFiles
@@ -23,6 +24,7 @@ class Agent:
         self.tools = {
             GitHubKnowledgebase(),
             GoogleSearch(),
+            WebScraper(),
             ReadFile(),
             WriteFile(),
             ListFiles(),

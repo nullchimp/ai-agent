@@ -9,14 +9,17 @@
     "test": "tests"
   },
   "scripts": {
-    "ui:build:chat": "npx tsc src/ui/chat.ts --target ES2020 --lib ES2020,DOM --outDir src/ui/dist",
-    "ui:build": "npm run ui:build:chat && cp src/ui/index.html src/ui/dist/index.html && cp src/ui/styles.css src/ui/dist/styles.css",
+    "ui:clean": "rm -rf src/ui/dist && mkdir -p src/ui/dist",
+    "ui:build": "npm run ui:clean && NODE_ENV=production node build.js && npm run ui:copy-assets",
+    "ui:dev": "npm run ui:clean && node build.js watch",
+    "ui:copy-assets": "cp src/ui/index.html src/ui/dist/index.html && cp src/ui/styles.css src/ui/dist/styles.css",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "devDependencies": {
+    "esbuild": "^0.20.0",
     "typescript": "^5.8.3"
   }
 }

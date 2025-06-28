@@ -6,6 +6,8 @@
                 "<Arguments to pass to the server>"
             ],
             "env": {
+                // Environment variable values preceeded by a dollar sign ($) will be replaced with the value from the .env file.
+                // For example, "$MCP_GITHUB_TOKEN" will be replaced with the value of MCP_GITHUB_TOKEN from the .env file.
                 "<Environment Variable Name>": "<Environment Variable Value>"
             }
         }
