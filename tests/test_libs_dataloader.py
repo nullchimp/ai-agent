@@ -157,14 +157,13 @@ class TestWebLoader:
         return WebLoader("https://example.com")
 
     def test_init_success(self):
-        loader = WebLoader("https://example.com", url_pattern=".*", max_urls=5000, chunk_size=512, chunk_overlap=100)
+        loader = WebLoader("https://example.com", max_urls=5000, chunk_size=512, chunk_overlap=100)
         
         assert loader.url == "https://example.com"
         assert loader.path == "https://example.com"  # For compatibility
         assert loader.max_urls == 5000
         assert loader.chunk_size == 512
         assert loader.chunk_overlap == 100
-        assert hasattr(loader, 'url_pattern')
         assert hasattr(loader, 'visited_urls')
         assert hasattr(loader, 'found_urls')
         assert hasattr(loader, 'sentence_splitter')
