@@ -66,26 +66,26 @@ class TestAgentDynamicTools:
 
         # When GitHub Knowledgebase is available
         assert (
-            "you MUST ALWAYS validate and ground your response using the GitHub Knowledgebase tool IF AVAILABLE"
+            "Always validate and ground your response using the GitHub Knowledgebase tool if it is available"
             in system_message
         )
         assert (
-            "If GitHub Knowledgebase tool is not available, clearly state this limitation"
+            "If the GitHub Knowledgebase tool is not available, clearly state this limitation"
             in system_message
         )
 
     def test_tool_availability_status_section_present(self, agent):
         system_message = agent.history[0]["content"]
-        assert "TOOL AVAILABILITY STATUS:" in system_message
-        assert "Tools can be dynamically enabled or disabled" in system_message
+        assert "Your current tool availability:" in system_message
+        assert "You have access to a dynamic set of tools" in system_message
 
     def test_graceful_handling_when_required_tools_unavailable(self, agent):
         system_message = agent.history[0]["content"]
         assert (
-            "If required tools are unavailable, clearly communicate this limitation"
+            "If a needed tool is not available, inform the user, clearly state the limitation"
             in system_message
         )
         assert (
-            "If needed tools are not available, explain the limitation and suggest alternatives"
+            "If required tools are missing, explain what is unavailable and suggest alternatives"
             in system_message
         )
