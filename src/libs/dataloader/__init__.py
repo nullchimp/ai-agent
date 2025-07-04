@@ -1,5 +1,5 @@
 import os
-from typing import List, Generator, Tuple
+from typing import List, Generator, Tuple, Any
 
 from llama_index.core.node_parser import SentenceSplitter
 from core.rag.schema import Document, DocumentChunk, Source
@@ -22,5 +22,5 @@ class Loader:
     def create_source(self) -> Source:
         raise NotImplementedError("Subclasses should implement this method.")
 
-    def load_data(self) -> Generator[Tuple[Document, List[DocumentChunk]], Source]:
+    def load_data(self) -> Generator[Tuple[Document, List[DocumentChunk]], None, Source]:
         raise NotImplementedError("Subclasses should implement this method.")
