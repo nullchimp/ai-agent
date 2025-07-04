@@ -1,13 +1,16 @@
 from fastapi import APIRouter, Depends, HTTPException, Response
+from typing import Optional
 import uuid
 
 from agent import get_agent_instance, Agent, delete_agent_instance
 from api.auth import get_api_key
 from api.models import (
     QueryRequest, QueryResponse, ToolsListResponse, ToolToggleRequest,
-    ToolToggleResponse, ToolInfo, DebugResponse, DebugRequest, NewSessionResponse
+    ToolToggleResponse, ToolInfo, DebugResponse, DebugRequest, NewSessionResponse,
+    SessionInfoResponse, SessionListResponse, MessageResponse, MemoryContextResponse
 )
 from core.debug_capture import get_debug_capture_instance, get_all_debug_events, clear_all_debug_events, delete_debug_capture_instance
+from core.storage.session_manager import get_session_manager
 
 session_router = APIRouter(prefix="/api")
 api_router = APIRouter(prefix="/api/{session_id}", dependencies=[Depends(get_api_key)])
@@ -15,31 +18,154 @@ api_router = APIRouter(prefix="/api/{session_id}", dependencies=[Depends(get_api
 @session_router.get("/session/{session_id}", response_model=NewSessionResponse)
 async def get_session(session_id: str):
     try:
+        session_manager = get_session_manager()
+        
         if session_id == "new":
-            session_id = str(uuid.uuid4())
+            # Create a new persistent session
+            session = await session_manager.create_session()
+            session_id = session.session_id
+        else:
+            # Check if session exists in persistent storage
+            session = await session_manager.get_session(session_id)
+            if not session:
+                raise HTTPException(status_code=404, detail="Session not found")
 
+        # Initialize agent and debug capture for the session
         await get_agent_instance(session_id)
         get_debug_capture_instance(session_id)
+        
         return NewSessionResponse(session_id=session_id, message="Session is active")
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error initializing agent: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error initializing session: {str(e)}")
 
 
 @session_router.delete("/session/{session_id}")
 async def delete_session(session_id: str):
-    if delete_agent_instance(session_id):
-        # Also clean up the debug capture instance for this session
+    try:
+        session_manager = get_session_manager()
+        
+        # Delete from persistent storage
+        deleted = await session_manager.delete_session(session_id)
+        
+        # Clean up in-memory instances
+        delete_agent_instance(session_id)
         delete_debug_capture_instance(session_id)
-        return Response(status_code=204)
-    else:
-        raise HTTPException(status_code=404, detail="Session not found")
+        
+        if deleted:
+            return Response(status_code=204)
+        else:
+            raise HTTPException(status_code=404, detail="Session not found")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error deleting session: {str(e)}")
+
+
+@session_router.get("/session/{session_id}/info", response_model=SessionInfoResponse)
+async def get_session_info(session_id: str):
+    try:
+        session_manager = get_session_manager()
+        session = await session_manager.get_session(session_id)
+        
+        if not session:
+            raise HTTPException(status_code=404, detail="Session not found")
+        
+        conversation_history = [
+            MessageResponse(
+                id=msg.id,
+                role=msg.role,
+                content=msg.content,
+                timestamp=msg.timestamp,
+                used_tools=msg.used_tools
+            )
+            for msg in session.conversation_history
+        ]
+        
+        return SessionInfoResponse(
+            session_id=session.session_id,
+            title=session.title,
+            status=session.status.value,
+            created_at=session.created_at,
+            last_activity=session.last_activity,
+            message_count=len(session.conversation_history),
+            conversation_history=conversation_history
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error retrieving session info: {str(e)}")
+
+
+@session_router.get("/sessions", response_model=SessionListResponse)
+async def list_sessions(user_id: Optional[str] = None, limit: int = 50):
+    try:
+        session_manager = get_session_manager()
+        sessions = await session_manager.storage_manager.session_repo.list_sessions(
+            user_id=user_id, 
+            limit=limit
+        )
+        
+        session_responses = []
+        for session in sessions:
+            session_responses.append(SessionInfoResponse(
+                session_id=session.session_id,
+                title=session.title,
+                status=session.status.value,
+                created_at=session.created_at,
+                last_activity=session.last_activity,
+                message_count=len(session.conversation_history),
+                conversation_history=[]  # Don't include full history in list view
+            ))
+        
+        return SessionListResponse(sessions=session_responses)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error listing sessions: {str(e)}")
+
+
+@api_router.get("/memory/context", response_model=MemoryContextResponse)
+async def get_memory_context(session_id: str, query: str = ""):
+    try:
+        session_manager = get_session_manager()
+        context = await session_manager.get_context_for_response(session_id, query)
+        
+        return MemoryContextResponse(
+            working_memory=context["memory_context"]["working_memory"],
+            episodic_memory=context["memory_context"]["episodic_memory"],
+            semantic_memory=context["memory_context"]["semantic_memory"],
+            recent_messages=context["recent_messages"]
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error retrieving memory context: {str(e)}")
 
 
 @api_router.post("/ask", response_model=QueryResponse)
 async def ask_agent(session_id: str, request: QueryRequest, agent_instance: Agent = Depends(get_agent_instance)) -> QueryResponse:
     try:
-        # Debug capture is now per-session, no need to set session_id
+        session_manager = get_session_manager()
+        
+        # Add user message to persistent storage
+        await session_manager.add_message(
+            session_id=session_id,
+            role="user",
+            content=request.query
+        )
+        
+        # Get memory context for the response
+        context = await session_manager.get_context_for_response(session_id, request.query)
+        
+        # Process query with agent (this could be enhanced to use memory context)
         response, used_tools = await agent_instance.process_query(request.query)
+        
+        # Add agent response to persistent storage  
+        await session_manager.add_message(
+            session_id=session_id,
+            role="assistant",
+            content=response,
+            used_tools=list(used_tools)
+        )
+        
         return QueryResponse(
             response=response,
             used_tools=list(used_tools)
