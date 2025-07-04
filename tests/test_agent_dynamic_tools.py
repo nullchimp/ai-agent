@@ -66,7 +66,7 @@ class TestAgentDynamicTools:
 
         # When GitHub Knowledgebase is available
         assert (
-            "Always validate and ground your response using the GitHub Knowledgebase tool if it is available"
+            "always validate and ground your response using the GitHub Knowledgebase tool if available"
             in system_message
         )
         assert (
