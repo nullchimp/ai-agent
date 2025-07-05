@@ -1,6 +1,8 @@
 import mgclient
 from . import GraphClient
 
+import mgclient
+
 # ════════════════════════════════════════════════════════════════════════
 #  MemGraphClient
 # ════════════════════════════════════════════════════════════════════════
@@ -51,4 +53,3 @@ class MemGraphClient(GraphClient):
         if self._conn:
             self._conn.close()
         print("Connection to Memgraph closed")
-        

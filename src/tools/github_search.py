@@ -26,9 +26,8 @@ class GitHubKnowledgebase(Tool):
 		import os
 		import json
 
-		from core.llm.chat import Chat
 		from core.rag.embedder import TextEmbedding3Small
-		from core.rag.dbhandler.memgraph import MemGraphClient
+		from core.db.handler.memgraph import MemGraphClient
 
 		db = MemGraphClient(
 			host="localhost" or os.environ.get("MEMGRAPH_URI", "localhost"),

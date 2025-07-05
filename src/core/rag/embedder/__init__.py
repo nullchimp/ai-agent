@@ -1,7 +1,7 @@
 from typing import List
 import asyncio
 
-from core.rag.schema import DocumentChunk, Vector
+from core.db.schemas.knowledge_base import DocumentChunk, Vector
 from core.llm.client import *
 
 class EmbeddingService:

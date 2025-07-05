@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from core.db.schemas import Node
+
 # Graph Schema Relationships:
 #
 # Node Types:
@@ -31,83 +33,7 @@ from __future__ import annotations
 #    Documents can reference other sources
 
 import hashlib
-
-from datetime import datetime, timezone
-from enum import Enum
-from typing import List, Dict, Any
-import uuid
-
-
-# ────────────────────────────────
-#  Graph semantics (optional)
-# ────────────────────────────────
-
-class ProcessingStatus(Enum):
-    PENDING = "pending"
-    PROCESSING = "processing"
-    COMPLETED = "completed"
-    FAILED = "failed"
-
-class EdgeType(Enum):
-    CHUNK_OF = "CHUNK_OF"          # DocumentChunk ➜ Document
-    FOLLOWS = "FOLLOWS"            # Interaction ➜ Interaction
-    SOURCED_FROM = "SOURCED_FROM"  # Document ➜ Source
-    STORED_IN = "STORED_IN"        # Vector ➜ VectorStore
-    EMBEDDING_OF = "EMBEDDING_OF"  # Vector ➜ DocumentChunk
-    REFERENCES = "REFERENCES"      # Document ➜ Source
-
-# ────────────────────────────────
-#  Core nodes
-# ────────────────────────────────
-
-class Node:
-    @classmethod
-    def label(cls) -> str:
-        return cls.__name__.upper()
-
-    def __init__(self, *args, **kwargs):
-        self.id = uuid.uuid4()
-        self.created_at = datetime.now(timezone.utc)
-        self.updated_at = datetime.now(timezone.utc)
-        self.metadata = {}
-
-    def fill(self, key: str, value: Any) -> None:
-        self.__dict__[key] = value
-
-    def create(self) -> str:
-        label = self.__class__.__name__.upper()
-        q = f"MERGE (n:`{label}` {{id: $id}}) SET n += $props RETURN n.id"
-        return [q, {"id": str(self.id), "props": self.to_dict()}]
-
-    def link(
-        self,
-        edge: EdgeType,
-        nodeType: str,
-        to_id: str,
-    ) -> None:
-        label = self.__class__.__name__.upper()
-        q = (
-            f"MATCH (a:`{label}` {{id: $lid}}), "
-            f"(b:`{nodeType}` {{id: $rid}}) "
-            f"MERGE (a)-[r:`{edge.value}`]->(b)"
-        )
-        return [q, {"lid": str(self.id), "rid": str(to_id)}]
-
-    def to_dict(self) -> dict:
-        def _value(v):
-            if isinstance(v, datetime):
-                return v.isoformat()
-            elif isinstance(v, Enum):
-                return v.value
-            elif isinstance(v, uuid.UUID):
-                return str(v)
-            return v
-
-        return {key: _value(value) for key, value in self.__dict__.items() if not (callable(value) or key.startswith('_'))}
-    
-    def add_metadata(self, *args, **kwargs):
-        for key, value in kwargs.items():
-            self.metadata[key] = value
+from typing import List
 
 class Source(Node):
     def __init__(
@@ -173,12 +99,10 @@ class Interaction(Node):
 class VectorStore(Node):
     def __init__(
         self,
-        model: str,                           
-        status: ProcessingStatus = ProcessingStatus.PENDING
+        model: str
     ):
         super().__init__()
         self.id = hashlib.sha256(model.encode()).hexdigest()[:32]
-        self.status = status
         self.model = model
 
 class Vector(Node):
