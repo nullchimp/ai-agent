@@ -22,5 +22,5 @@ class Loader:
     def create_source(self) -> Source:
         raise NotImplementedError("Subclasses should implement this method.")
 
-    def load_data(self) -> Generator[Tuple[Document, List[DocumentChunk]], Source]:
+    def load_data(self) -> Generator[Tuple[Document, List[DocumentChunk]], None, None]:
         raise NotImplementedError("Subclasses should implement this method.")
