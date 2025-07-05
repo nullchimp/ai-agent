@@ -1,4 +1,4 @@
-from core.rag.schema import DocumentChunk
+from db.schemas import DocumentChunk
 
 from . import EmbeddingService
 

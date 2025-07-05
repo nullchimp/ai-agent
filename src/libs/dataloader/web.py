@@ -10,7 +10,7 @@ from urllib.parse import urljoin, urlparse
 from bs4 import BeautifulSoup
 
 from . import Loader
-from core.rag.schema import Document, DocumentChunk, Source
+from db.schemas import Document, DocumentChunk, Source
 
 
 class WebLoader(Loader):

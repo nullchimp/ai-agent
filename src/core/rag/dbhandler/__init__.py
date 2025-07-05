@@ -11,7 +11,7 @@ from __future__ import annotations
 import mgclient
 from typing import Any, Dict, List, Optional, Sequence, Union
 
-from core.rag.schema import (
+from db.schemas import (
     Node as BaseNode,
     EdgeType, 
     Document, 

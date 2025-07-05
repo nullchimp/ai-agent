@@ -2,7 +2,7 @@ import os
 from typing import List, Generator, Tuple
 
 from llama_index.core.node_parser import SentenceSplitter
-from core.rag.schema import Document, DocumentChunk, Source
+from db.schemas import Document, DocumentChunk, Source
 
 class Loader:
     def __init__(self, path, file_types: List[str] = None, recursive = True, chunk_size: int = 1024, chunk_overlap: int = 200):

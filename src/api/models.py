@@ -40,7 +40,27 @@ class DebugResponse(BaseModel):
 class DebugRequest(BaseModel):
     enabled: bool
 
-
 class NewSessionResponse(BaseModel):
     session_id: str
     message: str
+
+class CreateSessionRequest(BaseModel):
+    title: Optional[str] = "New Session"
+
+class SessionInfo(BaseModel):
+    id: str
+    user_id: str
+    title: str
+    is_active: bool
+    created_at: str
+    updated_at: str
+    last_activity: str
+    agent_config: Dict[str, Any]
+
+class SessionsListResponse(BaseModel):
+    sessions: List[SessionInfo]
+
+class UpdateSessionRequest(BaseModel):
+    title: Optional[str] = None
+    agent_config: Optional[Dict[str, Any]] = None
+    is_active: Optional[bool] = None

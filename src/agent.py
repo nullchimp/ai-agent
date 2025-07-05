@@ -4,10 +4,13 @@ load_dotenv(override=True)
 import asyncio
 import os
 from datetime import date
+from typing import Optional
 
 from core import chatutil, graceful_exit, pretty_print
 from core.llm.chat import Chat
 from core.mcp.sessions_manager import MCPSessionManager
+from core.rag.dbhandler.memgraph import MemGraphClient
+from db import SessionManager
 
 from tools import Tool
 from tools.github_search import GitHubKnowledgebase
@@ -18,6 +21,28 @@ from tools.write_file import WriteFile
 from tools.list_files import ListFiles
 
 _agent_sessions = {}
+
+# Initialize global session manager (lazy loaded)
+_session_manager: Optional[SessionManager] = None
+
+
+def get_session_manager() -> SessionManager:
+    global _session_manager
+    if _session_manager is None:
+        # Use environment variables for database connection
+        host = os.getenv("MEMGRAPH_HOST", "127.0.0.1")
+        port = int(os.getenv("MEMGRAPH_PORT", "7687"))
+        username = os.getenv("MEMGRAPH_USERNAME")
+        password = os.getenv("MEMGRAPH_PASSWORD")
+        
+        db_client = MemGraphClient(
+            host=host,
+            port=port,
+            username=username,
+            password=password
+        )
+        _session_manager = SessionManager(db_client)
+    return _session_manager
 
 class Agent:
     def __init__(self, session_id: str = "cli-session"):
@@ -236,13 +261,28 @@ async def get_agent_instance(session_id: str = None) -> Agent:
     if not session_id:
         raise ValueError("Session ID must be provided to get agent instance.")
     
-    if not session_id in _agent_sessions:
+    if session_id not in _agent_sessions:
         print(f"Creating new agent instance for session: {session_id}")
+        
+        # Try to update session activity in database (non-blocking)
+        try:
+            session_manager = get_session_manager()
+            await session_manager.update_session_activity(session_id)
+        except Exception as e:
+            print(f"Warning: Could not update session activity in database: {e}")
+        
         agent: Agent = Agent(session_id)
         print(f"Agent instance created with session ID: {agent.session_id}")
         await agent.initialize_mcp_tools()
 
         _agent_sessions[session_id] = agent
+    else:
+        # Update activity for existing session
+        try:
+            session_manager = get_session_manager()
+            await session_manager.update_session_activity(session_id)
+        except Exception as e:
+            print(f"Warning: Could not update session activity in database: {e}")
 
     return _agent_sessions[session_id]
 
@@ -253,8 +293,40 @@ def delete_agent_instance(session_id: str) -> bool:
     if session_id in _agent_sessions:
         del _agent_sessions[session_id]
         delete_debug_capture_instance(session_id)
+        
+        # Try to mark session as inactive in database (non-blocking)
+        try:
+            import asyncio
+            session_manager = get_session_manager()
+            asyncio.create_task(session_manager.update_session(session_id, is_active=False))
+        except Exception as e:
+            print(f"Warning: Could not update session in database: {e}")
+        
         return True
     return False
+
+
+async def create_new_session(title: str = "New Session") -> str:
+    try:
+        session_manager = get_session_manager()
+        await session_manager.initialize_default_user()
+        session = await session_manager.create_user_session(title=title)
+        return str(session.id)
+    except Exception as e:
+        print(f"Warning: Could not create session in database: {e}")
+        # Fallback to generating a UUID
+        import uuid
+        return str(uuid.uuid4())
+
+
+async def list_sessions(active_only: bool = True) -> list:
+    try:
+        session_manager = get_session_manager()
+        sessions = await session_manager.list_user_sessions(active_only=active_only)
+        return [session.to_dict() for session in sessions]
+    except Exception as e:
+        print(f"Warning: Could not list sessions from database: {e}")
+        return []
 
 
 async def add_tool(tool: Tool, session_id: str = "cli-session") -> None:
