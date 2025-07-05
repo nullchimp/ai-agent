@@ -3,7 +3,19 @@ import { Tool, DebugEvent } from '../types';
 export class ApiManager {
     private apiBaseUrl = 'http://localhost:5555/api';
 
-    public async createNewBackendSession(): Promise<{ session_id: string }> {
+    public async createNewBackendSession(title?: string): Promise<{ session_id: string }> {
+        const response = await fetch(`${this.apiBaseUrl}/sessions`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ title: title || 'New Session' })
+        });
+        if (!response.ok) {
+            throw new Error(`Failed to create session: ${response.status}`);
+        }
+        return response.json();
+    }
+
+    public async createNewBackendSessionLegacy(): Promise<{ session_id: string }> {
         const response = await fetch(`${this.apiBaseUrl}/session/new`, {
             method: 'GET',
             headers: { 'Content-Type': 'application/json' }
@@ -34,6 +46,23 @@ export class ApiManager {
         } else {
             console.log(`Successfully deleted backend session ${sessionId}`);
         }
+    }
+
+    public async listBackendSessions(activeOnly: boolean = true): Promise<any[]> {
+        try {
+            const response = await fetch(`${this.apiBaseUrl}/sessions?active_only=${activeOnly}`, {
+                method: 'GET',
+                headers: { 'Content-Type': 'application/json' }
+            });
+            if (response.ok) {
+                const data = await response.json();
+                return data.sessions || [];
+            }
+            console.error('Failed to list sessions:', await response.text());
+        } catch (error) {
+            console.error('Error listing sessions:', error);
+        }
+        return [];
     }
 
     public async ask(sessionId: string, message: string): Promise<{ response: string, usedTools: string[] }> {
