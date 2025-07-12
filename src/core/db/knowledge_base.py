@@ -1,8 +1,7 @@
 from typing import Any, Dict, List, Optional, Sequence
 
 from core.db.schemas import EdgeType
-from core.db.schemas.knowledge_base import (
-    Node as BaseNode, 
+from core.db.schemas.document_objects import (
     Document, 
     DocumentChunk, 
     Interaction,
@@ -11,7 +10,7 @@ from core.db.schemas.knowledge_base import (
     Vector
 )
 
-from core.db.connection_pool import get_connection_pool
+from core.db import get_connection_pool, get_by_id, get_by_property
 
 def create_document(doc: Document) -> str:
     pool = get_connection_pool()
@@ -101,16 +100,13 @@ def update_chunk_embedding(
     embedding: List[float], 
     vector_store_id: str
 ) -> str:
-    pool = get_connection_pool()
+    vector = Vector(
+        chunk_id=chunk_id,
+        vector_store_id=vector_store_id,
+        embedding=embedding
+    )
     
-    with pool.get_connection() as db:
-        vector = Vector(
-            chunk_id=chunk_id,
-            vector_store_id=vector_store_id,
-            embedding=embedding
-        )
-        
-        return db.create_vector(vector)
+    return create_vector(vector)
 
 # ────────────────────────────────────────────────────────────────────
 #  VECTOR INDEX + SEARCH
@@ -131,8 +127,6 @@ def create_vector_store(
         print("Creating vector store...")
         try:
             db._execute(*vector_store.create())
-            print(f"Vector store created with ID: {vector_store.id}")
-            db._current_vector_store = vector_store
             
             # Create the actual vector index
             q = (
@@ -216,28 +210,25 @@ def search_chunks(
     index_name: str = "vector_embedding_index",
     k: int = 5
 ) -> List[Dict[str, Any]]:
-    pool = get_connection_pool()
+    vector_results = vector_search(query_vector, index_name, k)
     
-    with pool.get_connection() as db:
-        vector_results = db.vector_search(query_vector, index_name, k)
+    # For each vector result, fetch the associated chunk
+    results = []
+    for result in vector_results:
+        vector_node = result["node"]
+        chunk_id = vector_node.get("chunk_id")
         
-        # For each vector result, fetch the associated chunk
-        results = []
-        for result in vector_results:
-            vector_node = result["node"]
-            chunk_id = vector_node.get("chunk_id")
-            
-            if chunk_id:
-                chunk = db.get_by_id(DocumentChunk, chunk_id)
-                if chunk:
-                    results.append({
-                        "chunk": chunk,
-                        "vector": vector_node,
-                        "distance": result["distance"],
-                        "similarity": result["similarity"]
-                    })
-                    
-        return results
+        if chunk_id:
+            chunk = get_by_id(DocumentChunk, chunk_id)
+            if chunk:
+                results.append({
+                    "chunk": chunk,
+                    "vector": vector_node,
+                    "distance": result["distance"],
+                    "similarity": result["similarity"]
+                })
+                
+    return results
 
 def get_document_chunks(document_id: str) -> List[Dict[str, Any]]:
     pool = get_connection_pool()
@@ -277,38 +268,6 @@ def get_sources(
         db._cur.execute(q, {"doc_id": document_id})
         return [dict(row[0].properties) for row in db._cur.fetchall()]
 
-def get_by_id(
-    label: BaseNode | str, 
-    node_id: str
-) -> Optional[Dict[str, Any]]:
-    pool = get_connection_pool()
-    
-    with pool.get_connection() as db:
-        return db.get_by_property(label, "id", node_id, fetch_one=True)
-
-def get_by_property(
-    label: BaseNode | str, 
-    property_name: str,
-    property_value: Any,
-    fetch_one: bool = False
-) -> Optional[Dict[str, Any]]:
-    pool = get_connection_pool()
-    
-    with pool.get_connection() as db:
-        if issubclass(label, BaseNode) or isinstance(label, BaseNode):
-            label = label.label()
-
-        q = f"MATCH (n:`{label}` {{{property_name}: $value}}) RETURN n"
-        db._cur.execute(q, {"value": property_value})
-
-        if fetch_one:
-            result = db._cur.fetchone()
-            if result:
-                return dict(result[0].properties)
-            return None
-        
-        return [dict(row[0].properties) for row in db._cur.fetchall()]
-
 def get_source_by_chunk(
     chunk_id: str
 ) -> Optional[Dict[str, Any]]:
@@ -329,36 +288,33 @@ def load_vector_store(
     model: str = None,
     vector_store_id: str = None
 ) -> VectorStore:
-    pool = get_connection_pool()
+    if not (vector_store_id or model):
+        raise ValueError("Either model or vector_store_id must be provided")
     
-    with pool.get_connection() as db:
-        if not (vector_store_id or model):
-            raise ValueError("Either model or vector_store_id must be provided")
-        
-        prop = "id"
-        value = vector_store_id
-        if not vector_store_id:
-            prop = "model"
-            value = model
+    prop = "id"
+    value = vector_store_id
+    if not vector_store_id:
+        prop = "model"
+        value = model
 
-        vs_dict = db.get_by_property(
-            VectorStore,
-            prop,
-            value,
-            fetch_one=True
-        )
+    vs_dict = get_by_property(
+        VectorStore,
+        prop,
+        value,
+        fetch_one=True
+    )
 
-        if not vs_dict:
-            return None
-        
-        print(f"Loaded vector store: {vs_dict}")
-        # Create a VectorStore object from the dictionary
-        vector_store = VectorStore(
-            model=vs_dict.get('model', '')
-        )
+    if not vs_dict:
+        return None
+    
+    print(f"Loaded vector store: {vs_dict}")
+    # Create a VectorStore object from the dictionary
+    vector_store = VectorStore(
+        model=vs_dict.get('model', '')
+    )
 
-        for key, value in vs_dict.items():
-            if key not in ['model', 'id']:
-                vector_store.fill(key, value)
+    for key, value in vs_dict.items():
+        if key not in ['model', 'id']:
+            vector_store.fill(key, value)
 
-        return vector_store
+    return vector_store

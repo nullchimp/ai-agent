@@ -2,7 +2,7 @@ import pytest
 from unittest.mock import Mock, patch, AsyncMock
 from core.rag.embedder import EmbeddingService
 from core.rag.embedder.text_embedding_3_small import TextEmbedding3Small
-from core.db.schemas.knowledge_base import DocumentChunk, Vector
+from core.db.schemas.document_objects import DocumentChunk, Vector
 
 
 class TestEmbeddingService:

@@ -115,6 +115,5 @@ class Node:
             self.metadata[key] = value
 
 # Import all schemas
-from core.db.schemas.knowledge_base import *
-from core.db.schemas.session import *
-from core.db.schemas.user import *
+from core.db.schemas.document_objects import *
+from core.db.schemas.session_objects import *

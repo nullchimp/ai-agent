@@ -54,10 +54,3 @@ class GraphClient:
             if params:
                 print(f"Params: {params}")
             raise
-
-    def _fetch_by_id(self, id: str) -> Optional[Dict[str, Any]]:
-        query = f"MATCH (n {{id: $id}}) RETURN n"
-        self._execute(query, {"id": str(id)})
-        result = self._cur.fetchone()
-        if result:
-            return result[0].properties

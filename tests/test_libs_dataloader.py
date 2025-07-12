@@ -5,7 +5,7 @@ import os
 from libs.dataloader import Loader
 from libs.dataloader.document import DocumentLoader
 from libs.dataloader.web import WebLoader
-from core.db.schemas.knowledge_base import Document, DocumentChunk, Source
+from core.db.schemas.document_objects import Document, DocumentChunk, Source
 
 
 class TestLoader:
@@ -237,7 +237,7 @@ class TestWebLoader:
         web_loader._visit_site = Mock(return_value=("Test content", []))
         
         # Create a real Source object for testing
-        from core.db.schemas.knowledge_base import Source
+        from core.db.schemas.document_objects import Source
         test_source = Source(name="test", type="website", uri="https://example.com")
         web_loader.create_source = Mock(return_value=test_source)
         
@@ -262,7 +262,7 @@ class TestWebLoader:
         web_loader._visit_site = Mock(return_value=("", []))
         
         # Create a real Source object for testing
-        from core.db.schemas.knowledge_base import Source
+        from core.db.schemas.document_objects import Source
         test_source = Source(name="test", type="website", uri="https://example.com")
         web_loader.create_source = Mock(return_value=test_source)
         

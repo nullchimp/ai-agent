@@ -6,7 +6,7 @@ from . import Loader
 
 from llama_index.core.readers import SimpleDirectoryReader
 
-from core.db.schemas.knowledge_base import Document, DocumentChunk, Source
+from core.db.schemas.document_objects import Document, DocumentChunk, Source
 
 class DocumentLoader(Loader):
     def create_source(self, source_path) -> Document:

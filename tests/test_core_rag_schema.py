@@ -1,7 +1,7 @@
 import pytest
 import uuid
 from datetime import datetime, timezone
-from core.db.schemas.knowledge_base import Document, DocumentChunk, ProcessingStatus, EdgeType, Node, Source, Interaction, VectorStore, Vector
+from core.db.schemas.document_objects import Document, DocumentChunk, ProcessingStatus, EdgeType, Node, Source, Interaction, VectorStore, Vector
 
 
 class TestDocument:

@@ -9,10 +9,9 @@ from api.models import (
 )
 from core.debug_capture import get_debug_capture_instance, get_all_debug_events, clear_all_debug_events, delete_debug_capture_instance
 
-session_router = APIRouter(prefix="/api")
-api_router = APIRouter(prefix="/api/{session_id}", dependencies=[Depends(get_api_key)])
+router = APIRouter(prefix="/api/session/{session_id}", dependencies=[Depends(get_api_key)])
 
-@session_router.get("/session/{session_id}", response_model=NewSessionResponse)
+@router.get("", response_model=NewSessionResponse)
 async def get_session(session_id: str):
     try:
         if session_id == "new":
@@ -25,7 +24,7 @@ async def get_session(session_id: str):
         raise HTTPException(status_code=500, detail=f"Error initializing agent: {str(e)}")
 
 
-@session_router.delete("/session/{session_id}")
+@router.delete("")
 async def delete_session(session_id: str):
     if delete_agent_instance(session_id):
         # Also clean up the debug capture instance for this session
@@ -35,7 +34,7 @@ async def delete_session(session_id: str):
         raise HTTPException(status_code=404, detail="Session not found")
 
 
-@api_router.post("/ask", response_model=QueryResponse)
+@router.post("/ask", response_model=QueryResponse)
 async def ask_agent(session_id: str, request: QueryRequest, agent_instance: Agent = Depends(get_agent_instance)) -> QueryResponse:
     try:
         # Debug capture is now per-session, no need to set session_id
@@ -48,7 +47,7 @@ async def ask_agent(session_id: str, request: QueryRequest, agent_instance: Agen
         return QueryResponse(response=f"Sorry, I encountered an error: {str(e)}")
 
 
-@api_router.get("/tools", response_model=ToolsListResponse)
+@router.get("/tools", response_model=ToolsListResponse)
 async def list_tools(agent_instance: Agent = Depends(get_agent_instance)) -> ToolsListResponse:
     try:
         tools_info = agent_instance.get_tools()
@@ -66,7 +65,7 @@ async def list_tools(agent_instance: Agent = Depends(get_agent_instance)) -> Too
         raise HTTPException(status_code=500, detail=f"Error listing tools: {str(e)}")
 
 
-@api_router.post("/tools/toggle", response_model=ToolToggleResponse)
+@router.post("/tools/toggle", response_model=ToolToggleResponse)
 async def toggle_tool(request: ToolToggleRequest, agent_instance: Agent = Depends(get_agent_instance)) -> ToolToggleResponse:
     try:
         if request.enabled:
@@ -93,7 +92,7 @@ async def toggle_tool(request: ToolToggleRequest, agent_instance: Agent = Depend
         raise HTTPException(status_code=500, detail=f"Error toggling tool: {str(e)}")
 
 
-@api_router.get("/debug", response_model=DebugResponse)
+@router.get("/debug", response_model=DebugResponse)
 async def get_debug_info(session_id: str) -> DebugResponse:
     try:
         events = get_all_debug_events(session_id)
@@ -114,7 +113,7 @@ async def get_debug_info(session_id: str) -> DebugResponse:
         raise HTTPException(status_code=500, detail=f"Error retrieving debug info: {str(e)}")
 
 
-@api_router.post("/debug/toggle", response_model=DebugResponse)
+@router.post("/debug/toggle", response_model=DebugResponse)
 async def toggle_debug(session_id: str, request: DebugRequest) -> DebugResponse:
     try:
         capture = get_debug_capture_instance(session_id)
@@ -128,7 +127,7 @@ async def toggle_debug(session_id: str, request: DebugRequest) -> DebugResponse:
         raise HTTPException(status_code=500, detail=f"Error toggling debug: {str(e)}")
 
 
-@api_router.delete("/debug")
+@router.delete("/debug")
 async def clear_debug_events(session_id: str) -> Response:
     try:
         clear_all_debug_events(session_id)

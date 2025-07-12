@@ -1,4 +1,4 @@
-from core.db.schemas.knowledge_base import DocumentChunk
+from core.db.schemas.document_objects import DocumentChunk
 
 from . import EmbeddingService
 
