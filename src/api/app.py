@@ -3,7 +3,7 @@ import mimetypes
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
-from api.routes.session import router as session_router
+from api.routes.session import router as session_router, sessions_router
 
 mimetypes.add_type("application/javascript", ".js")
 
@@ -15,6 +15,7 @@ def create_app() -> FastAPI:
     )
 
     app.include_router(session_router)
+    app.include_router(sessions_router)
 
     static_files_path = os.path.join(os.path.dirname(__file__), "..", "ui", "dist")
     if os.path.exists(static_files_path):

@@ -1,4 +1,5 @@
 from dotenv import load_dotenv
+
 load_dotenv(override=True)
 
 import asyncio
@@ -19,8 +20,13 @@ from tools.list_files import ListFiles
 
 _agent_sessions = {}
 
+
 class Agent:
-    def __init__(self, session_id: str = "cli-session"):
+    def __init__(self, session_id: str = "cli-session", restore_from_db: bool = False):
+        self.session_id = session_id
+        self.mcp_initialized = False
+        self.history = []
+
         self.tools = {
             GitHubKnowledgebase(),
             GoogleSearch(),
@@ -31,15 +37,12 @@ class Agent:
         }
         self.chat = Chat.create(self.tools, session_id)
 
-        # Enable all tools by default
-        for tool in self.chat.tools:
-            tool.enable()
-
-        self.session_id = session_id
-        self.mcp_initialized = False
-
-        self.history = []
-        self._update_system_prompt()
+        if restore_from_db:
+            self._restore_from_db()
+        else:
+            for tool in self.chat.tools:
+                tool.enable()
+            self._update_system_prompt()
 
     def _get_available_tools_text(self) -> str:
         enabled_tools = [tool.name for tool in self.chat.tools if tool.enabled]
@@ -166,6 +169,7 @@ I cannot provide up-to-date information about open issues for octocat/Hello-Worl
         try:
             self.chat.enable_tool(tool_name)
             self._update_system_prompt()
+            self._save_to_db()
         except Exception as e:
             return False
         return True
@@ -174,6 +178,7 @@ I cannot provide up-to-date information about open issues for octocat/Hello-Worl
         try:
             self.chat.disable_tool(tool_name)
             self._update_system_prompt()
+            self._save_to_db()
         except Exception as e:
             return False
         return True
@@ -184,10 +189,12 @@ I cannot provide up-to-date information about open issues for octocat/Hello-Worl
     async def initialize_mcp_tools(self):
         if self.mcp_initialized:
             return
-        
+
         print("Initializing MCP tools...")
 
-        config_path = os.path.join(os.path.dirname(__file__), "..", "config", "mcp.json")
+        config_path = os.path.join(
+            os.path.dirname(__file__), "..", "config", "mcp.json"
+        )
         session_manager = MCPSessionManager()
         await session_manager.discovery(config_path)
         for tool in session_manager.tools:
@@ -209,7 +216,6 @@ I cannot provide up-to-date information about open issues for octocat/Hello-Worl
         messages.append(assistant_message)
 
         tools_used = set()
-        # Handle the case where tool_calls might be missing or not a list
         while assistant_message.get("tool_calls"):
             used_tools = await self.chat.process_tool_calls(
                 assistant_message, messages.append
@@ -228,19 +234,81 @@ I cannot provide up-to-date information about open issues for octocat/Hello-Worl
         if result:
             self.history.append(user_role)
             self.history.append(assistant_message)
+            self._save_to_db()
 
         pretty_print("History", self.history)
         return result, tools_used
 
+    def _save_to_db(self) -> None:
+        from core.db.session import save_session_state
+
+        enabled_tools = [tool.name for tool in self.chat.tools if tool.enabled]
+        disabled_tools = [tool.name for tool in self.chat.tools if not tool.enabled]
+
+        agent_config = {"session_id": self.session_id}
+
+        save_session_state(
+            session_id=self.session_id,
+            conversation_history=self.history,
+            enabled_tools=enabled_tools,
+            disabled_tools=disabled_tools,
+            mcp_initialized=self.mcp_initialized,
+            agent_config=agent_config,
+        )
+
+    def _restore_from_db(self) -> None:
+        from core.db.session import restore_session_state
+
+        session_state = restore_session_state(self.session_id)
+
+        if not session_state:
+            for tool in self.chat.tools:
+                tool.enable()
+            self._update_system_prompt()
+            return
+
+        self.history = session_state.get("conversation_history", [])
+        self.mcp_initialized = session_state.get("mcp_initialized", False)
+
+        enabled_tools = session_state.get("enabled_tools", [])
+        disabled_tools = session_state.get("disabled_tools", [])
+
+        for tool in self.chat.tools:
+            if tool.name in enabled_tools:
+                tool.enable()
+            elif tool.name in disabled_tools:
+                tool.disable()
+            else:
+                tool.enable()
+
+        self._update_system_prompt()
+
+
 async def get_agent_instance(session_id: str = None) -> Agent:
+    from core.db.session import get_session_by_id, create_session
+
     if not session_id:
         raise ValueError("Session ID must be provided to get agent instance.")
-    
+
     if not session_id in _agent_sessions:
-        print(f"Creating new agent instance for session: {session_id}")
-        agent: Agent = Agent(session_id)
+        existing_session = get_session_by_id(session_id)
+        restore_from_db = existing_session is not None
+
+        if not existing_session:
+            print(f"Creating new session in database: {session_id}")
+            create_session(session_id=session_id, title=f"Session {session_id[:8]}")
+            print(f"Creating new agent instance for session: {session_id}")
+            agent: Agent = Agent(session_id, restore_from_db=False)
+        else:
+            print(f"Restoring existing session from database: {session_id}")
+            agent: Agent = Agent(session_id, restore_from_db=True)
+
         print(f"Agent instance created with session ID: {agent.session_id}")
-        await agent.initialize_mcp_tools()
+
+        if not restore_from_db or not existing_session.mcp_initialized:
+            await agent.initialize_mcp_tools()
+            agent.mcp_initialized = True
+            agent._save_to_db()
 
         _agent_sessions[session_id] = agent
 
@@ -249,7 +317,7 @@ async def get_agent_instance(session_id: str = None) -> Agent:
 
 def delete_agent_instance(session_id: str) -> bool:
     from core.debug_capture import delete_debug_capture_instance
-    
+
     if session_id in _agent_sessions:
         del _agent_sessions[session_id]
         delete_debug_capture_instance(session_id)
@@ -260,6 +328,7 @@ def delete_agent_instance(session_id: str) -> bool:
 async def add_tool(tool: Tool, session_id: str = "cli-session") -> None:
     agent = await get_agent_instance(session_id)
     agent.add_tool(tool)
+
 
 @graceful_exit
 @chatutil("Agent")
