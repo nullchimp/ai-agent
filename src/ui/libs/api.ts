@@ -6,7 +6,7 @@ export class ApiManager {
     public async createNewBackendSession(): Promise<{ session_id: string }> {
         const response = await fetch(`${this.apiBaseUrl}/session/new`, {
             method: 'GET',
-            headers: { 'Content-Type': 'application/json' }
+            headers: { 'Content-Type': 'application/json', 'X-API-Key': 'test_12345' }
         });
         if (!response.ok) {
             throw new Error(`Failed to create session: ${response.status}`);
@@ -17,7 +17,7 @@ export class ApiManager {
     public async verifyBackendSession(sessionId: string): Promise<any> {
         const response = await fetch(`${this.apiBaseUrl}/session/${sessionId}`, {
             method: 'GET',
-            headers: { 'Content-Type': 'application/json' }
+            headers: { 'Content-Type': 'application/json', 'X-API-Key': 'test_12345' }
         });
         if (response.ok) {
             return response.json();
@@ -28,7 +28,10 @@ export class ApiManager {
     public async deleteBackendSession(sessionId: string): Promise<void> {
         const deleteUrl = `${this.apiBaseUrl}/session/${sessionId}`;
         console.log(`Deleting backend session at: ${deleteUrl}`);
-        const response = await fetch(deleteUrl, { method: 'DELETE' });
+        const response = await fetch(deleteUrl, { 
+            method: 'DELETE',
+            headers: { 'X-API-Key': 'test_12345' }
+        });
         if (!response.ok && response.status !== 404) {
             console.warn(`Failed to delete backend session ${sessionId}: ${response.status}`);
         } else {
@@ -37,7 +40,7 @@ export class ApiManager {
     }
 
     public async ask(sessionId: string, message: string): Promise<{ response: string, usedTools: string[] }> {
-        const apiUrl = `${this.apiBaseUrl}/${sessionId}/ask`;
+        const apiUrl = `${this.apiBaseUrl}/session/${sessionId}/ask`;
         console.log(`Making API call to: ${apiUrl}`);
         try {
             const response = await fetch(apiUrl, {
@@ -63,7 +66,7 @@ export class ApiManager {
     }
 
     public async loadTools(sessionId: string): Promise<Tool[]> {
-        const toolsUrl = `${this.apiBaseUrl}/${sessionId}/tools`;
+        const toolsUrl = `${this.apiBaseUrl}/session/${sessionId}/tools`;
         console.log(`Loading tools from: ${toolsUrl}`);
         try {
             const response = await fetch(toolsUrl, { headers: { 'X-API-Key': 'test_12345' } });
@@ -79,7 +82,7 @@ export class ApiManager {
     }
 
     public async toggleTool(sessionId: string, toolName: string, enabled: boolean): Promise<boolean> {
-        const toggleUrl = `${this.apiBaseUrl}/${sessionId}/tools/toggle`;
+        const toggleUrl = `${this.apiBaseUrl}/session/${sessionId}/tools/toggle`;
         console.log(`Toggling tool ${toolName} to ${enabled} at: ${toggleUrl}`);
         try {
             const response = await fetch(toggleUrl, {
@@ -100,7 +103,7 @@ export class ApiManager {
 
     public async setDebugMode(sessionId: string, enabled: boolean): Promise<{ enabled: boolean } | null> {
         try {
-            const response = await fetch(`${this.apiBaseUrl}/${sessionId}/debug/toggle`, {
+            const response = await fetch(`${this.apiBaseUrl}/session/${sessionId}/debug/toggle`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'X-API-Key': 'test_12345' },
                 body: JSON.stringify({ enabled: enabled })
@@ -117,7 +120,7 @@ export class ApiManager {
 
     public async loadDebugEvents(sessionId: string): Promise<{ events: DebugEvent[], enabled: boolean } | null> {
         try {
-            const response = await fetch(`${this.apiBaseUrl}/${sessionId}/debug`, {
+            const response = await fetch(`${this.apiBaseUrl}/session/${sessionId}/debug`, {
                 headers: { 'X-API-Key': 'test_12345' }
             });
             if (response.ok) {
@@ -132,7 +135,7 @@ export class ApiManager {
 
     public async clearDebugEvents(sessionId: string): Promise<boolean> {
         try {
-            const response = await fetch(`${this.apiBaseUrl}/${sessionId}/debug`, {
+            const response = await fetch(`${this.apiBaseUrl}/session/${sessionId}/debug`, {
                 method: 'DELETE',
                 headers: { 'X-API-Key': 'test_12345' }
             });

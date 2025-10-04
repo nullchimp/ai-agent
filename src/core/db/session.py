@@ -38,7 +38,8 @@ def update_session(session: Session) -> None:
     pool = get_connection_pool()
     with pool.get_connection() as db:
         q = f"MATCH (n:`{Session.label()}` {{session_id: $session_id}}) SET n += $props RETURN n"
-        db._execute(q, {"session_id": session.session_id, "props": session.to_dict()})
+        props = session.to_dict()
+        db._execute(q, {"session_id": str(session.session_id), "props": props})
 
 
 def save_session_state(

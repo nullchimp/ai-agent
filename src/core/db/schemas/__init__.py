@@ -53,12 +53,12 @@ class Node:
 
     def to_dict(self) -> dict:
         def _value(v):
+            if isinstance(v, uuid.UUID):
+                return str(v)
             if isinstance(v, datetime):
                 return v.isoformat()
             if isinstance(v, Enum):
                 return v.value
-            if isinstance(v, uuid.UUID):
-                return str(v)
             if isinstance(v, Node):
                 result = v.to_dict()
                 result["__class__"] = v.__class__.__name__
