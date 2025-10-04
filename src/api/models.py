@@ -53,6 +53,8 @@ class DebugRequest(BaseModel):
 class NewSessionResponse(BaseModel):
     session_id: str
     message: str
+    conversation_history: Optional[List[Dict[str, Any]]] = None
+    title: Optional[str] = None
 
 
 class SessionInfo(BaseModel):
@@ -88,3 +90,20 @@ class SessionUpdateResponse(BaseModel):
     session_id: str
     title: str
     message: str
+
+
+class LoginRequest(BaseModel):
+    user_token: str
+
+
+class LoginResponse(BaseModel):
+    user_id: str
+    user_token: str
+    email: Optional[str] = None
+    name: Optional[str] = None
+    message: str
+
+
+class UserSessionsResponse(BaseModel):
+    user_id: str
+    sessions: List[SessionInfo]

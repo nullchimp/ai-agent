@@ -6,11 +6,11 @@ from core.db.schemas.session_objects import Session
 
 
 def create_session(
-    session_id: Optional[str] = None, title: str = "New Session"
+    session_id: Optional[str] = None, title: str = "New Session", user_id: Optional[str] = None
 ) -> Session:
     pool = get_connection_pool()
     with pool.get_connection() as db:
-        session = Session(session_id=session_id, title=title)
+        session = Session(session_id=session_id, title=title, user_id=user_id)
 
         db._execute(*session.create())
         return session
@@ -25,8 +25,15 @@ def get_session_by_id(session_id: str) -> Optional[Session]:
     return Session.from_dict(result)
 
 
-def get_all_sessions() -> List[Session]:
-    results = get_by_property(Session, "is_active", True)
+def get_all_sessions(user_id: Optional[str] = None) -> List[Session]:
+    if user_id:
+        pool = get_connection_pool()
+        with pool.get_connection() as db:
+            q = "MATCH (n:`SESSION` {is_active: $is_active, user_id: $user_id}) RETURN n"
+            db._cur.execute(q, {"is_active": True, "user_id": user_id})
+            results = [dict(row[0].properties) for row in db._cur.fetchall()]
+    else:
+        results = get_by_property(Session, "is_active", True)
 
     if not results:
         return []

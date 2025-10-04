@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from api.routes.session import router as session_router, sessions_router
+from api.routes.auth import router as auth_router
 
 mimetypes.add_type("application/javascript", ".js")
 
@@ -14,6 +15,7 @@ def create_app() -> FastAPI:
         version="1.0.0",
     )
 
+    app.include_router(auth_router)
     app.include_router(session_router)
     app.include_router(sessions_router)
 

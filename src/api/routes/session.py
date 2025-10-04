@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response
 import uuid
 
 from agent import get_agent_instance, Agent, delete_agent_instance
-from api.auth import get_api_key
+from api.auth import get_api_key, get_user_id
 from api.models import (
     QueryRequest,
     QueryResponse,
@@ -31,6 +31,8 @@ from core.db.session import (
     restore_session_state,
     get_session_by_id,
     update_session,
+    create_session as create_db_session,
+    delete_session as delete_db_session,
 )
 
 router = APIRouter(
@@ -39,15 +41,32 @@ router = APIRouter(
 sessions_router = APIRouter(prefix="/api/sessions", dependencies=[Depends(get_api_key)])
 
 
+def filter_system_messages(conversation_history: list) -> list:
+    return [msg for msg in conversation_history if msg.get("role") != "system"]
+
+
 @router.get("", response_model=NewSessionResponse)
-async def get_session(session_id: str):
+async def get_session(session_id: str, user_id: str = Depends(get_user_id)):
     try:
         if session_id == "new":
             session_id = str(uuid.uuid4())
+            if user_id:
+                create_db_session(session_id=session_id, user_id=user_id)
 
         await get_agent_instance(session_id)
         get_debug_capture_instance(session_id)
-        return NewSessionResponse(session_id=session_id, message="Session is active")
+        
+        session_state = restore_session_state(session_id)
+        if session_state:
+            filtered_history = filter_system_messages(session_state["conversation_history"])
+            return NewSessionResponse(
+                session_id=session_id,
+                message="Session is active",
+                conversation_history=filtered_history,
+                title=session_state["title"]
+            )
+        
+        return NewSessionResponse(session_id=session_id, message="Session is active", conversation_history=[], title="New Session")
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Error initializing agent: {str(e)}"
@@ -56,12 +75,15 @@ async def get_session(session_id: str):
 
 @router.delete("")
 async def delete_session(session_id: str):
-    if delete_agent_instance(session_id):
-        # Also clean up the debug capture instance for this session
-        delete_debug_capture_instance(session_id)
-        return Response(status_code=204)
-    else:
+    session = get_session_by_id(session_id)
+    if not session:
         raise HTTPException(status_code=404, detail="Session not found")
+    
+    delete_agent_instance(session_id)
+    delete_debug_capture_instance(session_id)
+    delete_db_session(session_id)
+    
+    return Response(status_code=204)
 
 
 @router.post("/ask", response_model=QueryResponse)
@@ -175,9 +197,9 @@ async def clear_debug_events(session_id: str) -> Response:
 
 
 @sessions_router.get("", response_model=SessionListResponse)
-async def list_all_sessions() -> SessionListResponse:
+async def list_all_sessions(user_id: str = Depends(get_user_id)) -> SessionListResponse:
     try:
-        sessions = get_all_sessions()
+        sessions = get_all_sessions(user_id=user_id)
         session_infos = [
             SessionInfo(
                 session_id=session.session_id,
@@ -205,11 +227,12 @@ async def switch_session(request: SessionSwitchRequest) -> SessionSwitchResponse
 
         agent = await get_agent_instance(request.session_id)
 
+        filtered_history = filter_system_messages(session_state["conversation_history"])
         return SessionSwitchResponse(
             session_id=session_state["session_id"],
             title=session_state["title"],
             message=f"Successfully switched to session {session_state['title']}",
-            conversation_history=session_state["conversation_history"],
+            conversation_history=filtered_history,
             enabled_tools=session_state["enabled_tools"],
             mcp_initialized=session_state["mcp_initialized"],
         )

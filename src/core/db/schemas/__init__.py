@@ -117,3 +117,4 @@ class Node:
 # Import all schemas
 from core.db.schemas.document_objects import *
 from core.db.schemas.session_objects import *
+from core.db.schemas.user import *

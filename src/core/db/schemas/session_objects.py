@@ -10,6 +10,7 @@ class Session(Node):
         title: str = "New Session",
         is_active: bool = True,
         session_id: Optional[str] = None,
+        user_id: Optional[str] = None,
         conversation_history: Optional[List[Dict[str, Any]]] = None,
         enabled_tools: Optional[List[str]] = None,
         disabled_tools: Optional[List[str]] = None,
@@ -20,6 +21,7 @@ class Session(Node):
         self.title = title
         self.is_active = is_active
         self.session_id = session_id or str(self.id)
+        self.user_id = user_id
         self.last_activity = datetime.now(timezone.utc)
         self.conversation_count = 0
         self.conversation_history = conversation_history or []

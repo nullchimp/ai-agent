@@ -4,6 +4,7 @@ import { SessionManager } from './libs/session';
 import { ToolsManager } from './libs/tools';
 import { DebugManager } from './libs/debug';
 import { ChatManager } from './libs/chat';
+import { AuthManager } from './libs/auth';
 
 // =================================================================================
 // MAIN CHAT APP
@@ -11,6 +12,7 @@ import { ChatManager } from './libs/chat';
 export class AgentApp {
     public debugManager: DebugManager;
     private apiManager: ApiManager;
+    private authManager: AuthManager;
     private sessionManager: SessionManager;
     private toolsManager: ToolsManager;
     private uiManager: ChatManager;
@@ -18,6 +20,10 @@ export class AgentApp {
     private messageInput: HTMLTextAreaElement;
     private sendBtn: HTMLButtonElement;
     private newChatBtn: HTMLButtonElement;
+    private loginContainer: HTMLElement | null;
+    private appContainer: HTMLElement | null;
+    private loginForm: HTMLFormElement | null;
+    private loginError: HTMLElement | null;
 
     private isSendingMessage: boolean = false;
     private isCreatingSession: boolean = false;
@@ -27,7 +33,12 @@ export class AgentApp {
         this.messageInput = document.getElementById('messageInput') as HTMLTextAreaElement;
         this.sendBtn = document.getElementById('sendBtn') as HTMLButtonElement;
         this.newChatBtn = document.getElementById('newChatBtn') as HTMLButtonElement;
+        this.loginContainer = document.getElementById('loginContainer');
+        this.appContainer = document.getElementById('appContainer');
+        this.loginForm = document.getElementById('loginForm') as HTMLFormElement;
+        this.loginError = document.getElementById('loginError');
 
+        this.authManager = new AuthManager();
         this.apiManager = new ApiManager();
         this.uiManager = new ChatManager();
         this.sessionManager = new SessionManager(this.apiManager, () => this.onSessionChanged());
@@ -38,18 +49,73 @@ export class AgentApp {
     }
 
     private async init(): Promise<void> {
+        if (!this.authManager.isAuthenticated()) {
+            this.showLoginScreen();
+            return;
+        }
+
+        this.showAppScreen();
         this.setupEventListeners();
+        
+        this.isVerifyingSession = true;
+        this.updateButtonStates();
+        this.uiManager.showLoadingState('Loading your sessions...', 'Fetching your chat history from the database.');
+        
+        await this.sessionManager.loadUserSessions();
+        
+        this.isVerifyingSession = false;
+        
         if (this.sessionManager.sessions.length === 0) {
             await this.createNewSession();
         } else {
-            this.isVerifyingSession = true;
-            this.updateButtonStates();
-            this.uiManager.showLoadingState('Verifying session...', 'Checking if your previous session is still available.');
             await this.sessionManager.verifyCurrentSession();
-            this.isVerifyingSession = false;
             await this.onSessionChanged();
         }
+        
         this.sessionManager.renderChatHistory();
+    }
+
+    private showLoginScreen(): void {
+        if (this.loginContainer) this.loginContainer.style.display = 'flex';
+        if (this.appContainer) this.appContainer.style.display = 'none';
+        
+        if (this.loginForm) {
+            this.loginForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                await this.handleLogin();
+            });
+        }
+    }
+
+    private showAppScreen(): void {
+        if (this.loginContainer) this.loginContainer.style.display = 'none';
+        if (this.appContainer) this.appContainer.style.display = 'flex';
+    }
+
+    private async handleLogin(): Promise<void> {
+        const tokenInput = document.getElementById('userToken') as HTMLInputElement;
+        const userToken = tokenInput?.value.trim();
+
+        if (!userToken) {
+            this.showLoginError('Please enter a user token');
+            return;
+        }
+
+        try {
+            await this.authManager.login(userToken);
+            this.showAppScreen();
+            await this.init();
+        } catch (error) {
+            console.error('Login failed:', error);
+            this.showLoginError('Invalid user token. Please try again.');
+        }
+    }
+
+    private showLoginError(message: string): void {
+        if (this.loginError) {
+            this.loginError.textContent = message;
+            this.loginError.style.display = 'block';
+        }
     }
 
     private setupEventListeners(): void {

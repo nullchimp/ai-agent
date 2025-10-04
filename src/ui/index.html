@@ -9,6 +9,28 @@
     <script src="https://cdn.jsdelivr.net/npm/marked@9.1.6/marked.min.js"></script>
 </head>
 <body>
+    <!-- Login Screen -->
+    <div id="loginContainer" class="login-container">
+        <div class="login-box">
+            <h1>AI Agent Login</h1>
+            <p>Enter your user token to access your sessions</p>
+            <form id="loginForm">
+                <div class="login-input-group">
+                    <input 
+                        type="text" 
+                        id="userToken" 
+                        placeholder="Enter your user token"
+                        required
+                    />
+                </div>
+                <div id="loginError" class="login-error"></div>
+                <button type="submit" class="login-btn">Login</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Main Application -->
+    <div id="appContainer" style="display: none;">
     <div id="app">
         <div class="sidebar">
             <div class="sidebar-header">
@@ -137,6 +159,7 @@
                 <div class="debug-fullscreen-data" id="debugFullscreenData"></div>
             </div>
         </div>
+    </div>
     </div>
     
     <script src="bundle.js"></script>

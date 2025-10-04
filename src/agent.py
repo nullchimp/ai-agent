@@ -188,9 +188,9 @@ I cannot provide up-to-date information about open issues for octocat/Hello-Worl
 
     async def initialize_mcp_tools(self):
         if self.mcp_initialized:
-            return
-
-        print("Initializing MCP tools...")
+            print("MCP already initialized, re-loading tools...")
+        else:
+            print("Initializing MCP tools...")
 
         config_path = os.path.join(
             os.path.dirname(__file__), "..", "config", "mcp.json"
@@ -200,7 +200,7 @@ I cannot provide up-to-date information about open issues for octocat/Hello-Worl
         for tool in session_manager.tools:
             self.add_tool(tool)
 
-        print("MCP tools initialized.")
+        print(f"MCP tools initialized: {len(session_manager.tools)} tools added.")
         self.mcp_initialized = True
 
     async def process_query(self, user_prompt: str) -> str:
@@ -270,6 +270,17 @@ I cannot provide up-to-date information about open issues for octocat/Hello-Worl
         self.history = session_state.get("conversation_history", [])
         self.mcp_initialized = session_state.get("mcp_initialized", False)
 
+    def _restore_tool_states(self) -> None:
+        from core.db.session import restore_session_state
+
+        session_state = restore_session_state(self.session_id)
+
+        if not session_state:
+            for tool in self.chat.tools:
+                tool.enable()
+            self._update_system_prompt()
+            return
+
         enabled_tools = session_state.get("enabled_tools", [])
         disabled_tools = session_state.get("disabled_tools", [])
 
@@ -305,10 +316,14 @@ async def get_agent_instance(session_id: str = None) -> Agent:
 
         print(f"Agent instance created with session ID: {agent.session_id}")
 
-        if not restore_from_db or not existing_session.mcp_initialized:
-            await agent.initialize_mcp_tools()
+        await agent.initialize_mcp_tools()
+        if not agent.mcp_initialized:
             agent.mcp_initialized = True
-            agent._save_to_db()
+        
+        if restore_from_db:
+            agent._restore_tool_states()
+        
+        agent._save_to_db()
 
         _agent_sessions[session_id] = agent
 

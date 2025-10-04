@@ -1,20 +1,22 @@
 import { ChatSession, Message } from '../types';
 import { ApiManager } from './api';
+import { AuthManager, UserSession } from './auth';
 
 export class SessionManager {
     public sessions: ChatSession[] = [];
     public currentSession: ChatSession | null = null;
     private chatHistory: HTMLElement;
+    private authManager: AuthManager;
 
     constructor(private apiManager: ApiManager, private onSessionChanged: () => Promise<void>) {
         this.chatHistory = document.getElementById('chatHistory') as HTMLElement;
-        this.loadChatHistory();
+        this.authManager = new AuthManager();
     }
 
     public async createNewSession(): Promise<ChatSession> {
         const sessionData = await this.apiManager.createNewBackendSession();
         const session: ChatSession = {
-            id: this.generateId(),
+            id: sessionData.session_id,
             sessionId: sessionData.session_id,
             title: 'New Chat',
             messages: [],
@@ -25,7 +27,6 @@ export class SessionManager {
 
         this.sessions.unshift(session);
         this.currentSession = session;
-        this.saveChatHistory();
         this.renderChatHistory();
         await this.onSessionChanged();
         return session;
@@ -36,6 +37,21 @@ export class SessionManager {
         if (!session) return;
 
         this.currentSession = session;
+        
+        if (session.sessionId && session.messages.length === 0) {
+            try {
+                const sessionData = await this.apiManager.verifyBackendSession(session.sessionId);
+                if (sessionData.conversation_history && sessionData.conversation_history.length > 0) {
+                    session.messages = sessionData.conversation_history;
+                }
+                if (sessionData.title) {
+                    session.title = sessionData.title;
+                }
+            } catch (error) {
+                console.warn(`Failed to load session data for ${session.sessionId}:`, error);
+            }
+        }
+        
         this.renderChatHistory();
         await this.onSessionChanged();
     }
@@ -64,7 +80,6 @@ export class SessionManager {
             }
         }
 
-        this.saveChatHistory();
         this.renderChatHistory();
     }
 
@@ -76,14 +91,12 @@ export class SessionManager {
             this.currentSession.title = firstUserMessage.content.substring(0, 50) +
                 (firstUserMessage.content.length > 50 ? '...' : '');
             this.renderChatHistory();
-            this.saveChatHistory();
         }
     }
 
     public addMessageToCurrentSession(message: Message): void {
         if (!this.currentSession) return;
         this.currentSession.messages.push(message);
-        this.saveChatHistory();
     }
 
     public renderChatHistory(): void {
@@ -123,46 +136,50 @@ export class SessionManager {
     public async verifyCurrentSession(): Promise<void> {
         if (this.currentSession?.sessionId) {
             try {
-                await this.apiManager.verifyBackendSession(this.currentSession.sessionId);
+                const sessionData = await this.apiManager.verifyBackendSession(this.currentSession.sessionId);
                 console.log(`Backend session ${this.currentSession.sessionId} verified.`);
+                if (sessionData.conversation_history && sessionData.conversation_history.length > 0) {
+                    this.currentSession.messages = sessionData.conversation_history;
+                }
+                if (sessionData.title) {
+                    this.currentSession.title = sessionData.title;
+                }
             } catch (error) {
                 console.warn(`Backend session ${this.currentSession.sessionId} not found, will create new session when needed.`);
                 this.currentSession.sessionId = undefined;
-                this.saveChatHistory();
             }
         }
     }
 
-    private saveChatHistory(): void {
+    public async loadUserSessions(): Promise<void> {
+        if (!this.authManager.isAuthenticated()) {
+            this.sessions = [];
+            this.currentSession = null;
+            return;
+        }
+
         try {
-            const sessionsToSave = this.sessions.map(s => ({ ...s }));
-            localStorage.setItem('chatSessions', JSON.stringify(sessionsToSave));
+            const userSessions = await this.authManager.getUserSessions();
+            this.sessions = userSessions.map((session: UserSession) => ({
+                id: session.session_id,
+                sessionId: session.session_id,
+                title: session.title,
+                messages: [],
+                createdAt: new Date(session.last_activity),
+                debugPanelOpen: false,
+                debugEnabled: false
+            }));
+            
+            if (this.sessions.length > 0) {
+                this.currentSession = this.sessions[0];
+            }
         } catch (error) {
-            console.error('Failed to save chat history:', error);
+            console.error('Failed to load user sessions:', error);
+            this.sessions = [];
         }
     }
 
-    private loadChatHistory(): void {
-        const saved = localStorage.getItem('chatSessions');
-        if (saved) {
-            try {
-                const parsed = JSON.parse(saved);
-                this.sessions = parsed.map((session: any) => ({
-                    ...session,
-                    createdAt: new Date(session.createdAt),
-                    messages: session.messages.map((msg: any) => ({
-                        ...msg,
-                        timestamp: new Date(msg.timestamp)
-                    }))
-                }));
-                if (this.sessions.length > 0) {
-                    this.currentSession = this.sessions[0];
-                }
-            } catch (error) {
-                console.error('Failed to load chat history:', error);
-                this.sessions = [];
-            }
-        }
+    private async saveChatHistory(): Promise<void> {
     }
 
     private generateId(): string {
