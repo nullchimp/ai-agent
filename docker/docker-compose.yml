@@ -9,7 +9,7 @@ services:
       - "7687:7687" # Bolt protocol
       - "7444:7444" # HTTP API
     volumes:
-      - memgraph_data:/data
+      - memgraph_data:/var/lib/memgraph
       - memgraph_logs:/var/log/memgraph
       - memgraph_conf:/etc/memgraph
     healthcheck:
@@ -18,7 +18,28 @@ services:
       timeout: 10s
       retries: 3
     restart: unless-stopped
-    command: ["--log-level=TRACE", "--also-log-to-stderr"]
+    command: [
+      "--log-level=TRACE",
+      "--also-log-to-stderr",
+      "--storage-snapshot-interval-sec=300",
+      "--storage-wal-enabled=true",
+      "--storage-snapshot-on-exit=true",
+      "--data-directory=/var/lib/memgraph"
+    ]
+
+  memgraph-lab:
+    image: memgraph/lab:latest
+    container_name: ai-agent-memgraph-lab
+    ports:
+      - "3000:3000"  # Memgraph Lab UI
+    environment:
+      - QUICK_CONNECT_MG_HOST=memgraph
+      - QUICK_CONNECT_MG_PORT=7687
+      - QUICK_CONNECT_MG_USERNAME=${MEMGRAPH_USERNAME}
+      - QUICK_CONNECT_MG_PASSWORD=${MEMGRAPH_PASSWORD}
+    depends_on:
+      - memgraph
+    restart: unless-stopped
 
   neo4j-browser:
     image: neo4j:5.15-community
