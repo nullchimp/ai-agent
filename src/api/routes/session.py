@@ -49,9 +49,13 @@ def filter_system_messages(conversation_history: list) -> list:
 async def get_session(session_id: str, user_id: str = Depends(get_user_id)):
     try:
         if session_id == "new":
+            if not user_id:
+                raise HTTPException(
+                    status_code=401,
+                    detail="Authentication required to create a new session"
+                )
             session_id = str(uuid.uuid4())
-            if user_id:
-                create_db_session(session_id=session_id, user_id=user_id)
+            create_db_session(session_id=session_id, user_id=user_id)
 
         await get_agent_instance(session_id)
         get_debug_capture_instance(session_id)

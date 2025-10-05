@@ -61,7 +61,15 @@ export class AgentApp {
         this.updateButtonStates();
         this.uiManager.showLoadingState('Loading your sessions...', 'Fetching your chat history from the database.');
         
-        await this.sessionManager.loadUserSessions();
+        try {
+            await this.sessionManager.loadUserSessions();
+        } catch (error) {
+            console.error('Authentication failed during session loading:', error);
+            this.isVerifyingSession = false;
+            this.showLoginScreen();
+            this.showLoginError('Your session has expired. Please login again.');
+            return;
+        }
         
         this.isVerifyingSession = false;
         
@@ -143,14 +151,22 @@ export class AgentApp {
         this.uiManager.showLoadingState('Setting up your new chat...', 'Initializing tools and preparing the session for you.');
         try {
             await this.sessionManager.createNewSession();
-        } catch (error) {
+        } catch (error: any) {
             console.error('Failed to create new session:', error);
-            this.uiManager.showError('Failed to create new chat session. Please try again.');
-            this.handleEmptyState();
+            if (error.message && error.message.includes('401')) {
+                this.authManager.clearAuth();
+                this.showLoginScreen();
+                this.showLoginError('Authentication required. Please login to create a session.');
+            } else {
+                this.uiManager.showError('Failed to create new chat session. Please try again.');
+                this.handleEmptyState();
+            }
         } finally {
             this.isCreatingSession = false;
             this.updateButtonStates();
-            this.messageInput.focus();
+            if (this.authManager.isAuthenticated()) {
+                this.messageInput.focus();
+            }
         }
     }
 

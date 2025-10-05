@@ -14,22 +14,29 @@ export class SessionManager {
     }
 
     public async createNewSession(): Promise<ChatSession> {
-        const sessionData = await this.apiManager.createNewBackendSession();
-        const session: ChatSession = {
-            id: sessionData.session_id,
-            sessionId: sessionData.session_id,
-            title: 'New Chat',
-            messages: [],
-            createdAt: new Date(),
-            debugPanelOpen: false,
-            debugEnabled: false
-        };
+        try {
+            const sessionData = await this.apiManager.createNewBackendSession();
+            const session: ChatSession = {
+                id: sessionData.session_id,
+                sessionId: sessionData.session_id,
+                title: 'New Chat',
+                messages: [],
+                createdAt: new Date(),
+                debugPanelOpen: false,
+                debugEnabled: false
+            };
 
-        this.sessions.unshift(session);
-        this.currentSession = session;
-        this.renderChatHistory();
-        await this.onSessionChanged();
-        return session;
+            this.sessions.unshift(session);
+            this.currentSession = session;
+            this.renderChatHistory();
+            await this.onSessionChanged();
+            return session;
+        } catch (error: any) {
+            if (error.message && error.message.includes('401')) {
+                this.authManager.clearAuth();
+            }
+            throw error;
+        }
     }
 
     public async loadSession(sessionId: string): Promise<void> {
@@ -173,8 +180,12 @@ export class SessionManager {
             if (this.sessions.length > 0) {
                 this.currentSession = this.sessions[0];
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error('Failed to load user sessions:', error);
+            if (error.message && error.message.includes('401')) {
+                this.authManager.clearAuth();
+                throw error;
+            }
             this.sessions = [];
         }
     }
