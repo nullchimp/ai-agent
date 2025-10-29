@@ -1,8 +1,33 @@
 from typing import Optional, List, Dict, Any
+import time
 
 from core.db import get_connection_pool, get_by_id, get_by_property, delete_by_id
 from core.db.schemas import Node
 from core.db.schemas.session_objects import Session
+
+
+def retry_with_exponential_backoff(func, max_retries=3, initial_delay=0.1):
+    """
+    Retry a function with exponential backoff (T078).
+    
+    Args:
+        func: Function to retry
+        max_retries: Maximum number of retry attempts
+        initial_delay: Initial delay in seconds
+    
+    Returns:
+        Result of the function call
+    """
+    for attempt in range(max_retries):
+        try:
+            return func()
+        except Exception as e:
+            if attempt == max_retries - 1:
+                raise
+            delay = initial_delay * (2 ** attempt)
+            print(f"Retry attempt {attempt + 1}/{max_retries} after {delay}s delay: {e}")
+            time.sleep(delay)
+    return None
 
 
 def create_session(
@@ -11,6 +36,49 @@ def create_session(
     pool = get_connection_pool()
     with pool.get_connection() as db:
         session = Session(session_id=session_id, title=title, user_id=user_id)
+
+        db._execute(*session.create())
+        return session
+
+
+def create_db_session(
+    session_id: str,
+    user_id: Optional[str] = None,
+    title: str = "New Session",
+    conversation_history: Optional[List[Dict[str, Any]]] = None,
+    enabled_tools: Optional[List[str]] = None,
+    disabled_tools: Optional[List[str]] = None,
+    mcp_initialized: bool = False,
+    agent_config: Optional[Dict[str, Any]] = None,
+) -> Session:
+    """
+    Create a new session in the database with full initialization.
+    
+    Args:
+        session_id: Unique session identifier
+        user_id: Optional user identifier for multi-user scenarios
+        title: Session title
+        conversation_history: Initial conversation history
+        enabled_tools: List of enabled tools
+        disabled_tools: List of disabled tools
+        mcp_initialized: Whether MCP is initialized
+        agent_config: Agent configuration dictionary
+    
+    Returns:
+        Created Session instance
+    """
+    pool = get_connection_pool()
+    with pool.get_connection() as db:
+        session = Session(
+            session_id=session_id,
+            user_id=user_id,
+            title=title,
+            conversation_history=conversation_history or [],
+            enabled_tools=enabled_tools or [],
+            disabled_tools=disabled_tools or [],
+            mcp_initialized=mcp_initialized,
+            agent_config=agent_config or {},
+        )
 
         db._execute(*session.create())
         return session
@@ -57,21 +125,31 @@ def save_session_state(
     mcp_initialized: bool,
     agent_config: Optional[Dict[str, Any]] = None,
 ) -> None:
-    session = get_session_by_id(session_id)
+    """
+    Save session state to database with logging and error handling (T077, T079).
+    """
+    try:
+        session = get_session_by_id(session_id)
 
-    if not session:
-        session = Session(session_id=session_id, title=f"Session {session_id[:8]}")
-        pool = get_connection_pool()
-        with pool.get_connection() as db:
-            db._execute(*session.create())
+        if not session:
+            session = Session(session_id=session_id, title=f"Session {session_id[:8]}")
+            pool = get_connection_pool()
+            with pool.get_connection() as db:
+                db._execute(*session.create())
+            print(f"Created new session in database: {session_id}")
 
-    session.update_conversation_history(conversation_history)
-    session.update_tool_states(enabled_tools, disabled_tools)
-    session.set_mcp_initialized(mcp_initialized)
-    if agent_config:
-        session.update_agent_config(agent_config)
+        session.update_conversation_history(conversation_history)
+        session.update_tool_states(enabled_tools, disabled_tools)
+        session.set_mcp_initialized(mcp_initialized)
+        if agent_config:
+            session.update_agent_config(agent_config)
 
-    update_session(session)
+        update_session(session)
+        print(f"Saved session state for {session_id}: {len(conversation_history)} messages")
+    except Exception as e:
+        print(f"Error saving session state for {session_id}: {e}")
+        # Graceful degradation - continue with in-memory state
+        raise
 
 
 def restore_session_state(session_id: str) -> Optional[Dict[str, Any]]:
@@ -94,6 +172,19 @@ def restore_session_state(session_id: str) -> Optional[Dict[str, Any]]:
 
 
 def delete_session(session_id: str) -> None:
+    """
+    Delete a session and cascade delete associated debug events (T040).
+    """
+    from core.db.debug import delete_debug_events_by_session
+    
+    # First delete associated debug events
+    try:
+        deleted_count = delete_debug_events_by_session(session_id)
+        print(f"Deleted {deleted_count} debug events for session {session_id}")
+    except Exception as e:
+        print(f"Warning: Failed to delete debug events: {e}")
+    
+    # Then delete the session
     session = get_session_by_id(session_id)
     if session:
         return delete_by_id(Session, str(session.id))

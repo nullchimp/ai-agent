@@ -211,6 +211,25 @@ class DebugCapture:
             self._events.append(event)
             if len(self._events) > self._max_events:
                 self._events = self._events[-self._max_events:]
+        
+        # Persist to database (T036)
+        try:
+            from core.db.debug import create_debug_event
+            from core.db.schemas.debug_objects import DebugEventType as DBDebugEventType
+            
+            # Convert DebugEventType to database DebugEventType
+            db_event_type = DBDebugEventType(event_type.value)
+            
+            create_debug_event(
+                session_id=self.session_id,
+                event_type=db_event_type,
+                message=message,
+                data=safe_data,
+                timestamp=event.timestamp
+            )
+        except Exception as e:
+            # Don't crash on DB errors - debug events are non-critical (T037)
+            print(f"Warning: Failed to persist debug event to database: {e}")
 
     def get_events(self) -> List[Dict[str, Any]]:
         with self._lock:
@@ -219,6 +238,42 @@ class DebugCapture:
     def clear_events(self):
         with self._lock:
             self._events = []
+    
+    def load_events_from_db(self) -> None:
+        """
+        Load debug events from database into in-memory cache (T038).
+        Called when debug capture instance is created to restore events after restart.
+        """
+        try:
+            from core.db.debug import get_debug_events_by_session
+            
+            db_events = get_debug_events_by_session(
+                session_id=self.session_id,
+                limit=self._max_events
+            )
+            
+            with self._lock:
+                # Convert database DebugEvent objects to in-memory DebugEvent objects
+                self._events = []
+                for db_event in db_events:
+                    # Convert from database DebugEventType to in-memory DebugEventType
+                    try:
+                        event_type = DebugEventType(db_event.event_type)
+                    except ValueError:
+                        event_type = DebugEventType.SYSTEM_INFO
+                    
+                    event = DebugEvent(
+                        event_type=event_type,
+                        message=db_event.message,
+                        session_id=db_event.session_id,
+                        data=db_event.data if isinstance(db_event.data, dict) else {},
+                        timestamp=db_event.timestamp
+                    )
+                    self._events.append(event)
+                
+                print(f"Loaded {len(self._events)} debug events from database for session {self.session_id}")
+        except Exception as e:
+            print(f"Warning: Failed to load debug events from database: {e}")
 
     def capture_llm_request(self, payload: Dict[str, Any]):
         self.capture_event(
@@ -278,7 +333,10 @@ def get_debug_capture_instance(session_id: str) -> DebugCapture:
         raise ValueError("Session ID must be provided to get debug capture instance.")
     
     if session_id not in _debug_sessions:
-        _debug_sessions[session_id] = DebugCapture(session_id)
+        debug_capture = DebugCapture(session_id)
+        # Load events from database on first access (T039)
+        debug_capture.load_events_from_db()
+        _debug_sessions[session_id] = debug_capture
     
     return _debug_sessions[session_id]
 
