@@ -1,33 +1,30 @@
 <!--
   SYNC IMPACT REPORT
   ==================
-  Version Change: Template → 1.0.0
+  Version Change: 1.0.0 → 1.0.1
   
-  Modified Principles:
-  - PRINCIPLE_1_NAME → I. Modular Architecture & Separation of Concerns
-  - PRINCIPLE_2_NAME → II. Code Readability & Self-Documentation
-  - PRINCIPLE_3_NAME → III. Test-First Development (NON-NEGOTIABLE)
-  - PRINCIPLE_4_NAME → IV. Type Safety & Static Analysis
-  - PRINCIPLE_5_NAME → V. Python Best Practices
+  Modified Sections:
+  - V. Python Best Practices - Added explicit reference to project's .venv location
+  - Governance/Runtime Guidance - Added reference to copilot-instructions.md
   
-  Added Sections:
-  - Core Principles (5 principles defined)
-  - Security & Quality Standards
-  - Development Workflow & Review Process
-  - Governance
+  No Principle Changes:
+  - All five core principles remain unchanged
+  - No structural or semantic modifications
   
-  Templates Requiring Updates:
-  ✅ plan-template.md - Reviewed, constitution check section aligns
-  ✅ spec-template.md - Reviewed, requirements and acceptance criteria align
-  ✅ tasks-template.md - Reviewed, test-first and phase structure aligns
-  ✅ coding-guidelines.instructions.md - Source of truth for principles
+  Templates Status:
+  ✅ plan-template.md - Remains aligned, no changes needed
+  ✅ spec-template.md - Remains aligned, no changes needed
+  ✅ tasks-template.md - Remains aligned, no changes needed
+  ✅ coding-guidelines.instructions.md - Remains aligned, no changes needed
   
-  Follow-up TODOs: None - all principles fully defined
+  Follow-up TODOs: None
   
-  Rationale for Version 1.0.0:
-  - Initial ratification of constitution from template
-  - Establishes foundational governance for AI Agent project
-  - All principles and sections are now concrete and actionable
+  Rationale for Version 1.0.1 (PATCH):
+  - Minor clarification: explicit .venv reference for project consistency
+  - Documentation enhancement: added copilot-instructions.md to runtime guidance
+  - No backward-incompatible changes
+  - No new principles or sections added
+  - Non-semantic refinements only
 -->
 
 # AI Agent Constitution
@@ -95,7 +92,7 @@ All Python code MUST pass strict static analysis without warnings:
 All code MUST follow Python idioms and modern best practices:
 
 - **Python version**: Target Python 3.9+ for all features and dependencies
-- **Virtual environments**: Always use isolated virtual environments; never install packages globally
+- **Virtual environments**: Always use isolated virtual environments (this project uses `.venv`); never install packages globally
 - **Dependency management**: Pin exact versions in `requirements.txt`; regularly update and audit dependencies
 - **Async/await**: Use `asyncio` for I/O-bound operations (API calls, database queries, file I/O)
 - **Error handling**: Prefer specific exceptions over generic; always provide context in error messages; use structured logging
@@ -198,8 +195,9 @@ Constitution versions follow semantic versioning (MAJOR.MINOR.PATCH):
 For day-to-day development guidance and practical implementation details, developers SHOULD reference:
 
 - **Coding guidelines**: `.github/instructions/coding-guidelines.instructions.md`
+- **AI assistant configuration**: `.github/copilot-instructions.md`
 - **Architecture documentation**: `docs/architecture.md`
 - **Architecture Decision Records**: `docs/ADRs/` for historical context on technical decisions
 - **Template files**: `.specify/templates/*.md` for specification and planning workflows
 
-**Version**: 1.0.0 | **Ratified**: 2025-10-29 | **Last Amended**: 2025-10-29
+**Version**: 1.0.1 | **Ratified**: 2025-10-29 | **Last Amended**: 2025-10-29
